@@ -814,7 +814,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      soft_delete_manychat_contato: {
+        Args: { p_contato_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1333,6 +1336,27 @@ export const Constants = {
 //       NEW.email
 //     ) ON CONFLICT (id) DO NOTHING;
 //     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION soft_delete_manychat_contato(uuid)
+//   CREATE OR REPLACE FUNCTION public.soft_delete_manychat_contato(p_contato_id uuid)
+//    RETURNS void
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//    SET search_path TO 'public'
+//   AS $function$
+//   BEGIN
+//     IF auth.uid() IS NULL THEN
+//       RAISE EXCEPTION 'Usuário não autenticado';
+//     END IF;
+//
+//     UPDATE public.manychat_contatos
+//     SET
+//       deleted_at = now(),
+//       deleted_by = auth.uid()
+//     WHERE id = p_contato_id
+//       AND deleted_at IS NULL;
 //   END;
 //   $function$
 //

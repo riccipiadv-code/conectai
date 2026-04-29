@@ -73,15 +73,9 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
 }
 
 export async function deleteContact(id: string) {
-  const { data: userData } = await supabase.auth.getUser()
-
-  const { error } = await supabase
-    .from('manychat_contatos')
-    .update({
-      deleted_at: new Date().toISOString(),
-      deleted_by: userData?.user?.id ?? null,
-    })
-    .eq('id', id)
+  const { error } = await supabase.rpc('soft_delete_manychat_contato', {
+    p_contato_id: id,
+  })
 
   if (error) throw error
 }

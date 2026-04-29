@@ -48,64 +48,29 @@ export function normalizeManyChatPayload(payload: any) {
     cfMap = customFields
   }
 
-  let lead_nome = cfMap['user_nome'] || null
-  let lead_servico = cfMap['user_servico'] || null
-  let lead_email = cfMap['user_email'] || null
-  let lead_empresa_pf = cfMap['user_empresa'] || null
-  let lead_resumo = cfMap['user_resumo'] || null
+  const lead_nome = cfMap['user_nome'] || null
+  const lead_servico = cfMap['user_servico'] || null
+  const lead_email = cfMap['user_email'] || null
+  const lead_empresa_pf = cfMap['user_empresa'] || null
 
+  let lead_resumo = cfMap['user_resumo'] || null
   const chatgpt_resposta = cfMap['chatgpt_resposta_anterior'] || null
 
   if (chatgpt_resposta) {
-    let text = String(chatgpt_resposta)
-    const markers = [
-      '------------------------------------------------------------------',
-      '▶️',
-      'Em breve você será atendido',
-      'Obrigado pelo contato',
-    ]
-    for (const marker of markers) {
-      const idx = text.indexOf(marker)
-      if (idx !== -1) {
-        text = text.substring(0, idx)
-      }
-    }
-
-    const lines = text.split('\n')
-    let currentField = null
-    let resumoLines: string[] = []
-
-    for (const line of lines) {
-      const tLine = line.trim()
-      if (tLine.startsWith('👤 Nome:')) {
-        lead_nome = tLine.replace('👤 Nome:', '').trim()
-        currentField = 'nome'
-      } else if (tLine.startsWith('🏢 Empresa/PF:')) {
-        lead_empresa_pf = tLine.replace('🏢 Empresa/PF:', '').trim()
-        currentField = 'empresa'
-      } else if (tLine.startsWith('📧 E-mail:')) {
-        lead_email = tLine.replace('📧 E-mail:', '').trim()
-        currentField = 'email'
-      } else if (tLine.startsWith('🛠️ Serviço Selecionado:')) {
-        lead_servico = tLine.replace('🛠️ Serviço Selecionado:', '').trim()
-        currentField = 'servico'
-      } else if (tLine.startsWith('📝 Resumo da Solicitação:')) {
-        const val = tLine.replace('📝 Resumo da Solicitação:', '').trim()
-        if (val) resumoLines.push(val)
-        currentField = 'resumo'
-      } else if (currentField === 'resumo' && tLine) {
-        resumoLines.push(tLine)
-      }
-    }
-
-    if (resumoLines.length > 0) {
-      lead_resumo = resumoLines.join('\n').trim()
-    } else if (!currentField) {
+    const text = String(chatgpt_resposta)
+    const startMatch = text.match(
+      /Resumo do Atendimento:\*?\*?\s*([\s\S]*?)(?=Em breve voc. ser. atendido)/i,
+    )
+    if (startMatch && startMatch[1]) {
+      lead_resumo = startMatch[1].trim()
+    } else {
       lead_resumo = text.trim()
     }
   }
 
+  // Extract dynamic attributes
   const attributes: Record<string, string> = {}
+
   const extractAttributes = (obj: any) => {
     if (!obj || typeof obj !== 'object') return
     for (const [key, value] of Object.entries(obj)) {
