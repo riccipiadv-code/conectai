@@ -412,6 +412,7 @@ export type Database = {
       mc_audit_log: {
         Row: {
           action: string
+          changed_by: string | null
           contato_id: string | null
           created_at: string
           entity_id: string | null
@@ -419,12 +420,17 @@ export type Database = {
           field_name: string | null
           id: string
           metadata: Json | null
+          new_data: Json | null
           new_value: string | null
+          old_data: Json | null
           old_value: string | null
+          record_id: string
+          table_name: string
           user_id: string | null
         }
         Insert: {
           action: string
+          changed_by?: string | null
           contato_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -432,12 +438,17 @@ export type Database = {
           field_name?: string | null
           id?: string
           metadata?: Json | null
+          new_data?: Json | null
           new_value?: string | null
+          old_data?: Json | null
           old_value?: string | null
+          record_id: string
+          table_name: string
           user_id?: string | null
         }
         Update: {
           action?: string
+          changed_by?: string | null
           contato_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -445,8 +456,12 @@ export type Database = {
           field_name?: string | null
           id?: string
           metadata?: Json | null
+          new_data?: Json | null
           new_value?: string | null
+          old_data?: Json | null
           old_value?: string | null
+          record_id?: string
+          table_name?: string
           user_id?: string | null
         }
         Relationships: [
@@ -605,6 +620,8 @@ export type Database = {
           sla_due: string | null
           sla_start: string | null
           sla_status: string | null
+          stage: string
+          status: string
           updated_at: string
         }
         Insert: {
@@ -617,6 +634,8 @@ export type Database = {
           sla_due?: string | null
           sla_start?: string | null
           sla_status?: string | null
+          stage: string
+          status: string
           updated_at?: string
         }
         Update: {
@@ -629,6 +648,8 @@ export type Database = {
           sla_due?: string | null
           sla_start?: string | null
           sla_status?: string | null
+          stage?: string
+          status?: string
           updated_at?: string
         }
         Relationships: [
@@ -1039,7 +1060,12 @@ export const Constants = {
 //   created_at: timestamp with time zone (not null, default: now())
 // Table: mc_audit_log
 //   id: uuid (not null, default: gen_random_uuid())
+//   table_name: text (not null)
+//   record_id: text (not null)
 //   action: text (not null)
+//   old_data: jsonb (nullable)
+//   new_data: jsonb (nullable)
+//   changed_by: uuid (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
 //   contato_id: uuid (nullable)
 //   entity_name: text (nullable)
@@ -1081,6 +1107,8 @@ export const Constants = {
 // Table: mc_sla_tracking
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_id: text (not null)
+//   stage: text (not null)
+//   status: text (not null)
 //   created_at: timestamp with time zone (not null, default: now())
 //   updated_at: timestamp with time zone (not null, default: now())
 //   contato_id: uuid (nullable)

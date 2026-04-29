@@ -43,7 +43,6 @@ Deno.serve(async (req: Request) => {
   }
 
   const payloads = Array.isArray(rawPayload) ? rawPayload : [rawPayload]
-  const results = []
 
   for (const payload of payloads) {
     const { subscriber_id, event_type, sub, extracted } = normalizeManyChatPayload(payload)
@@ -55,7 +54,7 @@ Deno.serve(async (req: Request) => {
       status = 'error'
       errorMessage = 'Missing subscriber_id'
     } else {
-      const record = {
+      const record: any = {
         manychat_id: String(subscriber_id),
         nome: extracted.nome,
         first_name: extracted.first_name,
@@ -87,8 +86,29 @@ Deno.serve(async (req: Request) => {
         lead_resumo: extracted.lead_resumo,
       }
 
-      // Nota: current_stage e sla_status não estão no payload, então o Supabase vai preencher com
-      // o valor DEFAULT ('novo' e 'green') ao inserir um novo registro e não vai alterar se for um update
+      if (extracted.lead_servico) {
+        const { data: servico } = await supabase
+          .from('manychat_servicos')
+          .select('id')
+          .ilike('descricao', `%${extracted.lead_servico.trim()}%`)
+          .maybeSingle()
+        if (servico) {
+          record.servico_id = servico.id
+        }
+      }
+
+      const { data: existingContact } = await supabase
+        .from('manychat_contatos')
+        .select('id')
+        .eq('manychat_id', String(subscriber_id))
+        .maybeSingle()
+
+      if (!existingContact) {
+        record.current_stage = 'novo'
+        record.sla_status = 'green'
+        record.sla_started_at = new Date().toISOString()
+      }
+
       const { error: upsertError } = await supabase
         .from('manychat_contatos')
         .upsert(record, { onConflict: 'manychat_id' })
@@ -123,11 +143,9 @@ Deno.serve(async (req: Request) => {
         has_id: !!subscriber_id,
       },
     })
-
-    results.push({ success: status === 'processed', error: errorMessage })
   }
 
-  return new Response(JSON.stringify({ success: true, results }), {
+  return new Response(JSON.stringify({ success: true }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 })
