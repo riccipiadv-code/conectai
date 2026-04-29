@@ -17,7 +17,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Users, LogOut, Loader2, Settings, ListIcon } from 'lucide-react'
+import { LayoutDashboard, Users, LogOut, Loader2, Settings, ListIcon, Blocks } from 'lucide-react'
 
 export default function Layout() {
   const { user, loading, signOut } = useAuth()
@@ -32,7 +32,7 @@ export default function Layout() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-zinc-950">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
@@ -51,41 +51,55 @@ export default function Layout() {
 
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader className="border-b px-4 py-4">
-          <div className="flex items-center gap-2 font-semibold text-lg tracking-tight">
-            <div className="h-8 w-8 bg-primary rounded-md flex items-center justify-center text-primary-foreground">
-              SG
+      <Sidebar className="border-r border-slate-200/60 dark:border-zinc-800">
+        <SidebarHeader className="border-b border-slate-200/60 dark:border-zinc-800 px-6 py-5">
+          <div className="flex items-center gap-3 font-bold text-xl tracking-tight text-slate-900 dark:text-slate-100">
+            <div className="h-9 w-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/20">
+              <Blocks className="h-5 w-5" />
             </div>
-            Sistema Geral
+            ManySkip
           </div>
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="px-3 py-4">
           <SidebarGroup>
-            <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 px-3">
+              Menu Principal
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="space-y-1">
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.pathname === '/'}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === '/'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
+                  >
                     <Link to="/">
-                      <LayoutDashboard />
-                      <span>Dashboard</span>
+                      <LayoutDashboard className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Dashboard</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.pathname === '/contatos'}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === '/contatos'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
+                  >
                     <Link to="/contatos">
-                      <Users />
-                      <span>CRM</span>
+                      <Users className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Atendimentos</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={location.pathname === '/logs'}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === '/logs'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
+                  >
                     <Link to="/logs">
-                      <ListIcon />
-                      <span>Logs Webhook</span>
+                      <ListIcon className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Logs Webhook</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -93,15 +107,23 @@ export default function Layout() {
             </SidebarGroupContent>
           </SidebarGroup>
 
+          <div className="my-4 border-t border-slate-200/60 dark:border-zinc-800 mx-3"></div>
+
           <SidebarGroup>
-            <SidebarGroupLabel>Administração</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2 px-3">
+              Administração
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="space-y-1">
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild disabled>
+                  <SidebarMenuButton
+                    asChild
+                    disabled
+                    className="rounded-lg px-3 py-2.5 h-auto opacity-50"
+                  >
                     <Link to="#">
-                      <Settings />
-                      <span>Configurações</span>
+                      <Settings className="h-5 w-5" />
+                      <span className="text-[15px]">Configurações</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -109,33 +131,48 @@ export default function Layout() {
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
-        <SidebarFooter className="border-t p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col truncate">
-              <span className="text-sm font-medium truncate">{user.email}</span>
-              <span className="text-xs text-muted-foreground">Administrador</span>
+        <SidebarFooter className="border-t border-slate-200/60 dark:border-zinc-800 p-4">
+          <div className="flex items-center justify-between bg-slate-50 dark:bg-zinc-900 rounded-lg p-3 border border-slate-200/60 dark:border-zinc-800 shadow-sm">
+            <div className="flex flex-col truncate pr-2">
+              <span className="text-sm font-semibold truncate text-slate-900 dark:text-slate-100">
+                {user.email}
+              </span>
+              <span className="text-[11px] text-slate-500 uppercase tracking-wide font-medium">
+                Administrador
+              </span>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleSignOut} title="Sair">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSignOut}
+              title="Sair"
+              className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 shrink-0"
+            >
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px]">
-          <SidebarTrigger />
+
+      <SidebarInset className="bg-slate-50/50 dark:bg-zinc-950">
+        <header className="flex h-16 items-center gap-4 border-b border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 shadow-[0_1px_2px_0_rgba(0,0,0,0.02)] sticky top-0 z-10">
+          <SidebarTrigger className="text-slate-500 hover:text-slate-900" />
           <div className="flex-1">
-            <h1 className="font-semibold tracking-tight">
+            <h1 className="font-semibold text-lg tracking-tight text-slate-800 dark:text-slate-100">
               {location.pathname === '/'
-                ? 'Dashboard'
+                ? 'Dashboard Geral'
                 : location.pathname === '/contatos'
-                  ? 'Contatos do ManyChat'
-                  : 'Sistema'}
+                  ? 'Gestão de Atendimentos'
+                  : location.pathname === '/logs'
+                    ? 'Monitoramento de Logs'
+                    : 'Sistema'}
             </h1>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-auto bg-muted/10">
-          <Outlet />
+        <main className="flex-1 p-6 md:p-8 overflow-auto">
+          <div className="max-w-7xl mx-auto">
+            <Outlet />
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>
