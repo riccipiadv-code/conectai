@@ -188,10 +188,13 @@ export default function Contacts() {
     if (!deletingContact) return
     setSaving(true)
     try {
-      await deleteContact(deletingContact.id)
-      toast({ title: 'Sucesso', description: 'Contato excluído com sucesso.' })
-      setContacts(contacts.filter((c) => c.id !== deletingContact.id))
+      const contatoId = deletingContact.id
+      await deleteContact(contatoId)
+
       setDeletingContact(null)
+      setContacts((prev) => prev.filter((c) => c.id !== contatoId))
+
+      toast({ title: 'Sucesso', description: 'Contato excluído com sucesso.' })
     } catch (error: any) {
       toast({
         title: 'Erro',

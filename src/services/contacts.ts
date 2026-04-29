@@ -74,14 +74,12 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
 
 export async function deleteContact(id: string) {
   const { data: userData } = await supabase.auth.getUser()
-  const userId = userData?.user?.id || null
-  const now = new Date().toISOString()
 
   const { error } = await supabase
     .from('manychat_contatos')
     .update({
-      deleted_at: now,
-      deleted_by: userId,
+      deleted_at: new Date().toISOString(),
+      deleted_by: userData?.user?.id ?? null,
     })
     .eq('id', id)
 
