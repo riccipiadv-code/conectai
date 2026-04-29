@@ -136,8 +136,11 @@ export type Database = {
       }
       manychat_contatos: {
         Row: {
+          cancel_reason: string | null
           created_at: string
           current_stage: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           external_transfers: Json | null
           first_name: string | null
           foto: string | null
@@ -146,6 +149,7 @@ export type Database = {
           id: string
           last_interaction_at: string | null
           last_name: string | null
+          last_stage_change_at: string | null
           last_synced_at: string | null
           last_update_log: string | null
           last_update_status: string | null
@@ -163,7 +167,10 @@ export type Database = {
           messages_payload: Json | null
           nome: string | null
           payload_bruto: Json | null
+          responsible_user_id: string | null
           servico_id: string | null
+          sla_due_at: string | null
+          sla_started_at: string | null
           sla_status: string | null
           status: string | null
           subscribed_at: string | null
@@ -172,8 +179,11 @@ export type Database = {
           whatsapp_phone: string | null
         }
         Insert: {
+          cancel_reason?: string | null
           created_at?: string
           current_stage?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           external_transfers?: Json | null
           first_name?: string | null
           foto?: string | null
@@ -182,6 +192,7 @@ export type Database = {
           id?: string
           last_interaction_at?: string | null
           last_name?: string | null
+          last_stage_change_at?: string | null
           last_synced_at?: string | null
           last_update_log?: string | null
           last_update_status?: string | null
@@ -199,7 +210,10 @@ export type Database = {
           messages_payload?: Json | null
           nome?: string | null
           payload_bruto?: Json | null
+          responsible_user_id?: string | null
           servico_id?: string | null
+          sla_due_at?: string | null
+          sla_started_at?: string | null
           sla_status?: string | null
           status?: string | null
           subscribed_at?: string | null
@@ -208,8 +222,11 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Update: {
+          cancel_reason?: string | null
           created_at?: string
           current_stage?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           external_transfers?: Json | null
           first_name?: string | null
           foto?: string | null
@@ -218,6 +235,7 @@ export type Database = {
           id?: string
           last_interaction_at?: string | null
           last_name?: string | null
+          last_stage_change_at?: string | null
           last_synced_at?: string | null
           last_update_log?: string | null
           last_update_status?: string | null
@@ -235,7 +253,10 @@ export type Database = {
           messages_payload?: Json | null
           nome?: string | null
           payload_bruto?: Json | null
+          responsible_user_id?: string | null
           servico_id?: string | null
+          sla_due_at?: string | null
+          sla_started_at?: string | null
           sla_status?: string | null
           status?: string | null
           subscribed_at?: string | null
@@ -392,34 +413,66 @@ export type Database = {
         Row: {
           action: string
           changed_by: string | null
+          contato_id: string | null
           created_at: string
+          entity_id: string | null
+          entity_name: string | null
+          field_name: string | null
           id: string
+          metadata: Json | null
           new_data: Json | null
+          new_value: string | null
           old_data: Json | null
+          old_value: string | null
           record_id: string
           table_name: string
+          user_id: string | null
         }
         Insert: {
           action: string
           changed_by?: string | null
+          contato_id?: string | null
           created_at?: string
+          entity_id?: string | null
+          entity_name?: string | null
+          field_name?: string | null
           id?: string
+          metadata?: Json | null
           new_data?: Json | null
+          new_value?: string | null
           old_data?: Json | null
+          old_value?: string | null
           record_id: string
           table_name: string
+          user_id?: string | null
         }
         Update: {
           action?: string
           changed_by?: string | null
+          contato_id?: string | null
           created_at?: string
+          entity_id?: string | null
+          entity_name?: string | null
+          field_name?: string | null
           id?: string
+          metadata?: Json | null
           new_data?: Json | null
+          new_value?: string | null
           old_data?: Json | null
+          old_value?: string | null
           record_id?: string
           table_name?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'mc_audit_log_contato_id_fkey'
+            columns: ['contato_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_contatos'
+            referencedColumns: ['id']
+          },
+        ]
       }
       mc_conversations: {
         Row: {
@@ -480,29 +533,43 @@ export type Database = {
       mc_kanban_history: {
         Row: {
           changed_by: string | null
+          contato_id: string | null
           created_at: string
           id: string
           manychat_id: string
           new_stage: string
+          notes: string | null
           previous_stage: string | null
         }
         Insert: {
           changed_by?: string | null
+          contato_id?: string | null
           created_at?: string
           id?: string
           manychat_id: string
           new_stage: string
+          notes?: string | null
           previous_stage?: string | null
         }
         Update: {
           changed_by?: string | null
+          contato_id?: string | null
           created_at?: string
           id?: string
           manychat_id?: string
           new_stage?: string
+          notes?: string | null
           previous_stage?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'mc_kanban_history_contato_id_fkey'
+            columns: ['contato_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_contatos'
+            referencedColumns: ['id']
+          },
+        ]
       }
       mc_messages: {
         Row: {
@@ -544,30 +611,56 @@ export type Database = {
       }
       mc_sla_tracking: {
         Row: {
+          contato_id: string | null
           created_at: string
+          elapsed_business_hours: number | null
           id: string
+          last_calculated_at: string | null
           manychat_id: string
+          sla_due: string | null
+          sla_start: string | null
+          sla_status: string | null
           stage: string
           status: string
           updated_at: string
         }
         Insert: {
+          contato_id?: string | null
           created_at?: string
+          elapsed_business_hours?: number | null
           id?: string
+          last_calculated_at?: string | null
           manychat_id: string
+          sla_due?: string | null
+          sla_start?: string | null
+          sla_status?: string | null
           stage: string
           status: string
           updated_at?: string
         }
         Update: {
+          contato_id?: string | null
           created_at?: string
+          elapsed_business_hours?: number | null
           id?: string
+          last_calculated_at?: string | null
           manychat_id?: string
+          sla_due?: string | null
+          sla_start?: string | null
+          sla_status?: string | null
           stage?: string
           status?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'mc_sla_tracking_contato_id_fkey'
+            columns: ['contato_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_contatos'
+            referencedColumns: ['id']
+          },
+        ]
       }
       mc_tags: {
         Row: {
@@ -587,6 +680,36 @@ export type Database = {
           id?: string
           manychat_id?: string
           name?: string
+        }
+        Relationships: []
+      }
+      mc_user_profiles: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          department: string | null
+          id: string
+          role: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          role?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          role?: string | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -901,6 +1024,13 @@ export const Constants = {
 //   manual_updated_by: uuid (nullable)
 //   current_stage: text (nullable, default: 'novo'::text)
 //   sla_status: text (nullable, default: 'green'::text)
+//   responsible_user_id: uuid (nullable)
+//   last_stage_change_at: timestamp with time zone (nullable)
+//   sla_started_at: timestamp with time zone (nullable)
+//   sla_due_at: timestamp with time zone (nullable)
+//   deleted_at: timestamp with time zone (nullable)
+//   deleted_by: uuid (nullable)
+//   cancel_reason: text (nullable)
 // Table: manychat_servicos
 //   id: uuid (not null, default: gen_random_uuid())
 //   codigo: text (not null)
@@ -937,6 +1067,14 @@ export const Constants = {
 //   new_data: jsonb (nullable)
 //   changed_by: uuid (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   contato_id: uuid (nullable)
+//   entity_name: text (nullable)
+//   entity_id: text (nullable)
+//   field_name: text (nullable)
+//   old_value: text (nullable)
+//   new_value: text (nullable)
+//   user_id: uuid (nullable)
+//   metadata: jsonb (nullable)
 // Table: mc_conversations
 //   id: uuid (not null, default: gen_random_uuid())
 //   atendimento_id: uuid (nullable)
@@ -956,6 +1094,8 @@ export const Constants = {
 //   new_stage: text (not null)
 //   changed_by: uuid (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+//   contato_id: uuid (nullable)
+//   notes: text (nullable)
 // Table: mc_messages
 //   id: uuid (not null, default: gen_random_uuid())
 //   conversation_id: uuid (nullable)
@@ -971,11 +1111,25 @@ export const Constants = {
 //   status: text (not null)
 //   created_at: timestamp with time zone (not null, default: now())
 //   updated_at: timestamp with time zone (not null, default: now())
+//   contato_id: uuid (nullable)
+//   sla_start: timestamp with time zone (nullable)
+//   sla_due: timestamp with time zone (nullable)
+//   sla_status: text (nullable)
+//   elapsed_business_hours: numeric (nullable, default: 0)
+//   last_calculated_at: timestamp with time zone (nullable)
 // Table: mc_tags
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_id: text (not null)
 //   name: text (not null)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: mc_user_profiles
+//   id: uuid (not null, default: gen_random_uuid())
+//   user_id: uuid (nullable)
+//   role: text (nullable)
+//   department: text (nullable)
+//   active: boolean (nullable, default: true)
+//   created_at: timestamp with time zone (nullable, default: now())
+//   updated_at: timestamp with time zone (nullable, default: now())
 // Table: prazos
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_contato_id: uuid (nullable)
@@ -1015,9 +1169,11 @@ export const Constants = {
 //   FOREIGN KEY manychat_contact_attributes_manychat_id_fkey: FOREIGN KEY (manychat_id) REFERENCES manychat_contatos(manychat_id) ON DELETE CASCADE
 //   PRIMARY KEY manychat_contact_attributes_pkey: PRIMARY KEY (manychat_id, attribute_key)
 // Table: manychat_contatos
+//   FOREIGN KEY manychat_contatos_deleted_by_fkey: FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_manual_updated_by_fkey: FOREIGN KEY (manual_updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
 //   UNIQUE manychat_contatos_manychat_id_key: UNIQUE (manychat_id)
 //   PRIMARY KEY manychat_contatos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
 // Table: manychat_servicos
 //   UNIQUE manychat_servicos_codigo_key: UNIQUE (codigo)
@@ -1034,7 +1190,9 @@ export const Constants = {
 //   FOREIGN KEY mc_atendimento_tags_tag_id_fkey: FOREIGN KEY (tag_id) REFERENCES mc_tags(id) ON DELETE CASCADE
 // Table: mc_audit_log
 //   FOREIGN KEY mc_audit_log_changed_by_fkey: FOREIGN KEY (changed_by) REFERENCES auth.users(id)
+//   FOREIGN KEY mc_audit_log_contato_id_fkey: FOREIGN KEY (contato_id) REFERENCES manychat_contatos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_audit_log_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY mc_audit_log_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 // Table: mc_conversations
 //   FOREIGN KEY mc_conversations_atendimento_id_fkey: FOREIGN KEY (atendimento_id) REFERENCES atendimentos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_conversations_pkey: PRIMARY KEY (id)
@@ -1043,15 +1201,21 @@ export const Constants = {
 //   PRIMARY KEY mc_custom_fields_pkey: PRIMARY KEY (id)
 // Table: mc_kanban_history
 //   FOREIGN KEY mc_kanban_history_changed_by_fkey: FOREIGN KEY (changed_by) REFERENCES auth.users(id)
+//   FOREIGN KEY mc_kanban_history_contato_id_fkey: FOREIGN KEY (contato_id) REFERENCES manychat_contatos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_kanban_history_pkey: PRIMARY KEY (id)
 // Table: mc_messages
 //   FOREIGN KEY mc_messages_conversation_id_fkey: FOREIGN KEY (conversation_id) REFERENCES mc_conversations(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_messages_pkey: PRIMARY KEY (id)
 // Table: mc_sla_tracking
+//   FOREIGN KEY mc_sla_tracking_contato_id_fkey: FOREIGN KEY (contato_id) REFERENCES manychat_contatos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_sla_tracking_pkey: PRIMARY KEY (id)
 // Table: mc_tags
 //   UNIQUE mc_tags_manychat_id_key: UNIQUE (manychat_id)
 //   PRIMARY KEY mc_tags_pkey: PRIMARY KEY (id)
+// Table: mc_user_profiles
+//   PRIMARY KEY mc_user_profiles_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY mc_user_profiles_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+//   UNIQUE mc_user_profiles_user_id_key: UNIQUE (user_id)
 // Table: prazos
 //   PRIMARY KEY prazos_pkey: PRIMARY KEY (id)
 //   UNIQUE prazos_totvs_id_key: UNIQUE (totvs_id)
@@ -1079,7 +1243,11 @@ export const Constants = {
 //     USING: true
 //     WITH CHECK: true
 // Table: manychat_contatos
-//   Policy "authenticated_all_manychat_contatos" (ALL, PERMISSIVE) roles={authenticated}
+//   Policy "authenticated_insert_manychat_contatos" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_manychat_contatos" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (deleted_at IS NULL)
+//   Policy "authenticated_update_manychat_contatos" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
 // Table: manychat_servicos
@@ -1127,6 +1295,10 @@ export const Constants = {
 //   Policy "authenticated_all_mc_tags" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: mc_user_profiles
+//   Policy "authenticated_all_mc_user_profiles" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: prazos
 //   Policy "Allow insert" (INSERT, PERMISSIVE) roles={anon}
 //     WITH CHECK: true
@@ -1164,6 +1336,28 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION update_mc_sla_tracking_updated_at()
+//   CREATE OR REPLACE FUNCTION public.update_mc_sla_tracking_updated_at()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//     NEW.updated_at = now();
+//     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION update_mc_user_profiles_updated_at()
+//   CREATE OR REPLACE FUNCTION public.update_mc_user_profiles_updated_at()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//     NEW.updated_at = now();
+//     RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION update_updated_at_column()
 //   CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 //    RETURNS trigger
@@ -1185,6 +1379,10 @@ export const Constants = {
 //   set_updated_at_atendimentos_cf: CREATE TRIGGER set_updated_at_atendimentos_cf BEFORE UPDATE ON public.mc_atendimento_custom_fields FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
 // Table: mc_conversations
 //   set_updated_at_conversations: CREATE TRIGGER set_updated_at_conversations BEFORE UPDATE ON public.mc_conversations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()
+// Table: mc_sla_tracking
+//   set_updated_at_mc_sla_tracking: CREATE TRIGGER set_updated_at_mc_sla_tracking BEFORE UPDATE ON public.mc_sla_tracking FOR EACH ROW EXECUTE FUNCTION update_mc_sla_tracking_updated_at()
+// Table: mc_user_profiles
+//   set_updated_at_mc_user_profiles: CREATE TRIGGER set_updated_at_mc_user_profiles BEFORE UPDATE ON public.mc_user_profiles FOR EACH ROW EXECUTE FUNCTION update_mc_user_profiles_updated_at()
 
 // --- INDEXES ---
 // Table: atendimentos
@@ -1195,7 +1393,10 @@ export const Constants = {
 // Table: manychat_contact_attributes
 //   CREATE INDEX idx_manychat_contact_attributes_key ON public.manychat_contact_attributes USING btree (attribute_key)
 // Table: manychat_contatos
+//   CREATE INDEX idx_manychat_contatos_created_at ON public.manychat_contatos USING btree (created_at)
+//   CREATE INDEX idx_manychat_contatos_current_stage ON public.manychat_contatos USING btree (current_stage)
 //   CREATE INDEX idx_manychat_contatos_manychat_id ON public.manychat_contatos USING btree (manychat_id)
+//   CREATE INDEX idx_manychat_contatos_sla_status ON public.manychat_contatos USING btree (sla_status)
 //   CREATE INDEX idx_manychat_contatos_status ON public.manychat_contatos USING btree (last_update_status)
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
 // Table: manychat_servicos
@@ -1211,6 +1412,8 @@ export const Constants = {
 //   CREATE INDEX idx_mc_messages_conversation ON public.mc_messages USING btree (conversation_id)
 // Table: mc_tags
 //   CREATE UNIQUE INDEX mc_tags_manychat_id_key ON public.mc_tags USING btree (manychat_id)
+// Table: mc_user_profiles
+//   CREATE UNIQUE INDEX mc_user_profiles_user_id_key ON public.mc_user_profiles USING btree (user_id)
 // Table: prazos
 //   CREATE INDEX idx_prazos_caso_codigo ON public.prazos USING btree (caso_codigo)
 //   CREATE INDEX idx_prazos_cliente_codigo ON public.prazos USING btree (cliente_codigo)
