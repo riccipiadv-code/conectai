@@ -17,7 +17,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Users, LogOut, Loader2, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, LogOut, Loader2, Settings, ListIcon } from 'lucide-react'
 
 export default function Layout() {
   const { user, loading, signOut } = useAuth()
@@ -77,7 +77,15 @@ export default function Layout() {
                   <SidebarMenuButton asChild isActive={location.pathname === '/contatos'}>
                     <Link to="/contatos">
                       <Users />
-                      <span>Contatos</span>
+                      <span>CRM</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild isActive={location.pathname === '/logs'}>
+                    <Link to="/logs">
+                      <ListIcon />
+                      <span>Logs Webhook</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

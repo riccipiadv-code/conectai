@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase/client'
 import type { Database } from '@/lib/supabase/types'
 
-export type Contact = Database['public']['Tables']['manychat_contatos']['Row']
+export type Contact = Database['public']['Tables']['manychat_contatos']['Row'] & {
+  current_stage?: string
+  sla_status?: string
+}
 
 export async function getContacts() {
   const { data, error } = await supabase
@@ -11,7 +14,16 @@ export async function getContacts() {
     .limit(100)
 
   if (error) throw error
-  return data
+  return data as Contact[]
+}
+
+export async function updateContactStage(id: string, stage: string) {
+  const { error } = await supabase
+    .from('manychat_contatos')
+    .update({ current_stage: stage, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) throw error
 }
 
 export async function getDashboardStats() {

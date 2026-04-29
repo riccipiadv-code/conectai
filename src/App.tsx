@@ -6,6 +6,7 @@ import { AuthProvider } from '@/hooks/use-auth'
 import Index from './pages/Index'
 import Login from './pages/Login'
 import Contacts from './pages/Contacts'
+import Logs from './pages/Logs'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 
@@ -20,6 +21,7 @@ const App = () => (
           <Route element={<Layout />}>
             <Route path="/" element={<Index />} />
             <Route path="/contatos" element={<Contacts />} />
+            <Route path="/logs" element={<Logs />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
