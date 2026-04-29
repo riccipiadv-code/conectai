@@ -137,6 +137,7 @@ export type Database = {
       manychat_contatos: {
         Row: {
           created_at: string
+          current_stage: string | null
           external_transfers: Json | null
           first_name: string | null
           foto: string | null
@@ -163,6 +164,7 @@ export type Database = {
           nome: string | null
           payload_bruto: Json | null
           servico_id: string | null
+          sla_status: string | null
           status: string | null
           subscribed_at: string | null
           telefone: string | null
@@ -171,6 +173,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          current_stage?: string | null
           external_transfers?: Json | null
           first_name?: string | null
           foto?: string | null
@@ -197,6 +200,7 @@ export type Database = {
           nome?: string | null
           payload_bruto?: Json | null
           servico_id?: string | null
+          sla_status?: string | null
           status?: string | null
           subscribed_at?: string | null
           telefone?: string | null
@@ -205,6 +209,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          current_stage?: string | null
           external_transfers?: Json | null
           first_name?: string | null
           foto?: string | null
@@ -231,6 +236,7 @@ export type Database = {
           nome?: string | null
           payload_bruto?: Json | null
           servico_id?: string | null
+          sla_status?: string | null
           status?: string | null
           subscribed_at?: string | null
           telefone?: string | null
@@ -382,6 +388,39 @@ export type Database = {
           },
         ]
       }
+      mc_audit_log: {
+        Row: {
+          action: string
+          changed_by: string | null
+          created_at: string
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       mc_conversations: {
         Row: {
           atendimento_id: string | null
@@ -438,6 +477,33 @@ export type Database = {
         }
         Relationships: []
       }
+      mc_kanban_history: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          id: string
+          manychat_id: string
+          new_stage: string
+          previous_stage: string | null
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          manychat_id: string
+          new_stage: string
+          previous_stage?: string | null
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          id?: string
+          manychat_id?: string
+          new_stage?: string
+          previous_stage?: string | null
+        }
+        Relationships: []
+      }
       mc_messages: {
         Row: {
           content: string | null
@@ -475,6 +541,33 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      mc_sla_tracking: {
+        Row: {
+          created_at: string
+          id: string
+          manychat_id: string
+          stage: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          manychat_id: string
+          stage: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          manychat_id?: string
+          stage?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       mc_tags: {
         Row: {
@@ -806,6 +899,8 @@ export const Constants = {
 //   servico_id: uuid (nullable)
 //   manual_updated_at: timestamp with time zone (nullable)
 //   manual_updated_by: uuid (nullable)
+//   current_stage: text (nullable, default: 'novo'::text)
+//   sla_status: text (nullable, default: 'green'::text)
 // Table: manychat_servicos
 //   id: uuid (not null, default: gen_random_uuid())
 //   codigo: text (not null)
@@ -833,6 +928,15 @@ export const Constants = {
 //   atendimento_id: uuid (not null)
 //   tag_id: uuid (not null)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: mc_audit_log
+//   id: uuid (not null, default: gen_random_uuid())
+//   table_name: text (not null)
+//   record_id: text (not null)
+//   action: text (not null)
+//   old_data: jsonb (nullable)
+//   new_data: jsonb (nullable)
+//   changed_by: uuid (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: mc_conversations
 //   id: uuid (not null, default: gen_random_uuid())
 //   atendimento_id: uuid (nullable)
@@ -845,6 +949,13 @@ export const Constants = {
 //   name: text (not null)
 //   type: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: mc_kanban_history
+//   id: uuid (not null, default: gen_random_uuid())
+//   manychat_id: text (not null)
+//   previous_stage: text (nullable)
+//   new_stage: text (not null)
+//   changed_by: uuid (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: mc_messages
 //   id: uuid (not null, default: gen_random_uuid())
 //   conversation_id: uuid (nullable)
@@ -853,6 +964,13 @@ export const Constants = {
 //   message_type: text (nullable)
 //   content: text (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
+// Table: mc_sla_tracking
+//   id: uuid (not null, default: gen_random_uuid())
+//   manychat_id: text (not null)
+//   stage: text (not null)
+//   status: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
 // Table: mc_tags
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_id: text (not null)
@@ -914,15 +1032,23 @@ export const Constants = {
 //   FOREIGN KEY mc_atendimento_tags_atendimento_id_fkey: FOREIGN KEY (atendimento_id) REFERENCES atendimentos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_atendimento_tags_pkey: PRIMARY KEY (atendimento_id, tag_id)
 //   FOREIGN KEY mc_atendimento_tags_tag_id_fkey: FOREIGN KEY (tag_id) REFERENCES mc_tags(id) ON DELETE CASCADE
+// Table: mc_audit_log
+//   FOREIGN KEY mc_audit_log_changed_by_fkey: FOREIGN KEY (changed_by) REFERENCES auth.users(id)
+//   PRIMARY KEY mc_audit_log_pkey: PRIMARY KEY (id)
 // Table: mc_conversations
 //   FOREIGN KEY mc_conversations_atendimento_id_fkey: FOREIGN KEY (atendimento_id) REFERENCES atendimentos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_conversations_pkey: PRIMARY KEY (id)
 // Table: mc_custom_fields
 //   UNIQUE mc_custom_fields_manychat_id_key: UNIQUE (manychat_id)
 //   PRIMARY KEY mc_custom_fields_pkey: PRIMARY KEY (id)
+// Table: mc_kanban_history
+//   FOREIGN KEY mc_kanban_history_changed_by_fkey: FOREIGN KEY (changed_by) REFERENCES auth.users(id)
+//   PRIMARY KEY mc_kanban_history_pkey: PRIMARY KEY (id)
 // Table: mc_messages
 //   FOREIGN KEY mc_messages_conversation_id_fkey: FOREIGN KEY (conversation_id) REFERENCES mc_conversations(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_messages_pkey: PRIMARY KEY (id)
+// Table: mc_sla_tracking
+//   PRIMARY KEY mc_sla_tracking_pkey: PRIMARY KEY (id)
 // Table: mc_tags
 //   UNIQUE mc_tags_manychat_id_key: UNIQUE (manychat_id)
 //   PRIMARY KEY mc_tags_pkey: PRIMARY KEY (id)
@@ -973,6 +1099,10 @@ export const Constants = {
 //   Policy "authenticated_all_mc_atendimento_tags" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: mc_audit_log
+//   Policy "authenticated_all_mc_audit_log" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: mc_conversations
 //   Policy "authenticated_all_mc_conversations" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -981,8 +1111,16 @@ export const Constants = {
 //   Policy "authenticated_all_mc_custom_fields" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: mc_kanban_history
+//   Policy "authenticated_all_mc_kanban_history" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
 // Table: mc_messages
 //   Policy "authenticated_all_mc_messages" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
+// Table: mc_sla_tracking
+//   Policy "authenticated_all_mc_sla_tracking" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
 // Table: mc_tags
