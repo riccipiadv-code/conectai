@@ -10,11 +10,82 @@ export async function getContacts() {
   const { data, error } = await supabase
     .from('manychat_contatos')
     .select('*')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(100)
 
   if (error) throw error
   return data as Contact[]
+}
+
+export async function updateContact(id: string, updates: Partial<Contact>, previousStage?: string) {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData?.user?.id || null
+  const now = new Date().toISOString()
+
+  if (updates.current_stage && previousStage && updates.current_stage !== previousStage) {
+    const newStage = updates.current_stage
+    const validTransitions: Record<string, string[]> = {
+      novo: ['triagem_n1'],
+      triagem_n1: ['nivel_2'],
+      nivel_2: ['aguardando_cliente'],
+      aguardando_cliente: ['aprovado', 'cancelado'],
+      aprovado: [],
+      cancelado: [],
+    }
+    const allowed = validTransitions[previousStage] || []
+    if (!allowed.includes(newStage)) {
+      throw new Error(
+        `Transição de estágio não permitida: de '${previousStage}' para '${newStage}'`,
+      )
+    }
+    updates.last_stage_change_at = now
+  }
+
+  const { error } = await supabase
+    .from('manychat_contatos')
+    .update({
+      ...updates,
+      manual_updated_at: now,
+      manual_updated_by: userId,
+    })
+    .eq('id', id)
+
+  if (error) throw error
+
+  if (updates.current_stage && previousStage && updates.current_stage !== previousStage) {
+    const { data: contact } = await supabase
+      .from('manychat_contatos')
+      .select('manychat_id')
+      .eq('id', id)
+      .single()
+    if (contact) {
+      await supabase.from('mc_kanban_history').insert({
+        contato_id: id,
+        manychat_id: contact.manychat_id,
+        previous_stage: previousStage,
+        new_stage: updates.current_stage,
+        changed_by: userId,
+        created_at: now,
+      })
+    }
+  }
+}
+
+export async function deleteContact(id: string) {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData?.user?.id || null
+  const now = new Date().toISOString()
+
+  const { error } = await supabase
+    .from('manychat_contatos')
+    .update({
+      deleted_at: now,
+      deleted_by: userId,
+    })
+    .eq('id', id)
+
+  if (error) throw error
 }
 
 export async function updateContactStage(id: string, newStage: string) {

@@ -10,6 +10,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,6 +20,15 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -27,8 +37,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { getContacts, updateContactStage, Contact } from '@/services/contacts'
-import { Loader2, Search, Edit2, MessageCircle, Filter } from 'lucide-react'
+import { getContacts, updateContact, deleteContact, Contact } from '@/services/contacts'
+import { Loader2, Search, Edit2, MessageCircle, Filter, Trash2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 const getStageLabel = (stage: string) => {
@@ -100,8 +110,12 @@ export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [editingContact, setEditingContact] = useState<Contact | null>(null)
-  const [newStage, setNewStage] = useState('')
+
+  const [updatingContact, setUpdatingContact] = useState<Contact | null>(null)
+  const [updateForm, setUpdateForm] = useState<Partial<Contact>>({})
+
+  const [deletingContact, setDeletingContact] = useState<Contact | null>(null)
+
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
 
@@ -121,9 +135,10 @@ export default function Contacts() {
 
   const filteredContacts = contacts.filter(
     (contact) =>
+      (contact.lead_nome?.toLowerCase() || '').includes(search.toLowerCase()) ||
       (contact.nome?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (contact.whatsapp_phone || '').includes(search) ||
       (contact.telefone || '').includes(search) ||
-      (contact.manychat_id || '').includes(search) ||
       (contact.lead_email?.toLowerCase() || '').includes(search.toLowerCase()),
   )
 
@@ -138,24 +153,49 @@ export default function Contacts() {
   }
 
   const handleEdit = (contact: Contact) => {
-    setEditingContact(contact)
-    setNewStage(contact.current_stage || 'novo')
+    setUpdatingContact(contact)
+    setUpdateForm({
+      lead_nome: contact.lead_nome || '',
+      lead_empresa_pf: contact.lead_empresa_pf || '',
+      lead_email: contact.lead_email || '',
+      lead_servico: contact.lead_servico || '',
+      lead_resumo: contact.lead_resumo || '',
+      current_stage: contact.current_stage || 'novo',
+      sla_status: contact.sla_status || 'green',
+    })
   }
 
-  const handleSave = async () => {
-    if (!editingContact) return
+  const handleUpdate = async () => {
+    if (!updatingContact) return
     setSaving(true)
     try {
-      await updateContactStage(editingContact.id, newStage)
-      toast({ title: 'Sucesso', description: 'Estágio atualizado com sucesso.' })
-      setContacts(
-        contacts.map((c) => (c.id === editingContact.id ? { ...c, current_stage: newStage } : c)),
-      )
-      setEditingContact(null)
-    } catch (error) {
+      await updateContact(updatingContact.id, updateForm, updatingContact.current_stage || 'novo')
+      toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
+      setContacts(contacts.map((c) => (c.id === updatingContact.id ? { ...c, ...updateForm } : c)))
+      setUpdatingContact(null)
+    } catch (error: any) {
       toast({
         title: 'Erro',
-        description: 'Não foi possível atualizar o estágio.',
+        description: error.message || 'Não foi possível atualizar o contato.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletingContact) return
+    setSaving(true)
+    try {
+      await deleteContact(deletingContact.id)
+      toast({ title: 'Sucesso', description: 'Contato excluído com sucesso.' })
+      setContacts(contacts.filter((c) => c.id !== deletingContact.id))
+      setDeletingContact(null)
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Não foi possível excluir o contato.',
         variant: 'destructive',
       })
     } finally {
@@ -209,6 +249,7 @@ export default function Contacts() {
                     <TableHead className="font-semibold text-slate-600 py-4">
                       Serviço / Lead
                     </TableHead>
+                    <TableHead className="font-semibold text-slate-600 py-4">Consulta</TableHead>
                     <TableHead className="font-semibold text-slate-600 py-4">Estágio</TableHead>
                     <TableHead className="font-semibold text-slate-600 py-4">SLA</TableHead>
                     <TableHead className="font-semibold text-slate-600 py-4 text-right px-6">
@@ -219,7 +260,7 @@ export default function Contacts() {
                 <TableBody>
                   {filteredContacts.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-32 text-center text-slate-500">
+                      <TableCell colSpan={6} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <Search className="h-8 w-8 text-slate-300" />
                           <p>Nenhum contato encontrado para a busca atual.</p>
@@ -256,10 +297,16 @@ export default function Contacts() {
                               {contact.lead_servico || '-'}
                             </span>
                             <span className="text-sm text-slate-500 truncate max-w-[220px] mt-0.5">
-                              {contact.lead_empresa_pf ||
-                                contact.lead_email ||
-                                'Sem dados adicionais'}
+                              {contact.lead_empresa_pf || '-'}
                             </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div
+                            className="text-sm text-slate-600 dark:text-slate-300 max-w-[250px] line-clamp-2"
+                            title={contact.lead_resumo || ''}
+                          >
+                            {contact.lead_resumo || '-'}
                           </div>
                         </TableCell>
                         <TableCell className="py-4">
@@ -316,10 +363,19 @@ export default function Contacts() {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEdit(contact)}
-                              title="Editar Estágio"
+                              title="Atualizar Contato"
                               className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
                             >
                               <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingContact(contact)}
+                              title="Excluir Contato"
+                              className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -333,53 +389,136 @@ export default function Contacts() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!editingContact} onOpenChange={(open) => !open && setEditingContact(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Atualizar Estágio</DialogTitle>
+      {/* Edit Modal */}
+      <Dialog open={!!updatingContact} onOpenChange={(open) => !open && setUpdatingContact(null)}>
+        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-zinc-800">
+            <DialogTitle className="text-xl">Atualizar Contato</DialogTitle>
           </DialogHeader>
-          <div className="py-6 space-y-5">
-            <div className="space-y-2">
-              <Label className="text-slate-500 font-medium">Contato Atual</Label>
-              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-zinc-900 rounded-lg border border-slate-100 dark:border-zinc-800">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={editingContact?.foto || ''} />
-                  <AvatarFallback>
-                    {getInitials(editingContact?.lead_nome || editingContact?.nome)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {editingContact?.lead_nome || editingContact?.nome || ''}
-                </span>
+          <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-600">Nome (Lead)</Label>
+                <Input
+                  value={updateForm.lead_nome || ''}
+                  onChange={(e) => setUpdateForm({ ...updateForm, lead_nome: e.target.value })}
+                  placeholder="Nome do lead"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600">Empresa / PF</Label>
+                <Input
+                  value={updateForm.lead_empresa_pf || ''}
+                  onChange={(e) =>
+                    setUpdateForm({ ...updateForm, lead_empresa_pf: e.target.value })
+                  }
+                  placeholder="Nome da empresa"
+                />
               </div>
             </div>
+
             <div className="space-y-2">
-              <Label className="text-slate-500 font-medium">Novo Estágio Kanban</Label>
-              <Select value={newStage} onValueChange={setNewStage}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione um estágio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="novo">Novo</SelectItem>
-                  <SelectItem value="triagem_n1">Triagem N1</SelectItem>
-                  <SelectItem value="nivel_2">Nível 2</SelectItem>
-                  <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
-                  <SelectItem value="aprovado">Aprovado</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-slate-600">E-mail</Label>
+              <Input
+                type="email"
+                value={updateForm.lead_email || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, lead_email: e.target.value })}
+                placeholder="email@exemplo.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-600">Serviço Selecionado</Label>
+              <Input
+                value={updateForm.lead_servico || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, lead_servico: e.target.value })}
+                placeholder="Ex: Consultoria"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-slate-600">Resumo da Solicitação (Consulta)</Label>
+              <Textarea
+                value={updateForm.lead_resumo || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, lead_resumo: e.target.value })}
+                placeholder="Detalhes da consulta..."
+                className="resize-none"
+                rows={4}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-zinc-800">
+              <div className="space-y-2">
+                <Label className="text-slate-600">Estágio</Label>
+                <Select
+                  value={updateForm.current_stage || 'novo'}
+                  onValueChange={(v) => setUpdateForm({ ...updateForm, current_stage: v })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Estágio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="novo">Novo</SelectItem>
+                    <SelectItem value="triagem_n1">Triagem N1</SelectItem>
+                    <SelectItem value="nivel_2">Nível 2</SelectItem>
+                    <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
+                    <SelectItem value="aprovado">Aprovado</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600">SLA</Label>
+                <Select
+                  value={updateForm.sla_status || 'green'}
+                  onValueChange={(v) => setUpdateForm({ ...updateForm, sla_status: v })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="SLA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="green">No prazo</SelectItem>
+                    <SelectItem value="yellow">Atenção</SelectItem>
+                    <SelectItem value="red">Atrasado</SelectItem>
+                    <SelectItem value="paused">Pausado</SelectItem>
+                    <SelectItem value="done">Finalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingContact(null)} className="h-10">
+          <DialogFooter className="p-6 pt-4 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/50">
+            <Button variant="outline" onClick={() => setUpdatingContact(null)} className="h-10">
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="h-10 px-8">
-              {saving ? 'Salvando...' : 'Confirmar'}
+            <Button onClick={handleUpdate} disabled={saving} className="h-10 px-8">
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <AlertDialog
+        open={!!deletingContact}
+        onOpenChange={(open) => !open && setDeletingContact(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deseja realmente excluir esse contato?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá remover o contato da lista principal, mas os dados originais serão
+              preservados no histórico.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
+              {saving ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
