@@ -412,7 +412,6 @@ export type Database = {
       mc_audit_log: {
         Row: {
           action: string
-          changed_by: string | null
           contato_id: string | null
           created_at: string
           entity_id: string | null
@@ -420,17 +419,12 @@ export type Database = {
           field_name: string | null
           id: string
           metadata: Json | null
-          new_data: Json | null
           new_value: string | null
-          old_data: Json | null
           old_value: string | null
-          record_id: string
-          table_name: string
           user_id: string | null
         }
         Insert: {
           action: string
-          changed_by?: string | null
           contato_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -438,17 +432,12 @@ export type Database = {
           field_name?: string | null
           id?: string
           metadata?: Json | null
-          new_data?: Json | null
           new_value?: string | null
-          old_data?: Json | null
           old_value?: string | null
-          record_id: string
-          table_name: string
           user_id?: string | null
         }
         Update: {
           action?: string
-          changed_by?: string | null
           contato_id?: string | null
           created_at?: string
           entity_id?: string | null
@@ -456,12 +445,8 @@ export type Database = {
           field_name?: string | null
           id?: string
           metadata?: Json | null
-          new_data?: Json | null
           new_value?: string | null
-          old_data?: Json | null
           old_value?: string | null
-          record_id?: string
-          table_name?: string
           user_id?: string | null
         }
         Relationships: [
@@ -620,8 +605,6 @@ export type Database = {
           sla_due: string | null
           sla_start: string | null
           sla_status: string | null
-          stage: string
-          status: string
           updated_at: string
         }
         Insert: {
@@ -634,8 +617,6 @@ export type Database = {
           sla_due?: string | null
           sla_start?: string | null
           sla_status?: string | null
-          stage: string
-          status: string
           updated_at?: string
         }
         Update: {
@@ -648,8 +629,6 @@ export type Database = {
           sla_due?: string | null
           sla_start?: string | null
           sla_status?: string | null
-          stage?: string
-          status?: string
           updated_at?: string
         }
         Relationships: [
@@ -1060,12 +1039,7 @@ export const Constants = {
 //   created_at: timestamp with time zone (not null, default: now())
 // Table: mc_audit_log
 //   id: uuid (not null, default: gen_random_uuid())
-//   table_name: text (not null)
-//   record_id: text (not null)
 //   action: text (not null)
-//   old_data: jsonb (nullable)
-//   new_data: jsonb (nullable)
-//   changed_by: uuid (nullable)
 //   created_at: timestamp with time zone (not null, default: now())
 //   contato_id: uuid (nullable)
 //   entity_name: text (nullable)
@@ -1107,8 +1081,6 @@ export const Constants = {
 // Table: mc_sla_tracking
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_id: text (not null)
-//   stage: text (not null)
-//   status: text (not null)
 //   created_at: timestamp with time zone (not null, default: now())
 //   updated_at: timestamp with time zone (not null, default: now())
 //   contato_id: uuid (nullable)
@@ -1189,7 +1161,6 @@ export const Constants = {
 //   PRIMARY KEY mc_atendimento_tags_pkey: PRIMARY KEY (atendimento_id, tag_id)
 //   FOREIGN KEY mc_atendimento_tags_tag_id_fkey: FOREIGN KEY (tag_id) REFERENCES mc_tags(id) ON DELETE CASCADE
 // Table: mc_audit_log
-//   FOREIGN KEY mc_audit_log_changed_by_fkey: FOREIGN KEY (changed_by) REFERENCES auth.users(id)
 //   FOREIGN KEY mc_audit_log_contato_id_fkey: FOREIGN KEY (contato_id) REFERENCES manychat_contatos(id) ON DELETE CASCADE
 //   PRIMARY KEY mc_audit_log_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY mc_audit_log_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE SET NULL
@@ -1392,6 +1363,7 @@ export const Constants = {
 //   CREATE INDEX idx_integration_logs_created_at ON public.integration_logs USING btree (created_at)
 // Table: manychat_contact_attributes
 //   CREATE INDEX idx_manychat_contact_attributes_key ON public.manychat_contact_attributes USING btree (attribute_key)
+//   CREATE UNIQUE INDEX idx_manychat_contact_attributes_unique ON public.manychat_contact_attributes USING btree (manychat_id, attribute_key)
 // Table: manychat_contatos
 //   CREATE INDEX idx_manychat_contatos_created_at ON public.manychat_contatos USING btree (created_at)
 //   CREATE INDEX idx_manychat_contatos_current_stage ON public.manychat_contatos USING btree (current_stage)

@@ -352,11 +352,13 @@ Deno.serve(async (req: Request) => {
           .update({ status: 'error', last_error: structuredErrorMessage })
           .eq('id', runningSync.id)
       } else {
-        await supabase.from('manychat_sync_control').insert({
-          sync_type: 'error_recovery',
-          status: 'error',
-          last_error: structuredErrorMessage,
-        })
+        await supabase
+          .from('manychat_sync_control')
+          .insert({
+            sync_type: 'error_recovery',
+            status: 'error',
+            last_error: structuredErrorMessage,
+          })
       }
 
       if (executionMode === 'manual') {

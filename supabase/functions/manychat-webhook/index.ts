@@ -44,6 +44,9 @@ Deno.serve(async (req: Request) => {
 
   const payloads = Array.isArray(rawPayload) ? rawPayload : [rawPayload]
 
+  let processed = 0
+  let errors = 0
+
   for (const payload of payloads) {
     const { subscriber_id, event_type, sub, extracted } = normalizeManyChatPayload(payload)
 
@@ -143,9 +146,22 @@ Deno.serve(async (req: Request) => {
         has_id: !!subscriber_id,
       },
     })
+
+    if (status === 'error') {
+      errors++
+    } else {
+      processed++
+    }
   }
 
-  return new Response(JSON.stringify({ success: true }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
+  const isSuccess = processed > 0 || payloads.length === 0
+
+  return new Response(
+    JSON.stringify({
+      success: isSuccess,
+      processed,
+      errors,
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  )
 })
