@@ -37,8 +37,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { getContacts, updateContact, deleteContact, Contact } from '@/services/contacts'
-import { Loader2, Search, Edit2, MessageCircle, Filter, Trash2 } from 'lucide-react'
+import {
+  Loader2,
+  Search,
+  Edit2,
+  MessageCircle,
+  Filter,
+  Trash2,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  Clock,
+  CheckCircle,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 const getStageLabel = (stage: string) => {
@@ -58,7 +71,7 @@ const getStageColor = (stage: string) => {
     case 'novo':
       return 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
     case 'triagem_n1':
-      return 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-800'
+      return 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800'
     case 'nivel_2':
       return 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800'
     case 'aguardando_cliente':
@@ -103,6 +116,23 @@ const getSlaColor = (sla: string) => {
       return 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900'
     default:
       return 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200 dark:bg-gray-900/50 dark:text-gray-400 dark:border-gray-800'
+  }
+}
+
+const getSlaIcon = (sla: string) => {
+  switch (sla) {
+    case 'green':
+      return <CheckCircle2 className="h-3.5 w-3.5" />
+    case 'yellow':
+      return <AlertTriangle className="h-3.5 w-3.5" />
+    case 'red':
+      return <AlertCircle className="h-3.5 w-3.5" />
+    case 'paused':
+      return <Clock className="h-3.5 w-3.5" />
+    case 'done':
+      return <CheckCircle className="h-3.5 w-3.5" />
+    default:
+      return null
   }
 }
 
@@ -274,9 +304,9 @@ export default function Contacts() {
                     filteredContacts.map((contact) => (
                       <TableRow
                         key={contact.id}
-                        className="hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 transition-colors border-slate-100 dark:border-zinc-800/50"
+                        className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/60 transition-colors border-slate-100 dark:border-zinc-800/50 group"
                       >
-                        <TableCell className="px-6 py-4">
+                        <TableCell className="px-6 py-5">
                           <div className="flex items-center gap-4">
                             <Avatar className="h-10 w-10 border border-slate-200/50 shadow-sm">
                               <AvatarImage src={contact.foto || ''} alt={contact.nome || ''} />
@@ -285,7 +315,7 @@ export default function Contacts() {
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-[15px]">
+                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-base">
                                 {contact.lead_nome || contact.nome || 'Sem nome'}
                               </span>
                               <span className="text-sm text-slate-500 mt-0.5 flex items-center gap-1">
@@ -294,25 +324,35 @@ export default function Contacts() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="py-4">
+                        <TableCell className="py-5">
                           <div className="flex flex-col">
-                            <span className="font-medium text-slate-800 dark:text-slate-200">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 text-[15px]">
                               {contact.lead_servico || '-'}
                             </span>
-                            <span className="text-sm text-slate-500 truncate max-w-[220px] mt-0.5">
+                            <span className="text-sm text-slate-500 mt-0.5">
                               {contact.lead_empresa_pf || '-'}
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-4">
-                          <div
-                            className="text-sm text-slate-600 dark:text-slate-300 max-w-[250px] line-clamp-2"
-                            title={contact.lead_resumo || ''}
-                          >
-                            {contact.lead_resumo || '-'}
-                          </div>
+                        <TableCell className="py-5">
+                          {contact.lead_resumo ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="text-[15px] text-slate-700 dark:text-slate-300 max-w-[300px] truncate cursor-default">
+                                  {contact.lead_resumo}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-[400px] p-3 text-sm whitespace-pre-wrap break-words">
+                                {contact.lead_resumo}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <div className="text-[15px] text-slate-500 max-w-[300px] truncate">
+                              -
+                            </div>
+                          )}
                         </TableCell>
-                        <TableCell className="py-4">
+                        <TableCell className="py-5">
                           <Badge
                             variant="outline"
                             className={`font-medium px-2.5 py-1 border shadow-sm ${getStageColor(
@@ -322,64 +362,66 @@ export default function Contacts() {
                             {getStageLabel(contact.current_stage || 'novo')}
                           </Badge>
                         </TableCell>
-                        <TableCell className="py-4">
+                        <TableCell className="py-5">
                           <Badge
                             variant="outline"
-                            className={`font-semibold px-2.5 py-1 border shadow-sm flex inline-flex items-center gap-1.5 w-fit ${getSlaColor(
+                            className={`font-medium px-2.5 py-1 border shadow-sm flex inline-flex items-center gap-1.5 w-fit ${getSlaColor(
                               contact.sla_status || 'green',
                             )}`}
                           >
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                contact.sla_status === 'green'
-                                  ? 'bg-emerald-500'
-                                  : contact.sla_status === 'yellow'
-                                    ? 'bg-amber-500'
-                                    : contact.sla_status === 'red'
-                                      ? 'bg-rose-500'
-                                      : 'bg-slate-400'
-                              }`}
-                            ></span>
+                            {getSlaIcon(contact.sla_status || 'green')}
                             {getSlaLabel(contact.sla_status || 'green')}
                           </Badge>
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <TableCell className="py-5 px-6 text-right">
+                          <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
                             {contact.manychat_live_chat_url && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                asChild
-                                title="Abrir no ManyChat"
-                                className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                              >
-                                <a
-                                  href={contact.manychat_live_chat_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                >
-                                  <MessageCircle className="h-4 w-4" />
-                                </a>
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    asChild
+                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                  >
+                                    <a
+                                      href={contact.manychat_live_chat_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      <MessageCircle className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Abrir conversa</TooltipContent>
+                              </Tooltip>
                             )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(contact)}
-                              title="Atualizar Contato"
-                              className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeletingContact(contact)}
-                              title="Excluir Contato"
-                              className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEdit(contact)}
+                                  className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingContact(contact)}
+                                  className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Excluir</TooltipContent>
+                            </Tooltip>
                           </div>
                         </TableCell>
                       </TableRow>
