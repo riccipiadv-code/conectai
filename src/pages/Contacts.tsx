@@ -280,7 +280,7 @@ export default function Contacts() {
                       Contato
                     </TableHead>
                     <TableHead className="font-semibold text-slate-600 py-4">
-                      Serviço / Lead
+                      Serviço / Empresa
                     </TableHead>
                     <TableHead className="font-semibold text-slate-600 py-4">Consulta</TableHead>
                     <TableHead className="font-semibold text-slate-600 py-4">Estágio</TableHead>
@@ -327,10 +327,10 @@ export default function Contacts() {
                         <TableCell className="py-5">
                           <div className="flex flex-col">
                             <span className="font-semibold text-slate-800 dark:text-slate-200 text-[15px]">
-                              {contact.lead_servico || '-'}
+                              {contact.manychat_servicos?.descricao || 'Não informado'}
                             </span>
                             <span className="text-sm text-slate-500 mt-0.5">
-                              {contact.lead_empresa_pf || '-'}
+                              {contact.lead_empresa_pf || 'Pessoa Física'}
                             </span>
                           </div>
                         </TableCell>
@@ -443,11 +443,11 @@ export default function Contacts() {
           <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-slate-600">Nome (Lead)</Label>
+                <Label className="text-slate-600">Nome</Label>
                 <Input
                   value={updateForm.lead_nome || ''}
                   onChange={(e) => setUpdateForm({ ...updateForm, lead_nome: e.target.value })}
-                  placeholder="Nome do lead"
+                  placeholder="Nome"
                 />
               </div>
               <div className="space-y-2">

@@ -4,12 +4,13 @@ import type { Database } from '@/lib/supabase/types'
 export type Contact = Database['public']['Tables']['manychat_contatos']['Row'] & {
   current_stage?: string
   sla_status?: string
+  manychat_servicos?: { descricao: string } | null
 }
 
 export async function getContacts() {
   const { data, error } = await supabase
     .from('manychat_contatos')
-    .select('*')
+    .select('*, manychat_servicos(descricao)')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(100)
