@@ -48,11 +48,36 @@ export function normalizeManyChatPayload(payload: any) {
     cfMap = customFields
   }
 
-  let lead_nome = cfMap['user_nome'] || null
-  let lead_servico = cfMap['user_servico'] || null
-  let lead_email = cfMap['user_email'] || null
+  const mapServicoNumerico = (val: string) => {
+    switch (String(val).trim()) {
+      case '1':
+        return 'Registro de Marcas'
+      case '2':
+        return 'Proteção de Patentes'
+      case '3':
+        return 'Proteção de Desenho Industrial'
+      case '4':
+        return 'Direitos Autorais ou Programas de Computador'
+      case '5':
+        return 'Consultoria em Propriedade Intelectual'
+      case '6':
+        return 'Assessoria em Ações Judiciais'
+      case '7':
+        return 'Outros Assuntos'
+      default:
+        return val
+    }
+  }
+
+  let lead_nome = cfMap['user_nome'] || sub?.name || sub?.first_name || null
+  let lead_email = cfMap['user_email'] || sub?.email || null
   let lead_empresa_pf = cfMap['user_empresa'] || null
   let lead_resumo = cfMap['user_resumo'] || null
+
+  let lead_servico = cfMap['nome_servico'] || null
+  if (!lead_servico && cfMap['user_servico']) {
+    lead_servico = mapServicoNumerico(cfMap['user_servico'])
+  }
 
   const chatgpt_resposta = cfMap['chatgpt_resposta_anterior'] || null
 
@@ -77,17 +102,17 @@ export function normalizeManyChatPayload(payload: any) {
 
     for (const line of lines) {
       const tLine = line.trim()
-      if (tLine.startsWith('👤 Nome:')) {
+      if (!lead_nome && tLine.startsWith('👤 Nome:')) {
         lead_nome = tLine.replace('👤 Nome:', '').trim()
         currentField = 'nome'
-      } else if (tLine.startsWith('🏢 Empresa/PF:')) {
+      } else if (!lead_empresa_pf && tLine.startsWith('🏢 Empresa/PF:')) {
         lead_empresa_pf = tLine.replace('🏢 Empresa/PF:', '').trim()
         currentField = 'empresa'
-      } else if (tLine.startsWith('📧 E-mail:')) {
+      } else if (!lead_email && tLine.startsWith('📧 E-mail:')) {
         lead_email = tLine.replace('📧 E-mail:', '').trim()
         currentField = 'email'
-      } else if (tLine.startsWith('🛠️ Serviço Selecionado:')) {
-        lead_servico = tLine.replace('🛠️ Serviço Selecionado:', '').trim()
+      } else if (!lead_servico && tLine.startsWith('🛠️ Serviço Selecionado:')) {
+        lead_servico = mapServicoNumerico(tLine.replace('🛠️ Serviço Selecionado:', '').trim())
         currentField = 'servico'
       } else if (tLine.startsWith('📝 Resumo da Solicitação:')) {
         const val = tLine.replace('📝 Resumo da Solicitação:', '').trim()
@@ -98,9 +123,9 @@ export function normalizeManyChatPayload(payload: any) {
       }
     }
 
-    if (resumoLines.length > 0) {
+    if (!lead_resumo && resumoLines.length > 0) {
       lead_resumo = resumoLines.join('\n').trim()
-    } else if (!currentField) {
+    } else if (!lead_resumo && !currentField) {
       lead_resumo = text.trim()
     }
   }

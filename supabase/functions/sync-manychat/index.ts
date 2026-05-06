@@ -169,7 +169,7 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            const record = {
+            const record: any = {
               manychat_id: manychatIdStr,
               nome: extracted.nome,
               first_name: extracted.first_name,
@@ -198,6 +198,28 @@ Deno.serve(async (req: Request) => {
               lead_email: extracted.lead_email,
               lead_empresa_pf: extracted.lead_empresa_pf,
               lead_resumo: extracted.lead_resumo,
+            }
+
+            if (extracted.lead_servico) {
+              let { data: servico } = await supabase
+                .from('manychat_servicos')
+                .select('id')
+                .ilike('descricao', extracted.lead_servico.trim())
+                .maybeSingle()
+
+              if (!servico) {
+                const { data: servicoLike } = await supabase
+                  .from('manychat_servicos')
+                  .select('id')
+                  .ilike('descricao', `%${extracted.lead_servico.trim()}%`)
+                  .limit(1)
+                  .maybeSingle()
+                servico = servicoLike
+              }
+
+              if (servico) {
+                record.servico_id = servico.id
+              }
             }
 
             const { error: upsertError } = await supabase

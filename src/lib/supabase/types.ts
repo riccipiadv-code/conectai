@@ -1181,6 +1181,7 @@ export const Constants = {
 // Table: manychat_servicos
 //   UNIQUE manychat_servicos_codigo_key: UNIQUE (codigo)
 //   PRIMARY KEY manychat_servicos_pkey: PRIMARY KEY (id)
+//   UNIQUE unique_manychat_servicos_codigo: UNIQUE (codigo)
 // Table: manychat_sync_control
 //   PRIMARY KEY manychat_sync_control_pkey: PRIMARY KEY (id)
 // Table: mc_atendimento_custom_fields
@@ -1426,6 +1427,7 @@ export const Constants = {
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
 // Table: manychat_servicos
 //   CREATE UNIQUE INDEX manychat_servicos_codigo_key ON public.manychat_servicos USING btree (codigo)
+//   CREATE UNIQUE INDEX unique_manychat_servicos_codigo ON public.manychat_servicos USING btree (codigo)
 // Table: manychat_sync_control
 //   CREATE INDEX idx_manychat_sync_control_created_at ON public.manychat_sync_control USING btree (created_at)
 //   CREATE INDEX idx_manychat_sync_control_status ON public.manychat_sync_control USING btree (status)

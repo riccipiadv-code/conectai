@@ -90,11 +90,22 @@ Deno.serve(async (req: Request) => {
       }
 
       if (extracted.lead_servico) {
-        const { data: servico } = await supabase
+        let { data: servico } = await supabase
           .from('manychat_servicos')
           .select('id')
-          .ilike('descricao', `%${extracted.lead_servico.trim()}%`)
+          .ilike('descricao', extracted.lead_servico.trim())
           .maybeSingle()
+
+        if (!servico) {
+          const { data: servicoLike } = await supabase
+            .from('manychat_servicos')
+            .select('id')
+            .ilike('descricao', `%${extracted.lead_servico.trim()}%`)
+            .limit(1)
+            .maybeSingle()
+          servico = servicoLike
+        }
+
         if (servico) {
           record.servico_id = servico.id
         }

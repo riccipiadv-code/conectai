@@ -327,7 +327,9 @@ export default function Contacts() {
                         <TableCell className="py-5">
                           <div className="flex flex-col">
                             <span className="font-semibold text-slate-800 dark:text-slate-200 text-[15px]">
-                              {contact.manychat_servicos?.descricao || 'Não informado'}
+                              {contact.manychat_servicos?.descricao ||
+                                contact.lead_servico ||
+                                'Não informado'}
                             </span>
                             <span className="text-sm text-slate-500 mt-0.5">
                               {contact.lead_empresa_pf || 'Pessoa Física'}
