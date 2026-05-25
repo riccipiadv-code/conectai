@@ -53,12 +53,16 @@ export function useKanbanData() {
 
     try {
       await updateContactStage(id, newStage)
-      toast({ title: 'Sucesso', description: 'Estágio atualizado' })
+      toast({ title: 'Sucesso', description: 'Estágio atualizado.' })
     } catch (error: any) {
       setContacts((prev) =>
         prev.map((c) => (c.id === id ? { ...c, current_stage: previousStage } : c)),
       )
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível mover o contato.',
+        variant: 'destructive',
+      })
     }
   }
 
