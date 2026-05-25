@@ -308,11 +308,11 @@ export default function Contacts() {
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm overflow-hidden">
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800/50 bg-slate-50/30 dark:bg-zinc-900/20 pb-4">
-          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2 whitespace-nowrap">
             <Filter className="h-4 w-4 text-slate-400" />
             Filtros e Busca
           </CardTitle>
-          <div className="relative w-full sm:w-96">
+          <div className="relative w-full flex-1 max-w-full sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Buscar por nome, e-mail ou telefone..."
@@ -333,20 +333,22 @@ export default function Contacts() {
               <Table>
                 <TableHeader className="bg-slate-50/80 dark:bg-zinc-900/50">
                   <TableRow className="hover:bg-transparent border-slate-200/60 dark:border-zinc-800">
-                    <TableHead className="font-semibold text-slate-600 py-4 px-6 w-[25%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 px-6 min-w-[250px] w-[20%]">
                       Contato
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 w-[25%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[200px] w-[20%]">
                       Serviço / Empresa
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 w-[25%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[250px] w-[15%]">
                       Consulta
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 w-[12%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[220px] w-[20%]">
                       Estágio
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 w-[8%]">SLA</TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 text-right px-6 w-[5%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[120px] w-[10%]">
+                      SLA
+                    </TableHead>
+                    <TableHead className="font-semibold text-slate-600 py-4 text-right px-6 min-w-[150px] w-[15%]">
                       Ações
                     </TableHead>
                   </TableRow>
@@ -399,26 +401,17 @@ export default function Contacts() {
                         </TableCell>
                         <TableCell className="py-5">
                           {contact.lead_resumo ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="text-[15px] text-slate-700 dark:text-slate-300 max-w-[350px] 2xl:max-w-[500px] truncate cursor-default">
-                                  {contact.lead_resumo}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-[400px] p-3 text-sm whitespace-pre-wrap break-words">
-                                {contact.lead_resumo}
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <div className="text-[15px] text-slate-500 max-w-[350px] 2xl:max-w-[500px] truncate">
-                              -
+                            <div className="text-[14px] text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-relaxed max-w-full">
+                              {contact.lead_resumo}
                             </div>
+                          ) : (
+                            <div className="text-[14px] text-slate-500">-</div>
                           )}
                         </TableCell>
                         <TableCell className="py-5">
                           <Badge
                             variant="outline"
-                            className={`font-medium px-2.5 py-1 border shadow-sm ${getStageColor(
+                            className={`font-medium px-2.5 py-1 border shadow-sm whitespace-nowrap ${getStageColor(
                               contact.current_stage || 'nivel_1_novo',
                             )}`}
                           >
@@ -428,7 +421,7 @@ export default function Contacts() {
                         <TableCell className="py-5">
                           <Badge
                             variant="outline"
-                            className={`font-medium px-2.5 py-1 border shadow-sm flex inline-flex items-center gap-1.5 w-fit ${getSlaColor(
+                            className={`font-medium px-2.5 py-1 border shadow-sm flex inline-flex items-center gap-1.5 w-fit whitespace-nowrap ${getSlaColor(
                               contact.sla_status || 'green',
                             )}`}
                           >
@@ -437,7 +430,7 @@ export default function Contacts() {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-5 px-6 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                          <div className="flex items-center justify-end gap-2">
                             {contact.manychat_live_chat_url && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
