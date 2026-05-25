@@ -551,6 +551,27 @@ export type Database = {
           },
         ]
       }
+      manychat_deptos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: number
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id: number
+          nome: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: number
+          nome?: string
+        }
+        Relationships: []
+      }
       manychat_servicos: {
         Row: {
           ativo: boolean
@@ -558,6 +579,7 @@ export type Database = {
           created_at: string
           descricao: string
           id: string
+          ordem_fluxo: number | null
         }
         Insert: {
           ativo?: boolean
@@ -565,6 +587,7 @@ export type Database = {
           created_at?: string
           descricao: string
           id?: string
+          ordem_fluxo?: number | null
         }
         Update: {
           ativo?: boolean
@@ -572,6 +595,7 @@ export type Database = {
           created_at?: string
           descricao?: string
           id?: string
+          ordem_fluxo?: number | null
         }
         Relationships: []
       }
@@ -1586,7 +1610,7 @@ export const Constants = {
 //   servico_id: uuid (nullable)
 //   manual_updated_at: timestamp with time zone (nullable)
 //   manual_updated_by: uuid (nullable)
-//   current_stage: text (nullable, default: 'novo'::text)
+//   current_stage: text (nullable, default: 'nivel_1_novo'::text)
 //   sla_status: text (nullable, default: 'green'::text)
 //   responsible_user_id: uuid (nullable)
 //   last_stage_change_at: timestamp with time zone (nullable)
@@ -1595,12 +1619,18 @@ export const Constants = {
 //   deleted_at: timestamp with time zone (nullable)
 //   deleted_by: uuid (nullable)
 //   cancel_reason: text (nullable)
+// Table: manychat_deptos
+//   id: integer (not null)
+//   nome: text (not null)
+//   ativo: boolean (not null, default: true)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: manychat_servicos
 //   id: uuid (not null, default: gen_random_uuid())
 //   codigo: text (not null)
 //   descricao: text (not null)
 //   ativo: boolean (not null, default: true)
 //   created_at: timestamp with time zone (not null, default: now())
+//   ordem_fluxo: integer (nullable)
 // Table: manychat_sync_control
 //   id: uuid (not null, default: gen_random_uuid())
 //   sync_type: text (not null)
@@ -1811,6 +1841,9 @@ export const Constants = {
 //   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
 //   UNIQUE unique_telefone: UNIQUE (telefone)
+// Table: manychat_deptos
+//   UNIQUE manychat_deptos_nome_key: UNIQUE (nome)
+//   PRIMARY KEY manychat_deptos_pkey: PRIMARY KEY (id)
 // Table: manychat_servicos
 //   UNIQUE manychat_servicos_codigo_key: UNIQUE (codigo)
 //   PRIMARY KEY manychat_servicos_pkey: PRIMARY KEY (id)
@@ -2043,6 +2076,7 @@ export const Constants = {
 // You MUST create RLS policies for these tables to allow data access.
 //   - anexos
 //   - departamentos
+//   - manychat_deptos
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()
@@ -2218,6 +2252,8 @@ export const Constants = {
 //   CREATE INDEX idx_manychat_contatos_status ON public.manychat_contatos USING btree (last_update_status)
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
 //   CREATE UNIQUE INDEX unique_telefone ON public.manychat_contatos USING btree (telefone)
+// Table: manychat_deptos
+//   CREATE UNIQUE INDEX manychat_deptos_nome_key ON public.manychat_deptos USING btree (nome)
 // Table: manychat_servicos
 //   CREATE UNIQUE INDEX manychat_servicos_codigo_key ON public.manychat_servicos USING btree (codigo)
 //   CREATE UNIQUE INDEX unique_manychat_servicos_codigo ON public.manychat_servicos USING btree (codigo)

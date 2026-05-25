@@ -48,7 +48,7 @@ export function normalizeManyChatPayload(payload: any) {
     cfMap = customFields
   }
 
-  const mapServicoNumerico = (val: string) => {
+  const mapServicoLegado = (val: string) => {
     switch (String(val).trim()) {
       case '1':
         return 'Registro de Marcas'
@@ -71,12 +71,15 @@ export function normalizeManyChatPayload(payload: any) {
 
   let lead_nome = cfMap['user_nome'] || sub?.name || sub?.first_name || null
   let lead_email = cfMap['user_email'] || sub?.email || null
-  let lead_empresa_pf = cfMap['user_empresa'] || null
+  let lead_empresa_pf = cfMap['user_empresa'] || cfMap['user_tipo'] || null
   let lead_resumo = cfMap['user_resumo'] || null
+
+  let depto_id_raw = cfMap['user_servico']
+  let depto_id = depto_id_raw && !isNaN(Number(depto_id_raw)) ? Number(depto_id_raw) : null
 
   let lead_servico = cfMap['nome_servico'] || null
   if (!lead_servico && cfMap['user_servico']) {
-    lead_servico = mapServicoNumerico(cfMap['user_servico'])
+    lead_servico = mapServicoLegado(cfMap['user_servico'])
   }
 
   const chatgpt_resposta = cfMap['chatgpt_resposta_anterior'] || null
@@ -112,7 +115,7 @@ export function normalizeManyChatPayload(payload: any) {
         lead_email = tLine.replace('📧 E-mail:', '').trim()
         currentField = 'email'
       } else if (!lead_servico && tLine.startsWith('🛠️ Serviço Selecionado:')) {
-        lead_servico = mapServicoNumerico(tLine.replace('🛠️ Serviço Selecionado:', '').trim())
+        lead_servico = mapServicoLegado(tLine.replace('🛠️ Serviço Selecionado:', '').trim())
         currentField = 'servico'
       } else if (tLine.startsWith('📝 Resumo da Solicitação:')) {
         const val = tLine.replace('📝 Resumo da Solicitação:', '').trim()
@@ -175,6 +178,7 @@ export function normalizeManyChatPayload(payload: any) {
       lead_email,
       lead_empresa_pf,
       lead_resumo,
+      depto_id,
       attributes,
     },
   }

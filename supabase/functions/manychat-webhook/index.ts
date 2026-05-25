@@ -87,6 +87,7 @@ Deno.serve(async (req: Request) => {
         lead_email: extracted.lead_email,
         lead_empresa_pf: extracted.lead_empresa_pf,
         lead_resumo: extracted.lead_resumo,
+        depto_id: extracted.depto_id,
       }
 
       if (extracted.lead_servico) {
