@@ -69,6 +69,16 @@ export async function getContacts() {
   return data as Contact[]
 }
 
+const OFFICIAL_STAGES = [
+  'nivel_1_novo',
+  'nivel_2_especialista',
+  'nivel_3_especial',
+  'reuniao_consulta_agendada',
+  'enviado_orcamento_ag_retorno',
+  'orcamento_aprovado',
+  'cancelado',
+]
+
 export async function updateContact(id: string, updates: Partial<Contact>, previousStage?: string) {
   const { data: userData } = await supabase.auth.getUser()
   const userId = userData?.user?.id || null
@@ -76,42 +86,8 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
 
   if (updates.current_stage && previousStage && updates.current_stage !== previousStage) {
     const newStage = updates.current_stage
-    const validTransitions: Record<string, string[]> = {
-      nivel_1_novo: [
-        'nivel_2_especialista',
-        'nivel_3_especial',
-        'reuniao_consulta_agendada',
-        'enviado_orcamento_ag_retorno',
-        'orcamento_aprovado',
-        'cancelado',
-      ],
-      nivel_2_especialista: [
-        'nivel_3_especial',
-        'reuniao_consulta_agendada',
-        'enviado_orcamento_ag_retorno',
-        'orcamento_aprovado',
-        'cancelado',
-      ],
-      nivel_3_especial: [
-        'reuniao_consulta_agendada',
-        'enviado_orcamento_ag_retorno',
-        'orcamento_aprovado',
-        'cancelado',
-      ],
-      reuniao_consulta_agendada: [
-        'enviado_orcamento_ag_retorno',
-        'orcamento_aprovado',
-        'cancelado',
-      ],
-      enviado_orcamento_ag_retorno: ['orcamento_aprovado', 'cancelado'],
-      orcamento_aprovado: ['cancelado'],
-      cancelado: [],
-    }
-    const allowed = validTransitions[previousStage] || []
-    if (!allowed.includes(newStage) && newStage !== 'cancelado') {
-      throw new Error(
-        `Transição de estágio não permitida: de '${previousStage}' para '${newStage}'`,
-      )
+    if (!OFFICIAL_STAGES.includes(newStage)) {
+      throw new Error(`Estágio inválido: '${newStage}'`)
     }
     updates.last_stage_change_at = now
   }
@@ -145,7 +121,7 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
       .eq('id', id)
       .single()
     if (contact) {
-      await supabase.from('mc_kanban_history').insert({
+      const { error: historyError } = await supabase.from('mc_kanban_history').insert({
         contato_id: id,
         manychat_id: contact.manychat_id,
         previous_stage: previousStage,
@@ -153,6 +129,9 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
         changed_by: userId,
         created_at: now,
       })
+      if (historyError) {
+        console.error('Erro ao salvar histórico do kanban:', historyError)
+      }
     }
   }
 }
@@ -181,37 +160,8 @@ export async function updateContactStage(id: string, newStage: string) {
   if (currentStage === newStage) return
 
   // 2. Validar transição de estágio
-  const validTransitions: Record<string, string[]> = {
-    nivel_1_novo: [
-      'nivel_2_especialista',
-      'nivel_3_especial',
-      'reuniao_consulta_agendada',
-      'enviado_orcamento_ag_retorno',
-      'orcamento_aprovado',
-      'cancelado',
-    ],
-    nivel_2_especialista: [
-      'nivel_3_especial',
-      'reuniao_consulta_agendada',
-      'enviado_orcamento_ag_retorno',
-      'orcamento_aprovado',
-      'cancelado',
-    ],
-    nivel_3_especial: [
-      'reuniao_consulta_agendada',
-      'enviado_orcamento_ag_retorno',
-      'orcamento_aprovado',
-      'cancelado',
-    ],
-    reuniao_consulta_agendada: ['enviado_orcamento_ag_retorno', 'orcamento_aprovado', 'cancelado'],
-    enviado_orcamento_ag_retorno: ['orcamento_aprovado', 'cancelado'],
-    orcamento_aprovado: ['cancelado'],
-    cancelado: [],
-  }
-
-  const allowed = validTransitions[currentStage] || []
-  if (!allowed.includes(newStage) && newStage !== 'cancelado') {
-    throw new Error(`Transição de estágio não permitida: de '${currentStage}' para '${newStage}'`)
+  if (!OFFICIAL_STAGES.includes(newStage)) {
+    throw new Error(`Estágio inválido: '${newStage}'`)
   }
 
   const { data: userData } = await supabase.auth.getUser()
@@ -243,7 +193,6 @@ export async function updateContactStage(id: string, newStage: string) {
 
   if (historyError) {
     console.error('Erro ao salvar histórico do kanban:', historyError)
-    throw historyError
   }
 }
 

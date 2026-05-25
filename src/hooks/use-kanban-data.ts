@@ -48,16 +48,22 @@ export function useKanbanData() {
     const contact = contacts.find((c) => c.id === id)
     if (!contact || contact.current_stage === newStage) return
 
-    const previousStage = contact.current_stage
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, current_stage: newStage } : c)))
+    const previousContact = { ...contact }
+    const now = new Date().toISOString()
+
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.id === id
+          ? { ...c, current_stage: newStage, last_stage_change_at: now, updated_at: now }
+          : c,
+      ),
+    )
 
     try {
       await updateContactStage(id, newStage)
       toast({ title: 'Sucesso', description: 'Estágio atualizado.' })
     } catch (error: any) {
-      setContacts((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, current_stage: previousStage } : c)),
-      )
+      setContacts((prev) => prev.map((c) => (c.id === id ? previousContact : c)))
       toast({
         title: 'Erro',
         description: 'Não foi possível mover o contato.',

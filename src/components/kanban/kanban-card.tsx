@@ -54,14 +54,17 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
         >
           {contact.lead_nome || contact.nome || 'Sem nome'}
         </div>
-        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity gap-1 shrink-0">
+        <div className="flex gap-1 shrink-0">
           <button
             onClick={() => onView(contact)}
-            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
+            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => onEdit(contact)} className="p-1 text-slate-400 hover:text-primary">
+          <button
+            onClick={() => onEdit(contact)}
+            className="p-1 text-slate-400 hover:text-primary transition-colors"
+          >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
         </div>
