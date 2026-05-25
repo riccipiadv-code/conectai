@@ -121,6 +121,7 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
 
   const payload: any = {
     ...updates,
+    depto_id: updates.depto_id !== undefined ? updates.depto_id : null,
     manual_updated_at: now,
     manual_updated_by: userId,
     updated_at: now,

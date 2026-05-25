@@ -219,7 +219,7 @@ export default function Contacts() {
       lead_empresa_pf: contact.lead_empresa_pf || '',
       lead_email: contact.lead_email || '',
       servico_id: contact.servico_id || '',
-      depto_id: contact.depto_id || undefined,
+      depto_id: contact.depto_id ?? null,
       lead_servico: contact.lead_servico || '',
       lead_resumo: contact.lead_resumo || '',
       current_stage: contact.current_stage || 'nivel_1_novo',
@@ -570,7 +570,7 @@ export default function Contacts() {
                       ...updateForm,
                       servico_id: val,
                       lead_servico: servico?.descricao || '',
-                      depto_id: servico?.depto_id || undefined,
+                      depto_id: servico?.depto_id ?? null,
                     })
                   }}
                   disabled={isView}
@@ -591,7 +591,9 @@ export default function Contacts() {
                 <Label className="text-slate-600 dark:text-slate-400">Departamento</Label>
                 <Select
                   value={updateForm.depto_id ? String(updateForm.depto_id) : ''}
-                  onValueChange={(val) => setUpdateForm({ ...updateForm, depto_id: Number(val) })}
+                  onValueChange={(val) =>
+                    setUpdateForm({ ...updateForm, depto_id: val ? Number(val) : null })
+                  }
                   disabled={isView}
                 >
                   <SelectTrigger className="h-10">

@@ -170,7 +170,9 @@ export default function Layout() {
           </div>
         </header>
         <main className="flex-1 p-6 md:p-8 overflow-auto">
-          <div className="max-w-7xl mx-auto">
+          <div
+            className={location.pathname === '/contatos' ? 'w-full mx-auto' : 'max-w-7xl mx-auto'}
+          >
             <Outlet />
           </div>
         </main>
