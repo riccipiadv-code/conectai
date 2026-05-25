@@ -27,15 +27,38 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
   if (updates.current_stage && previousStage && updates.current_stage !== previousStage) {
     const newStage = updates.current_stage
     const validTransitions: Record<string, string[]> = {
-      novo: ['triagem_n1'],
-      triagem_n1: ['nivel_2'],
-      nivel_2: ['aguardando_cliente'],
-      aguardando_cliente: ['aprovado', 'cancelado'],
-      aprovado: [],
+      nivel_1_novo: [
+        'nivel_2_especialista',
+        'nivel_3_especial',
+        'reuniao_consulta_agendada',
+        'enviado_orcamento_ag_retorno',
+        'orcamento_aprovado',
+        'cancelado',
+      ],
+      nivel_2_especialista: [
+        'nivel_3_especial',
+        'reuniao_consulta_agendada',
+        'enviado_orcamento_ag_retorno',
+        'orcamento_aprovado',
+        'cancelado',
+      ],
+      nivel_3_especial: [
+        'reuniao_consulta_agendada',
+        'enviado_orcamento_ag_retorno',
+        'orcamento_aprovado',
+        'cancelado',
+      ],
+      reuniao_consulta_agendada: [
+        'enviado_orcamento_ag_retorno',
+        'orcamento_aprovado',
+        'cancelado',
+      ],
+      enviado_orcamento_ag_retorno: ['orcamento_aprovado', 'cancelado'],
+      orcamento_aprovado: ['cancelado'],
       cancelado: [],
     }
     const allowed = validTransitions[previousStage] || []
-    if (!allowed.includes(newStage)) {
+    if (!allowed.includes(newStage) && newStage !== 'cancelado') {
       throw new Error(
         `Transição de estágio não permitida: de '${previousStage}' para '${newStage}'`,
       )
@@ -92,22 +115,41 @@ export async function updateContactStage(id: string, newStage: string) {
   if (fetchError) throw fetchError
   if (!contact) throw new Error('Contato não encontrado')
 
-  const currentStage = contact.current_stage || 'novo'
+  const currentStage = contact.current_stage || 'nivel_1_novo'
 
   if (currentStage === newStage) return
 
   // 2. Validar transição de estágio
   const validTransitions: Record<string, string[]> = {
-    novo: ['triagem_n1'],
-    triagem_n1: ['nivel_2'],
-    nivel_2: ['aguardando_cliente'],
-    aguardando_cliente: ['aprovado', 'cancelado'],
-    aprovado: [],
+    nivel_1_novo: [
+      'nivel_2_especialista',
+      'nivel_3_especial',
+      'reuniao_consulta_agendada',
+      'enviado_orcamento_ag_retorno',
+      'orcamento_aprovado',
+      'cancelado',
+    ],
+    nivel_2_especialista: [
+      'nivel_3_especial',
+      'reuniao_consulta_agendada',
+      'enviado_orcamento_ag_retorno',
+      'orcamento_aprovado',
+      'cancelado',
+    ],
+    nivel_3_especial: [
+      'reuniao_consulta_agendada',
+      'enviado_orcamento_ag_retorno',
+      'orcamento_aprovado',
+      'cancelado',
+    ],
+    reuniao_consulta_agendada: ['enviado_orcamento_ag_retorno', 'orcamento_aprovado', 'cancelado'],
+    enviado_orcamento_ag_retorno: ['orcamento_aprovado', 'cancelado'],
+    orcamento_aprovado: ['cancelado'],
     cancelado: [],
   }
 
   const allowed = validTransitions[currentStage] || []
-  if (!allowed.includes(newStage)) {
+  if (!allowed.includes(newStage) && newStage !== 'cancelado') {
     throw new Error(`Transição de estágio não permitida: de '${currentStage}' para '${newStage}'`)
   }
 

@@ -56,11 +56,12 @@ import { useToast } from '@/hooks/use-toast'
 
 const getStageLabel = (stage: string) => {
   const map: Record<string, string> = {
-    novo: 'Novo',
-    triagem_n1: 'Triagem N1',
-    nivel_2: 'Nível 2',
-    aguardando_cliente: 'Aguardando Cliente',
-    aprovado: 'Aprovado',
+    nivel_1_novo: 'Nível 1 - Novo',
+    nivel_2_especialista: 'Nível 2 - Especialista',
+    nivel_3_especial: 'Nível 3 - Especial',
+    reuniao_consulta_agendada: 'Reunião Consulta Agendada',
+    enviado_orcamento_ag_retorno: 'Enviado orçamento - Ag. Retorno',
+    orcamento_aprovado: 'Orçamento aprovado',
     cancelado: 'Cancelado',
   }
   return map[stage] || stage.replace('_', ' ')
@@ -68,15 +69,17 @@ const getStageLabel = (stage: string) => {
 
 const getStageColor = (stage: string) => {
   switch (stage) {
-    case 'novo':
+    case 'nivel_1_novo':
       return 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-    case 'triagem_n1':
+    case 'nivel_2_especialista':
       return 'bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800'
-    case 'nivel_2':
+    case 'nivel_3_especial':
       return 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800'
-    case 'aguardando_cliente':
-      return 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 dark:bg-amber-900/50 dark:text-amber-300 dark:border-amber-800'
-    case 'aprovado':
+    case 'reuniao_consulta_agendada':
+      return 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800'
+    case 'enviado_orcamento_ag_retorno':
+      return 'bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:border-orange-800'
+    case 'orcamento_aprovado':
       return 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800'
     case 'cancelado':
       return 'bg-rose-100 text-rose-700 hover:bg-rose-200 border-rose-200 dark:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800'
@@ -190,7 +193,7 @@ export default function Contacts() {
       lead_email: contact.lead_email || '',
       lead_servico: contact.lead_servico || '',
       lead_resumo: contact.lead_resumo || '',
-      current_stage: contact.current_stage || 'novo',
+      current_stage: contact.current_stage || 'nivel_1_novo',
       sla_status: contact.sla_status || 'green',
     })
   }
@@ -199,7 +202,11 @@ export default function Contacts() {
     if (!updatingContact) return
     setSaving(true)
     try {
-      await updateContact(updatingContact.id, updateForm, updatingContact.current_stage || 'novo')
+      await updateContact(
+        updatingContact.id,
+        updateForm,
+        updatingContact.current_stage || 'nivel_1_novo',
+      )
       toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
       setContacts(contacts.map((c) => (c.id === updatingContact.id ? { ...c, ...updateForm } : c)))
       setUpdatingContact(null)
@@ -358,10 +365,10 @@ export default function Contacts() {
                           <Badge
                             variant="outline"
                             className={`font-medium px-2.5 py-1 border shadow-sm ${getStageColor(
-                              contact.current_stage || 'novo',
+                              contact.current_stage || 'nivel_1_novo',
                             )}`}
                           >
-                            {getStageLabel(contact.current_stage || 'novo')}
+                            {getStageLabel(contact.current_stage || 'nivel_1_novo')}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-5">
@@ -498,18 +505,23 @@ export default function Contacts() {
               <div className="space-y-2">
                 <Label className="text-slate-600">Estágio</Label>
                 <Select
-                  value={updateForm.current_stage || 'novo'}
+                  value={updateForm.current_stage || 'nivel_1_novo'}
                   onValueChange={(v) => setUpdateForm({ ...updateForm, current_stage: v })}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="Estágio" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="novo">Novo</SelectItem>
-                    <SelectItem value="triagem_n1">Triagem N1</SelectItem>
-                    <SelectItem value="nivel_2">Nível 2</SelectItem>
-                    <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
-                    <SelectItem value="aprovado">Aprovado</SelectItem>
+                    <SelectItem value="nivel_1_novo">Nível 1 - Novo</SelectItem>
+                    <SelectItem value="nivel_2_especialista">Nível 2 - Especialista</SelectItem>
+                    <SelectItem value="nivel_3_especial">Nível 3 - Especial</SelectItem>
+                    <SelectItem value="reuniao_consulta_agendada">
+                      Reunião Consulta Agendada
+                    </SelectItem>
+                    <SelectItem value="enviado_orcamento_ag_retorno">
+                      Enviado orçamento - Ag. Retorno
+                    </SelectItem>
+                    <SelectItem value="orcamento_aprovado">Orçamento aprovado</SelectItem>
                     <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>

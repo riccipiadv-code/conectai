@@ -118,7 +118,7 @@ Deno.serve(async (req: Request) => {
         .maybeSingle()
 
       if (!existingContact) {
-        record.current_stage = 'novo'
+        record.current_stage = 'nivel_1_novo'
         record.sla_status = 'green'
         record.sla_started_at = new Date().toISOString()
       }
