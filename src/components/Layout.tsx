@@ -17,7 +17,7 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, Users, LogOut, Loader2, Settings, ListIcon, Blocks } from 'lucide-react'
+import { Kanban, Users, LogOut, Loader2, Settings, ListIcon, Blocks } from 'lucide-react'
 
 export default function Layout() {
   const { user, loading, signOut } = useAuth()
@@ -74,8 +74,8 @@ export default function Layout() {
                     className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
                   >
                     <Link to="/">
-                      <LayoutDashboard className="h-5 w-5 opacity-70" />
-                      <span className="text-[15px]">Dashboard</span>
+                      <Kanban className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Kanban</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -160,7 +160,7 @@ export default function Layout() {
           <div className="flex-1">
             <h1 className="font-semibold text-lg tracking-tight text-slate-800 dark:text-slate-100">
               {location.pathname === '/'
-                ? 'Dashboard Geral'
+                ? 'Kanban'
                 : location.pathname === '/contatos'
                   ? 'Gestão de Atendimentos'
                   : location.pathname === '/logs'
