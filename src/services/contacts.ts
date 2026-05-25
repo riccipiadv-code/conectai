@@ -30,7 +30,7 @@ export async function getServicos(): Promise<Servico[]> {
     .from('manychat_servicos')
     .select('id, descricao, depto_id')
     .eq('ativo', true)
-    .order('descricao')
+    .order('ordem_fluxo', { ascending: true })
   if (error) throw error
   return data
 }
@@ -40,7 +40,7 @@ export async function getDeptos(): Promise<Depto[]> {
     .from('manychat_deptos')
     .select('id, nome')
     .eq('ativo', true)
-    .order('nome')
+    .order('id', { ascending: true })
   if (error) throw error
   return data
 }

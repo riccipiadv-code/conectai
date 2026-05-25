@@ -376,6 +376,27 @@ export type Database = {
         }
         Relationships: []
       }
+      manychat_cancel_reasons: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          motivo: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          motivo: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          motivo?: string
+        }
+        Relationships: []
+      }
       manychat_contact_attributes: {
         Row: {
           attribute_key: string
@@ -413,7 +434,9 @@ export type Database = {
       }
       manychat_contatos: {
         Row: {
+          cancel_obs: string | null
           cancel_reason: string | null
+          cancel_reason_id: string | null
           created_at: string
           current_stage: string | null
           deleted_at: string | null
@@ -457,7 +480,9 @@ export type Database = {
           whatsapp_phone: string | null
         }
         Insert: {
+          cancel_obs?: string | null
           cancel_reason?: string | null
+          cancel_reason_id?: string | null
           created_at?: string
           current_stage?: string | null
           deleted_at?: string | null
@@ -501,7 +526,9 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Update: {
+          cancel_obs?: string | null
           cancel_reason?: string | null
+          cancel_reason_id?: string | null
           created_at?: string
           current_stage?: string | null
           deleted_at?: string | null
@@ -545,6 +572,13 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'manychat_contatos_cancel_reason_id_fkey'
+            columns: ['cancel_reason_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_cancel_reasons'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'manychat_contatos_depto_id_fkey'
             columns: ['depto_id']
@@ -1591,6 +1625,11 @@ export const Constants = {
 //   origem: text (nullable, default: 'LEGALDESK'::text)
 //   sincronizado_em: timestamp with time zone (nullable, default: now())
 //   departamento: text (nullable)
+// Table: manychat_cancel_reasons
+//   id: uuid (not null, default: gen_random_uuid())
+//   motivo: text (not null)
+//   ativo: boolean (not null, default: true)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: manychat_contact_attributes
 //   id: uuid (nullable, default: gen_random_uuid())
 //   manychat_id: text (not null)
@@ -1641,6 +1680,8 @@ export const Constants = {
 //   deleted_by: uuid (nullable)
 //   cancel_reason: text (nullable)
 //   depto_id: integer (nullable)
+//   cancel_reason_id: uuid (nullable)
+//   cancel_obs: text (nullable)
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)
@@ -1853,10 +1894,14 @@ export const Constants = {
 // Table: legaldesk_usuarios
 //   PRIMARY KEY legaldesk_usuarios_pkey: PRIMARY KEY (id)
 //   UNIQUE legaldesk_usuarios_source_id_key: UNIQUE (source_id)
+// Table: manychat_cancel_reasons
+//   UNIQUE manychat_cancel_reasons_motivo_key: UNIQUE (motivo)
+//   PRIMARY KEY manychat_cancel_reasons_pkey: PRIMARY KEY (id)
 // Table: manychat_contact_attributes
 //   FOREIGN KEY manychat_contact_attributes_manychat_id_fkey: FOREIGN KEY (manychat_id) REFERENCES manychat_contatos(manychat_id) ON DELETE CASCADE
 //   PRIMARY KEY manychat_contact_attributes_pkey: PRIMARY KEY (manychat_id, attribute_key)
 // Table: manychat_contatos
+//   FOREIGN KEY manychat_contatos_cancel_reason_id_fkey: FOREIGN KEY (cancel_reason_id) REFERENCES manychat_cancel_reasons(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_deleted_by_fkey: FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_manual_updated_by_fkey: FOREIGN KEY (manual_updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
@@ -1981,6 +2026,9 @@ export const Constants = {
 //     USING: true
 // Table: legaldesk_usuarios
 //   Policy "authenticated_select_legaldesk_usuarios" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: manychat_cancel_reasons
+//   Policy "authenticated_select_cancel_reasons" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: manychat_contact_attributes
 //   Policy "authenticated_all_manychat_contact_attributes" (ALL, PERMISSIVE) roles={authenticated}
@@ -2266,6 +2314,8 @@ export const Constants = {
 // Table: legaldesk_usuarios
 //   CREATE INDEX idx_legaldesk_usuarios_email ON public.legaldesk_usuarios USING btree (email)
 //   CREATE UNIQUE INDEX legaldesk_usuarios_source_id_key ON public.legaldesk_usuarios USING btree (source_id)
+// Table: manychat_cancel_reasons
+//   CREATE UNIQUE INDEX manychat_cancel_reasons_motivo_key ON public.manychat_cancel_reasons USING btree (motivo)
 // Table: manychat_contact_attributes
 //   CREATE INDEX idx_manychat_contact_attributes_key ON public.manychat_contact_attributes USING btree (attribute_key)
 //   CREATE UNIQUE INDEX idx_manychat_contact_attributes_unique ON public.manychat_contact_attributes USING btree (manychat_id, attribute_key)

@@ -62,6 +62,7 @@ import {
   AlertCircle,
   Clock,
   CheckCircle,
+  Eye,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -69,7 +70,7 @@ const getStageLabel = (stage: string) => {
   const map: Record<string, string> = {
     nivel_1_novo: 'Nível 1 - Novo',
     nivel_2_especialista: 'Nível 2 - Especialista',
-    nivel_3_especial: 'Nível 3 - Especial',
+    nivel_3_especial: 'Nível 3 - Especialista',
     reuniao_consulta_agendada: 'Reunião/Consulta Agendada',
     enviado_orcamento_ag_retorno: 'Enviado Orçamento / Aguardando Retorno',
     orcamento_aprovado: 'Orçamento Aprovado',
@@ -161,6 +162,7 @@ export default function Contacts() {
 
   const [updatingContact, setUpdatingContact] = useState<Contact | null>(null)
   const [updateForm, setUpdateForm] = useState<Partial<Contact>>({})
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('edit')
 
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null)
 
@@ -208,12 +210,13 @@ export default function Contacts() {
       .toUpperCase()
   }
 
-  const handleEdit = (contact: Contact) => {
+  const handleOpenModal = (contact: Contact, mode: 'view' | 'edit') => {
+    setModalMode(mode)
     setUpdatingContact(contact)
     setUpdateForm({
       nome: contact.nome || contact.lead_nome || '',
       lead_nome: contact.lead_nome || contact.nome || '',
-      lead_empresa_pf: contact.lead_empresa_pf || 'Pessoa Física',
+      lead_empresa_pf: contact.lead_empresa_pf || '',
       lead_email: contact.lead_email || '',
       servico_id: contact.servico_id || '',
       depto_id: contact.depto_id || undefined,
@@ -240,22 +243,20 @@ export default function Contacts() {
 
     setSaving(true)
     try {
+      const payload = { ...updateForm }
+      if (payload.current_stage !== 'cancelado') {
+        payload.cancel_reason_id = null
+        payload.cancel_obs = null
+      }
+
       await updateContact(
         updatingContact.id,
-        updateForm,
+        payload,
         updatingContact.current_stage || 'nivel_1_novo',
       )
       toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
 
-      const nullifiedForm = { ...updateForm }
-      if (nullifiedForm.current_stage !== 'cancelado') {
-        nullifiedForm.cancel_reason_id = null
-        nullifiedForm.cancel_obs = null
-      }
-
-      setContacts(
-        contacts.map((c) => (c.id === updatingContact.id ? { ...c, ...nullifiedForm } : c)),
-      )
+      setContacts(contacts.map((c) => (c.id === updatingContact.id ? { ...c, ...payload } : c)))
       setUpdatingContact(null)
     } catch (error: any) {
       toast({
@@ -290,6 +291,8 @@ export default function Contacts() {
     }
   }
 
+  const isView = modalMode === 'view'
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -309,11 +312,11 @@ export default function Contacts() {
             <Filter className="h-4 w-4 text-slate-400" />
             Filtros e Busca
           </CardTitle>
-          <div className="relative w-full sm:w-80">
+          <div className="relative w-full sm:w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Buscar por nome, e-mail ou telefone..."
-              className="pl-9 bg-white dark:bg-zinc-950 border-slate-200 shadow-sm focus-visible:ring-primary/20 h-10"
+              className="pl-9 bg-white dark:bg-zinc-950 border-slate-200 shadow-sm focus-visible:ring-primary/20 h-10 w-full"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -330,16 +333,20 @@ export default function Contacts() {
               <Table>
                 <TableHeader className="bg-slate-50/80 dark:bg-zinc-900/50">
                   <TableRow className="hover:bg-transparent border-slate-200/60 dark:border-zinc-800">
-                    <TableHead className="font-semibold text-slate-600 py-4 px-6">
+                    <TableHead className="font-semibold text-slate-600 py-4 px-6 w-[25%]">
                       Contato
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4">
+                    <TableHead className="font-semibold text-slate-600 py-4 w-[25%]">
                       Serviço / Empresa
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4">Consulta</TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4">Estágio</TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4">SLA</TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 text-right px-6">
+                    <TableHead className="font-semibold text-slate-600 py-4 w-[25%]">
+                      Consulta
+                    </TableHead>
+                    <TableHead className="font-semibold text-slate-600 py-4 w-[12%]">
+                      Estágio
+                    </TableHead>
+                    <TableHead className="font-semibold text-slate-600 py-4 w-[8%]">SLA</TableHead>
+                    <TableHead className="font-semibold text-slate-600 py-4 text-right px-6 w-[5%]">
                       Ações
                     </TableHead>
                   </TableRow>
@@ -362,30 +369,30 @@ export default function Contacts() {
                       >
                         <TableCell className="px-6 py-5">
                           <div className="flex items-center gap-4">
-                            <Avatar className="h-10 w-10 border border-slate-200/50 shadow-sm">
+                            <Avatar className="h-10 w-10 border border-slate-200/50 shadow-sm shrink-0">
                               <AvatarImage src={contact.foto || ''} alt={contact.nome || ''} />
                               <AvatarFallback className="bg-primary/10 text-primary font-medium">
                                 {getInitials(contact.lead_nome || contact.nome)}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-base">
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate">
                                 {contact.lead_nome || contact.nome || 'Sem nome'}
                               </span>
-                              <span className="text-sm text-slate-500 mt-0.5 flex items-center gap-1">
+                              <span className="text-sm text-slate-500 mt-0.5 flex items-center gap-1 truncate">
                                 {contact.whatsapp_phone || contact.telefone || 'Sem telefone'}
                               </span>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell className="py-5">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-slate-800 dark:text-slate-200 text-[15px]">
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 text-[15px] truncate">
                               {contact.manychat_servicos?.descricao ||
                                 contact.lead_servico ||
                                 'Não informado'}
                             </span>
-                            <span className="text-sm text-slate-500 mt-0.5">
+                            <span className="text-sm text-slate-500 mt-0.5 truncate">
                               {contact.lead_empresa_pf || 'Pessoa Física'}
                             </span>
                           </div>
@@ -394,7 +401,7 @@ export default function Contacts() {
                           {contact.lead_resumo ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="text-[15px] text-slate-700 dark:text-slate-300 max-w-[300px] truncate cursor-default">
+                                <div className="text-[15px] text-slate-700 dark:text-slate-300 max-w-[350px] 2xl:max-w-[500px] truncate cursor-default">
                                   {contact.lead_resumo}
                                 </div>
                               </TooltipTrigger>
@@ -403,7 +410,7 @@ export default function Contacts() {
                               </TooltipContent>
                             </Tooltip>
                           ) : (
-                            <div className="text-[15px] text-slate-500 max-w-[300px] truncate">
+                            <div className="text-[15px] text-slate-500 max-w-[350px] 2xl:max-w-[500px] truncate">
                               -
                             </div>
                           )}
@@ -430,7 +437,7 @@ export default function Contacts() {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-5 px-6 text-right">
-                          <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
                             {contact.manychat_live_chat_url && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -438,7 +445,7 @@ export default function Contacts() {
                                     variant="ghost"
                                     size="icon"
                                     asChild
-                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-900/30 transition-colors"
                                   >
                                     <a
                                       href={contact.manychat_live_chat_url}
@@ -457,7 +464,20 @@ export default function Contacts() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleEdit(contact)}
+                                  onClick={() => handleOpenModal(contact, 'view')}
+                                  className="h-8 w-8 text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:hover:text-slate-100 dark:hover:bg-zinc-800 transition-colors"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Visualizar</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenModal(contact, 'edit')}
                                   className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/10 transition-colors"
                                 >
                                   <Edit2 className="h-4 w-4" />
@@ -471,7 +491,7 @@ export default function Contacts() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => setDeletingContact(contact)}
-                                  className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                  className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-900/30 transition-colors"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -490,16 +510,18 @@ export default function Contacts() {
         </CardContent>
       </Card>
 
-      {/* Edit Modal */}
+      {/* View/Edit Modal */}
       <Dialog open={!!updatingContact} onOpenChange={(open) => !open && setUpdatingContact(null)}>
-        <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-zinc-800">
-            <DialogTitle className="text-xl">Atualizar Contato</DialogTitle>
+            <DialogTitle className="text-xl">
+              {isView ? 'Visualizar Contato' : 'Atualizar Contato'}
+            </DialogTitle>
           </DialogHeader>
           <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-slate-600">Nome</Label>
+                <Label className="text-slate-600 dark:text-slate-400">Nome</Label>
                 <Input
                   value={updateForm.lead_nome || ''}
                   onChange={(e) =>
@@ -510,38 +532,36 @@ export default function Contacts() {
                     })
                   }
                   placeholder="Nome"
+                  disabled={isView}
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-600">Empresa / PF</Label>
-                <Select
+                <Label className="text-slate-600 dark:text-slate-400">Empresa / PF</Label>
+                <Input
                   value={updateForm.lead_empresa_pf || ''}
-                  onValueChange={(v) => setUpdateForm({ ...updateForm, lead_empresa_pf: v })}
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue placeholder="Empresa / PF" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Pessoa Física">Pessoa Física</SelectItem>
-                    <SelectItem value="Empresa">Empresa</SelectItem>
-                  </SelectContent>
-                </Select>
+                  onChange={(e) =>
+                    setUpdateForm({ ...updateForm, lead_empresa_pf: e.target.value })
+                  }
+                  placeholder="Nome da empresa ou PF"
+                  disabled={isView}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-600">E-mail</Label>
+              <Label className="text-slate-600 dark:text-slate-400">E-mail</Label>
               <Input
                 type="email"
                 value={updateForm.lead_email || ''}
                 onChange={(e) => setUpdateForm({ ...updateForm, lead_email: e.target.value })}
                 placeholder="email@exemplo.com"
+                disabled={isView}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-slate-600">Serviço Selecionado</Label>
+                <Label className="text-slate-600 dark:text-slate-400">Serviço Selecionado</Label>
                 <Select
                   value={updateForm.servico_id || ''}
                   onValueChange={(val) => {
@@ -553,6 +573,7 @@ export default function Contacts() {
                       depto_id: servico?.depto_id || undefined,
                     })
                   }}
+                  disabled={isView}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione um serviço" />
@@ -567,10 +588,11 @@ export default function Contacts() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-600">Departamento</Label>
+                <Label className="text-slate-600 dark:text-slate-400">Departamento</Label>
                 <Select
                   value={updateForm.depto_id ? String(updateForm.depto_id) : ''}
                   onValueChange={(val) => setUpdateForm({ ...updateForm, depto_id: Number(val) })}
+                  disabled={isView}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="Selecione um departamento" />
@@ -587,22 +609,24 @@ export default function Contacts() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-600">Resumo da Solicitação</Label>
+              <Label className="text-slate-600 dark:text-slate-400">Resumo da Solicitação</Label>
               <Textarea
                 value={updateForm.lead_resumo || ''}
                 onChange={(e) => setUpdateForm({ ...updateForm, lead_resumo: e.target.value })}
                 placeholder="Detalhes da consulta..."
                 className="resize-none"
                 rows={4}
+                disabled={isView}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-zinc-800">
               <div className="space-y-2">
-                <Label className="text-slate-600">Estágio</Label>
+                <Label className="text-slate-600 dark:text-slate-400">Estágio</Label>
                 <Select
                   value={updateForm.current_stage || 'nivel_1_novo'}
                   onValueChange={(v) => setUpdateForm({ ...updateForm, current_stage: v })}
+                  disabled={isView}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="Estágio" />
@@ -610,7 +634,7 @@ export default function Contacts() {
                   <SelectContent>
                     <SelectItem value="nivel_1_novo">Nível 1 - Novo</SelectItem>
                     <SelectItem value="nivel_2_especialista">Nível 2 - Especialista</SelectItem>
-                    <SelectItem value="nivel_3_especial">Nível 3 - Especial</SelectItem>
+                    <SelectItem value="nivel_3_especial">Nível 3 - Especialista</SelectItem>
                     <SelectItem value="reuniao_consulta_agendada">
                       Reunião/Consulta Agendada
                     </SelectItem>
@@ -623,10 +647,11 @@ export default function Contacts() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-600">SLA</Label>
+                <Label className="text-slate-600 dark:text-slate-400">SLA</Label>
                 <Select
                   value={updateForm.sla_status || 'green'}
                   onValueChange={(v) => setUpdateForm({ ...updateForm, sla_status: v })}
+                  disabled={isView}
                 >
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder="SLA" />
@@ -645,14 +670,15 @@ export default function Contacts() {
             {updateForm.current_stage === 'cancelado' && (
               <div className="grid grid-cols-1 gap-4 pt-4 border-t border-slate-100 dark:border-zinc-800 animate-fade-in-up duration-300">
                 <div className="space-y-2">
-                  <Label className="text-slate-600">
+                  <Label className="text-slate-600 dark:text-slate-400">
                     Motivo do Cancelamento <span className="text-rose-500">*</span>
                   </Label>
                   <Select
                     value={updateForm.cancel_reason_id || ''}
                     onValueChange={(v) => setUpdateForm({ ...updateForm, cancel_reason_id: v })}
+                    disabled={isView}
                   >
-                    <SelectTrigger className="h-10 border-rose-200 focus:ring-rose-500/20">
+                    <SelectTrigger className="h-10 border-rose-200 dark:border-rose-900/50 focus:ring-rose-500/20">
                       <SelectValue placeholder="Selecione um motivo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -665,13 +691,16 @@ export default function Contacts() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-600">Observação do Cancelamento</Label>
+                  <Label className="text-slate-600 dark:text-slate-400">
+                    Observação do Cancelamento
+                  </Label>
                   <Textarea
                     value={updateForm.cancel_obs || ''}
                     onChange={(e) => setUpdateForm({ ...updateForm, cancel_obs: e.target.value })}
                     placeholder="Adicione observações adicionais..."
                     className="resize-none"
                     rows={3}
+                    disabled={isView}
                   />
                 </div>
               </div>
@@ -679,11 +708,13 @@ export default function Contacts() {
           </div>
           <DialogFooter className="p-6 pt-4 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/50">
             <Button variant="outline" onClick={() => setUpdatingContact(null)} className="h-10">
-              Cancelar
+              {isView ? 'Fechar' : 'Cancelar'}
             </Button>
-            <Button onClick={handleUpdate} disabled={saving} className="h-10 px-8">
-              {saving ? 'Salvando...' : 'Salvar Alterações'}
-            </Button>
+            {!isView && (
+              <Button onClick={handleUpdate} disabled={saving} className="h-10 px-8">
+                {saving ? 'Salvando...' : 'Salvar Alterações'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
