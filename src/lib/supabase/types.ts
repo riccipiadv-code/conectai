@@ -9,6 +9,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      anexos: {
+        Row: {
+          created_at: string
+          file_url: string
+          id: string
+          nome: string
+          tarefa_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_url: string
+          id?: string
+          nome: string
+          tarefa_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_url?: string
+          id?: string
+          nome?: string
+          tarefa_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'anexos_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'tarefas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      areas: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          gestor_id: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          gestor_id?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          gestor_id?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'areas_gestor_id_fkey'
+            columns: ['gestor_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'fk_gestor'
+            columns: ['gestor_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       atendimentos: {
         Row: {
           created_at: string
@@ -60,6 +137,95 @@ export type Database = {
         }
         Relationships: []
       }
+      comentarios: {
+        Row: {
+          conteudo: string
+          created_at: string
+          id: string
+          tarefa_id: string
+          user_id: string
+        }
+        Insert: {
+          conteudo: string
+          created_at?: string
+          id?: string
+          tarefa_id: string
+          user_id: string
+        }
+        Update: {
+          conteudo?: string
+          created_at?: string
+          id?: string
+          tarefa_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comentarios_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'tarefas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      departamentos: {
+        Row: {
+          id: string
+          nome: string
+        }
+        Insert: {
+          id?: string
+          nome: string
+        }
+        Update: {
+          id?: string
+          nome?: string
+        }
+        Relationships: []
+      }
+      historico_tarefas: {
+        Row: {
+          acao: string
+          created_at: string
+          detalhes: Json | null
+          id: string
+          tarefa_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          tarefa_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          detalhes?: Json | null
+          id?: string
+          tarefa_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'historico_tarefas_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'tarefas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'historico_tarefas_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       integration_logs: {
         Row: {
           created_at: string
@@ -96,6 +262,117 @@ export type Database = {
           received_at?: string | null
           status?: string
           subscriber_id?: string | null
+        }
+        Relationships: []
+      }
+      legaldesk_tarefas: {
+        Row: {
+          ativo: boolean | null
+          cliente: string | null
+          codigo_cliente: string | null
+          data_atualizacao_origem: string | null
+          data_criacao_origem: string | null
+          data_prazo: string | null
+          depto: string | null
+          descricao: string | null
+          excluido_origem: boolean | null
+          id: number
+          link_codigo_origem: string | null
+          origem: string | null
+          processo: string | null
+          responsavel: string | null
+          sincronizado_em: string | null
+          source_id: string
+          status: string | null
+          tipo_origem: string | null
+          titulo: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          cliente?: string | null
+          codigo_cliente?: string | null
+          data_atualizacao_origem?: string | null
+          data_criacao_origem?: string | null
+          data_prazo?: string | null
+          depto?: string | null
+          descricao?: string | null
+          excluido_origem?: boolean | null
+          id?: number
+          link_codigo_origem?: string | null
+          origem?: string | null
+          processo?: string | null
+          responsavel?: string | null
+          sincronizado_em?: string | null
+          source_id: string
+          status?: string | null
+          tipo_origem?: string | null
+          titulo?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          cliente?: string | null
+          codigo_cliente?: string | null
+          data_atualizacao_origem?: string | null
+          data_criacao_origem?: string | null
+          data_prazo?: string | null
+          depto?: string | null
+          descricao?: string | null
+          excluido_origem?: boolean | null
+          id?: number
+          link_codigo_origem?: string | null
+          origem?: string | null
+          processo?: string | null
+          responsavel?: string | null
+          sincronizado_em?: string | null
+          source_id?: string
+          status?: string | null
+          tipo_origem?: string | null
+          titulo?: string | null
+        }
+        Relationships: []
+      }
+      legaldesk_usuarios: {
+        Row: {
+          ativo: boolean | null
+          data_atualizacao_origem: string | null
+          data_criacao_origem: string | null
+          departamento: string | null
+          email: string | null
+          id: string
+          nome: string
+          origem: string | null
+          sigla: string | null
+          sincronizado_em: string | null
+          source_id: string
+          tipo_usuario: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          data_atualizacao_origem?: string | null
+          data_criacao_origem?: string | null
+          departamento?: string | null
+          email?: string | null
+          id?: string
+          nome: string
+          origem?: string | null
+          sigla?: string | null
+          sincronizado_em?: string | null
+          source_id: string
+          tipo_usuario?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          data_atualizacao_origem?: string | null
+          data_criacao_origem?: string | null
+          departamento?: string | null
+          email?: string | null
+          id?: string
+          nome?: string
+          origem?: string | null
+          sigla?: string | null
+          sincronizado_em?: string | null
+          source_id?: string
+          tipo_usuario?: string | null
         }
         Relationships: []
       }
@@ -713,6 +990,30 @@ export type Database = {
         }
         Relationships: []
       }
+      notificacoes: {
+        Row: {
+          created_at: string
+          id: string
+          lida: boolean | null
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lida?: boolean | null
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lida?: boolean | null
+          titulo?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       prazos: {
         Row: {
           assunto: string | null
@@ -790,37 +1091,232 @@ export type Database = {
       }
       profiles: {
         Row: {
+          area_id: string | null
+          ativo: boolean | null
           created_at: string
           email: string
+          ferias_fim: string | null
+          ferias_inicio: string | null
           id: string
           name: string
+          perfil: string | null
+          substituto_id: string | null
         }
         Insert: {
+          area_id?: string | null
+          ativo?: boolean | null
           created_at?: string
           email: string
+          ferias_fim?: string | null
+          ferias_inicio?: string | null
           id: string
           name: string
+          perfil?: string | null
+          substituto_id?: string | null
         }
         Update: {
+          area_id?: string | null
+          ativo?: boolean | null
           created_at?: string
           email?: string
+          ferias_fim?: string | null
+          ferias_inicio?: string | null
           id?: string
           name?: string
+          perfil?: string | null
+          substituto_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'profiles_area_id_fkey'
+            columns: ['area_id']
+            isOneToOne: false
+            referencedRelation: 'areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profiles_substituto_id_fkey'
+            columns: ['substituto_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      skip_tarefas: {
+        Row: {
+          alerta_status: boolean | null
+          area_id: string | null
+          auxiliar_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          numero_caso: string | null
+          origem: string | null
+          prazo: string | null
+          prioridade: string | null
+          responsavel_id: string | null
+          status: string | null
+          tipo_servico: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          alerta_status?: boolean | null
+          area_id?: string | null
+          auxiliar_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          numero_caso?: string | null
+          origem?: string | null
+          prazo?: string | null
+          prioridade?: string | null
+          responsavel_id?: string | null
+          status?: string | null
+          tipo_servico?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          alerta_status?: boolean | null
+          area_id?: string | null
+          auxiliar_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          numero_caso?: string | null
+          origem?: string | null
+          prazo?: string | null
+          prioridade?: string | null
+          responsavel_id?: string | null
+          status?: string | null
+          tipo_servico?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'skip_tarefas_area_id_fkey'
+            columns: ['area_id']
+            isOneToOne: false
+            referencedRelation: 'areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skip_tarefas_auxiliar_id_fkey'
+            columns: ['auxiliar_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'skip_tarefas_responsavel_id_fkey'
+            columns: ['responsavel_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      tarefas: {
+        Row: {
+          alerta_status: boolean | null
+          area_id: string | null
+          auxiliar_id: string | null
+          cliente_nome: string | null
+          created_at: string
+          descricao: string | null
+          id: string
+          numero_caso: string | null
+          origem: string | null
+          prazo: string | null
+          prioridade: string | null
+          responsavel_id: string | null
+          status: string | null
+          tipo_servico: string | null
+          titulo: string
+          updated_at: string
+        }
+        Insert: {
+          alerta_status?: boolean | null
+          area_id?: string | null
+          auxiliar_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          numero_caso?: string | null
+          origem?: string | null
+          prazo?: string | null
+          prioridade?: string | null
+          responsavel_id?: string | null
+          status?: string | null
+          tipo_servico?: string | null
+          titulo: string
+          updated_at?: string
+        }
+        Update: {
+          alerta_status?: boolean | null
+          area_id?: string | null
+          auxiliar_id?: string | null
+          cliente_nome?: string | null
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          numero_caso?: string | null
+          origem?: string | null
+          prazo?: string | null
+          prioridade?: string | null
+          responsavel_id?: string | null
+          status?: string | null
+          tipo_servico?: string | null
+          titulo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tarefas_area_id_fkey'
+            columns: ['area_id']
+            isOneToOne: false
+            referencedRelation: 'areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tarefas_auxiliar_id_fkey'
+            columns: ['auxiliar_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tarefas_responsavel_id_fkey'
+            columns: ['responsavel_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      hard_delete_manychat_contato: {
+        Args: { p_contato_id: string }
+        Returns: undefined
+      }
       soft_delete_manychat_contato: {
         Args: { p_contato_id: string }
         Returns: undefined
       }
     }
     Enums: {
-      [_ in never]: never
+      perfil_type: 'socio_gestor' | 'gestor_area' | 'advogado' | 'estagiario' | 'administrativo'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -945,7 +1441,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      perfil_type: ['socio_gestor', 'gestor_area', 'advogado', 'estagiario', 'administrativo'],
+    },
   },
 } as const
 
@@ -959,6 +1457,20 @@ export const Constants = {
 // --- COLUMN TYPES (actual PostgreSQL types) ---
 // Use this to know the real database type when writing migrations.
 // "string" in TypeScript types above may be uuid, text, varchar, timestamptz, etc.
+// Table: anexos
+//   id: uuid (not null, default: gen_random_uuid())
+//   tarefa_id: uuid (not null)
+//   user_id: uuid (not null)
+//   file_url: text (not null)
+//   nome: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: areas
+//   id: uuid (not null, default: gen_random_uuid())
+//   nome: text (not null)
+//   descricao: text (nullable)
+//   gestor_id: uuid (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
 // Table: atendimentos
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_id: text (not null)
@@ -974,6 +1486,22 @@ export const Constants = {
 //   last_interaction_at: timestamp with time zone (nullable)
 //   optin_phone: boolean (nullable, default: false)
 //   optin_email: boolean (nullable, default: false)
+// Table: comentarios
+//   id: uuid (not null, default: gen_random_uuid())
+//   tarefa_id: uuid (not null)
+//   user_id: uuid (not null)
+//   conteudo: text (not null)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: departamentos
+//   id: uuid (not null, default: gen_random_uuid())
+//   nome: text (not null)
+// Table: historico_tarefas
+//   id: uuid (not null, default: gen_random_uuid())
+//   tarefa_id: uuid (not null)
+//   usuario_id: uuid (nullable)
+//   acao: text (not null)
+//   detalhes: jsonb (nullable)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: integration_logs
 //   id: uuid (not null, default: gen_random_uuid())
 //   event_type: text (not null)
@@ -985,6 +1513,39 @@ export const Constants = {
 //   detected_event_type: text (nullable)
 //   processing_context: jsonb (nullable)
 //   received_at: timestamp with time zone (nullable, default: now())
+// Table: legaldesk_tarefas
+//   id: bigint (not null, default: nextval('legaldesk_tarefas_id_seq'::regclass))
+//   source_id: text (not null)
+//   origem: text (nullable)
+//   cliente: text (nullable)
+//   codigo_cliente: text (nullable)
+//   processo: text (nullable)
+//   depto: text (nullable)
+//   titulo: text (nullable)
+//   descricao: text (nullable)
+//   tipo_origem: text (nullable)
+//   status: text (nullable)
+//   responsavel: text (nullable)
+//   data_prazo: timestamp without time zone (nullable)
+//   data_criacao_origem: timestamp without time zone (nullable)
+//   data_atualizacao_origem: timestamp without time zone (nullable)
+//   ativo: boolean (nullable, default: true)
+//   excluido_origem: boolean (nullable, default: false)
+//   link_codigo_origem: text (nullable)
+//   sincronizado_em: timestamp without time zone (nullable, default: now())
+// Table: legaldesk_usuarios
+//   id: uuid (not null, default: gen_random_uuid())
+//   source_id: text (not null)
+//   nome: text (not null)
+//   sigla: text (nullable)
+//   email: text (nullable)
+//   ativo: boolean (nullable, default: true)
+//   tipo_usuario: text (nullable)
+//   data_criacao_origem: timestamp with time zone (nullable)
+//   data_atualizacao_origem: timestamp with time zone (nullable)
+//   origem: text (nullable, default: 'LEGALDESK'::text)
+//   sincronizado_em: timestamp with time zone (nullable, default: now())
+//   departamento: text (nullable)
 // Table: manychat_contact_attributes
 //   id: uuid (nullable, default: gen_random_uuid())
 //   manychat_id: text (not null)
@@ -1133,6 +1694,12 @@ export const Constants = {
 //   active: boolean (nullable, default: true)
 //   created_at: timestamp with time zone (nullable, default: now())
 //   updated_at: timestamp with time zone (nullable, default: now())
+// Table: notificacoes
+//   id: uuid (not null, default: gen_random_uuid())
+//   user_id: uuid (not null)
+//   titulo: text (not null)
+//   lida: boolean (nullable, default: false)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: prazos
 //   id: uuid (not null, default: gen_random_uuid())
 //   manychat_contato_id: uuid (nullable)
@@ -1161,13 +1728,78 @@ export const Constants = {
 //   name: text (not null)
 //   email: text (not null)
 //   created_at: timestamp with time zone (not null, default: now())
+//   perfil: text (nullable, default: 'advogado'::text)
+//   area_id: uuid (nullable)
+//   ativo: boolean (nullable, default: true)
+//   ferias_inicio: timestamp with time zone (nullable)
+//   ferias_fim: timestamp with time zone (nullable)
+//   substituto_id: uuid (nullable)
+// Table: skip_tarefas
+//   id: uuid (not null, default: gen_random_uuid())
+//   titulo: text (not null)
+//   descricao: text (nullable)
+//   area_id: uuid (nullable)
+//   tipo_servico: text (nullable)
+//   cliente_nome: text (nullable)
+//   numero_caso: text (nullable)
+//   responsavel_id: uuid (nullable)
+//   auxiliar_id: uuid (nullable)
+//   status: text (nullable, default: 'Pendente'::text)
+//   prioridade: text (nullable, default: 'media'::text)
+//   prazo: timestamp with time zone (nullable)
+//   alerta_status: boolean (nullable, default: false)
+//   origem: text (nullable, default: 'SKIP'::text)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
+// Table: tarefas
+//   id: uuid (not null, default: gen_random_uuid())
+//   titulo: text (not null)
+//   descricao: text (nullable)
+//   area_id: uuid (nullable)
+//   tipo_servico: text (nullable)
+//   cliente_nome: text (nullable)
+//   numero_caso: text (nullable)
+//   responsavel_id: uuid (nullable)
+//   auxiliar_id: uuid (nullable)
+//   status: text (nullable, default: 'novo'::text)
+//   prioridade: text (nullable, default: 'media'::text)
+//   prazo: timestamp with time zone (nullable)
+//   alerta_status: boolean (nullable, default: false)
+//   origem: text (nullable, default: 'manual'::text)
+//   created_at: timestamp with time zone (not null, default: now())
+//   updated_at: timestamp with time zone (not null, default: now())
 
 // --- CONSTRAINTS ---
+// Table: anexos
+//   PRIMARY KEY anexos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY anexos_tarefa_id_fkey: FOREIGN KEY (tarefa_id) REFERENCES tarefas(id) ON DELETE CASCADE
+//   FOREIGN KEY anexos_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: areas
+//   FOREIGN KEY areas_gestor_id_fkey: FOREIGN KEY (gestor_id) REFERENCES profiles(id) ON DELETE SET NULL
+//   PRIMARY KEY areas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY fk_gestor: FOREIGN KEY (gestor_id) REFERENCES profiles(id) ON DELETE SET NULL
 // Table: atendimentos
 //   UNIQUE atendimentos_manychat_id_key: UNIQUE (manychat_id)
 //   PRIMARY KEY atendimentos_pkey: PRIMARY KEY (id)
+// Table: comentarios
+//   PRIMARY KEY comentarios_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY comentarios_tarefa_id_fkey: FOREIGN KEY (tarefa_id) REFERENCES tarefas(id) ON DELETE CASCADE
+//   FOREIGN KEY comentarios_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
+// Table: departamentos
+//   UNIQUE departamentos_nome_key: UNIQUE (nome)
+//   PRIMARY KEY departamentos_pkey: PRIMARY KEY (id)
+// Table: historico_tarefas
+//   PRIMARY KEY historico_tarefas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY historico_tarefas_tarefa_id_fkey: FOREIGN KEY (tarefa_id) REFERENCES tarefas(id) ON DELETE CASCADE
+//   FOREIGN KEY historico_tarefas_usuario_id_fkey: FOREIGN KEY (usuario_id) REFERENCES profiles(id) ON DELETE SET NULL
 // Table: integration_logs
 //   PRIMARY KEY integration_logs_pkey: PRIMARY KEY (id)
+// Table: legaldesk_tarefas
+//   PRIMARY KEY legaldesk_tarefas_pkey: PRIMARY KEY (id)
+//   UNIQUE legaldesk_tarefas_source_id_key: UNIQUE (source_id)
+// Table: legaldesk_usuarios
+//   PRIMARY KEY legaldesk_usuarios_pkey: PRIMARY KEY (id)
+//   UNIQUE legaldesk_usuarios_source_id_key: UNIQUE (source_id)
 // Table: manychat_contact_attributes
 //   FOREIGN KEY manychat_contact_attributes_manychat_id_fkey: FOREIGN KEY (manychat_id) REFERENCES manychat_contatos(manychat_id) ON DELETE CASCADE
 //   PRIMARY KEY manychat_contact_attributes_pkey: PRIMARY KEY (manychat_id, attribute_key)
@@ -1178,6 +1810,7 @@ export const Constants = {
 //   PRIMARY KEY manychat_contatos_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
+//   UNIQUE unique_telefone: UNIQUE (telefone)
 // Table: manychat_servicos
 //   UNIQUE manychat_servicos_codigo_key: UNIQUE (codigo)
 //   PRIMARY KEY manychat_servicos_pkey: PRIMARY KEY (id)
@@ -1220,14 +1853,41 @@ export const Constants = {
 //   PRIMARY KEY mc_user_profiles_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY mc_user_profiles_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 //   UNIQUE mc_user_profiles_user_id_key: UNIQUE (user_id)
+// Table: notificacoes
+//   PRIMARY KEY notificacoes_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY notificacoes_user_id_fkey: FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE
 // Table: prazos
 //   PRIMARY KEY prazos_pkey: PRIMARY KEY (id)
 //   UNIQUE prazos_totvs_id_key: UNIQUE (totvs_id)
 // Table: profiles
+//   FOREIGN KEY profiles_area_id_fkey: FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE SET NULL
 //   FOREIGN KEY profiles_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+//   CHECK profiles_perfil_check: CHECK ((perfil = ANY (ARRAY['socio_gestor'::text, 'gestor_area'::text, 'advogado'::text, 'estagiario'::text, 'administrativo'::text])))
 //   PRIMARY KEY profiles_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY profiles_substituto_id_fkey: FOREIGN KEY (substituto_id) REFERENCES profiles(id) ON DELETE SET NULL
+// Table: skip_tarefas
+//   FOREIGN KEY skip_tarefas_area_id_fkey: FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE CASCADE
+//   FOREIGN KEY skip_tarefas_auxiliar_id_fkey: FOREIGN KEY (auxiliar_id) REFERENCES profiles(id) ON DELETE SET NULL
+//   PRIMARY KEY skip_tarefas_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY skip_tarefas_responsavel_id_fkey: FOREIGN KEY (responsavel_id) REFERENCES profiles(id) ON DELETE SET NULL
+// Table: tarefas
+//   FOREIGN KEY tarefas_area_id_fkey: FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE CASCADE
+//   FOREIGN KEY tarefas_auxiliar_id_fkey: FOREIGN KEY (auxiliar_id) REFERENCES profiles(id) ON DELETE SET NULL
+//   PRIMARY KEY tarefas_pkey: PRIMARY KEY (id)
+//   CHECK tarefas_prioridade_check: CHECK ((prioridade = ANY (ARRAY['baixa'::text, 'media'::text, 'alta'::text, 'urgente'::text])))
+//   FOREIGN KEY tarefas_responsavel_id_fkey: FOREIGN KEY (responsavel_id) REFERENCES profiles(id) ON DELETE SET NULL
+//   CHECK tarefas_status_check: CHECK ((status = ANY (ARRAY['novo'::text, 'em_andamento'::text, 'revisao'::text, 'concluido'::text])))
 
 // --- ROW LEVEL SECURITY POLICIES ---
+// Table: areas
+//   Policy "authenticated_areas_all" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//   Policy "authenticated_areas_select" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_select_areas" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "socio_all_areas" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
 // Table: atendimentos
 //   Policy "authenticated_delete_atendimentos" (DELETE, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -1238,10 +1898,32 @@ export const Constants = {
 //   Policy "authenticated_update_atendimentos" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: comentarios
+//   Policy "authenticated_comentarios_insert" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_comentarios_select" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_insert_comentarios" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_comentarios" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: historico_tarefas
+//   Policy "authenticated_historico_insert" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_historico_select" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: integration_logs
 //   Policy "authenticated_all_integration_logs" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: legaldesk_tarefas
+//   Policy "anon_select_legaldesk_tarefas" (SELECT, PERMISSIVE) roles={anon}
+//     USING: true
+//   Policy "authenticated_select_legaldesk_tarefas" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: legaldesk_usuarios
+//   Policy "authenticated_select_legaldesk_usuarios" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: manychat_contact_attributes
 //   Policy "authenticated_all_manychat_contact_attributes" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -1303,6 +1985,11 @@ export const Constants = {
 //   Policy "authenticated_all_mc_user_profiles" (ALL, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: notificacoes
+//   Policy "user_select_notificacoes" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (user_id = auth.uid())
+//   Policy "user_update_notificacoes" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (user_id = auth.uid())
 // Table: prazos
 //   Policy "Allow insert" (INSERT, PERMISSIVE) roles={anon}
 //     WITH CHECK: true
@@ -1321,6 +2008,41 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: (auth.uid() = id)
 //     WITH CHECK: (auth.uid() = id)
+// Table: skip_tarefas
+//   Policy "authenticated_delete_skip_tarefas" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_insert_skip_tarefas" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_skip_tarefas" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_update_skip_tarefas" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//     WITH CHECK: true
+// Table: tarefas
+//   Policy "authenticated_insert_tarefas" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_tarefas" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_tarefas_delete" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles p   WHERE ((p.id = auth.uid()) AND ((p.perfil = 'socio_gestor'::text) OR ((p.perfil = 'gestor_area'::text) AND (p.area_id = tarefas.area_id))))))
+//   Policy "authenticated_tarefas_insert" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_tarefas_select" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles p   WHERE ((p.id = auth.uid()) AND ((p.perfil = 'socio_gestor'::text) OR (p.area_id = tarefas.area_id) OR (tarefas.responsavel_id = auth.uid()) OR (tarefas.auxiliar_id = auth.uid())))))
+//   Policy "authenticated_tarefas_update" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles p   WHERE ((p.id = auth.uid()) AND ((p.perfil = 'socio_gestor'::text) OR ((p.perfil = 'gestor_area'::text) AND (p.area_id = tarefas.area_id)) OR (tarefas.responsavel_id = auth.uid()) OR (tarefas.auxiliar_id = auth.uid())))))
+//   Policy "authenticated_update_tarefas" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "socio_delete_tarefas" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+
+// --- WARNING: TABLES WITH RLS ENABLED BUT NO POLICIES ---
+// These tables have Row Level Security enabled but NO policies defined.
+// This means ALL queries (SELECT, INSERT, UPDATE, DELETE) will return ZERO rows
+// for non-superuser roles (including the anon and authenticated roles used by the app).
+// You MUST create RLS policies for these tables to allow data access.
+//   - anexos
+//   - departamentos
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()
@@ -1337,6 +2059,60 @@ export const Constants = {
 //       NEW.email
 //     ) ON CONFLICT (id) DO NOTHING;
 //     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION handle_tarefa_substitution()
+//   CREATE OR REPLACE FUNCTION public.handle_tarefa_substitution()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   DECLARE
+//     sub_id UUID;
+//   BEGIN
+//     IF NEW.responsavel_id IS NOT NULL THEN
+//       SELECT substituto_id INTO sub_id FROM public.profiles WHERE id = NEW.responsavel_id AND ferias_inicio <= NOW() AND ferias_fim >= NOW() AND ativo = true;
+//       IF sub_id IS NOT NULL THEN
+//         NEW.responsavel_id = sub_id;
+//       END IF;
+//     END IF;
+//     RETURN NEW;
+//   END;
+//   $function$
+//
+// FUNCTION hard_delete_manychat_contato(uuid)
+//   CREATE OR REPLACE FUNCTION public.hard_delete_manychat_contato(p_contato_id uuid)
+//    RETURNS void
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//    SET search_path TO 'public'
+//   AS $function$
+//   DECLARE
+//     v_manychat_id text;
+//   BEGIN
+//     IF auth.uid() IS NULL THEN
+//       RAISE EXCEPTION 'Usuário não autenticado';
+//     END IF;
+//
+//     SELECT manychat_id
+//     INTO v_manychat_id
+//     FROM public.manychat_contatos
+//     WHERE id = p_contato_id;
+//
+//     DELETE FROM public.mc_kanban_history
+//     WHERE contato_id = p_contato_id;
+//
+//     DELETE FROM public.mc_sla_tracking
+//     WHERE contato_id = p_contato_id;
+//
+//     DELETE FROM public.mc_audit_log
+//     WHERE contato_id = p_contato_id;
+//
+//     DELETE FROM public.manychat_contact_attributes
+//     WHERE manychat_id = v_manychat_id;
+//
+//     DELETE FROM public.manychat_contatos
+//     WHERE id = p_contato_id;
 //   END;
 //   $function$
 //
@@ -1408,13 +2184,29 @@ export const Constants = {
 //   set_updated_at_mc_sla_tracking: CREATE TRIGGER set_updated_at_mc_sla_tracking BEFORE UPDATE ON public.mc_sla_tracking FOR EACH ROW EXECUTE FUNCTION update_mc_sla_tracking_updated_at()
 // Table: mc_user_profiles
 //   set_updated_at_mc_user_profiles: CREATE TRIGGER set_updated_at_mc_user_profiles BEFORE UPDATE ON public.mc_user_profiles FOR EACH ROW EXECUTE FUNCTION update_mc_user_profiles_updated_at()
+// Table: tarefas
+//   on_tarefa_insert_substitution: CREATE TRIGGER on_tarefa_insert_substitution BEFORE INSERT OR UPDATE OF responsavel_id ON public.tarefas FOR EACH ROW EXECUTE FUNCTION handle_tarefa_substitution()
 
 // --- INDEXES ---
 // Table: atendimentos
 //   CREATE UNIQUE INDEX atendimentos_manychat_id_key ON public.atendimentos USING btree (manychat_id)
 //   CREATE INDEX idx_atendimentos_last_interaction ON public.atendimentos USING btree (last_interaction_at)
+// Table: departamentos
+//   CREATE UNIQUE INDEX departamentos_nome_key ON public.departamentos USING btree (nome)
 // Table: integration_logs
 //   CREATE INDEX idx_integration_logs_created_at ON public.integration_logs USING btree (created_at)
+// Table: legaldesk_tarefas
+//   CREATE INDEX idx_legaldesk_tarefas_cliente ON public.legaldesk_tarefas USING btree (cliente)
+//   CREATE INDEX idx_legaldesk_tarefas_codigo_cliente ON public.legaldesk_tarefas USING btree (codigo_cliente)
+//   CREATE INDEX idx_legaldesk_tarefas_depto ON public.legaldesk_tarefas USING btree (depto)
+//   CREATE INDEX idx_legaldesk_tarefas_prazo ON public.legaldesk_tarefas USING btree (data_prazo)
+//   CREATE INDEX idx_legaldesk_tarefas_processo ON public.legaldesk_tarefas USING btree (processo)
+//   CREATE INDEX idx_legaldesk_tarefas_responsavel ON public.legaldesk_tarefas USING btree (responsavel)
+//   CREATE INDEX idx_legaldesk_tarefas_status ON public.legaldesk_tarefas USING btree (status)
+//   CREATE UNIQUE INDEX legaldesk_tarefas_source_id_key ON public.legaldesk_tarefas USING btree (source_id)
+// Table: legaldesk_usuarios
+//   CREATE INDEX idx_legaldesk_usuarios_email ON public.legaldesk_usuarios USING btree (email)
+//   CREATE UNIQUE INDEX legaldesk_usuarios_source_id_key ON public.legaldesk_usuarios USING btree (source_id)
 // Table: manychat_contact_attributes
 //   CREATE INDEX idx_manychat_contact_attributes_key ON public.manychat_contact_attributes USING btree (attribute_key)
 //   CREATE UNIQUE INDEX idx_manychat_contact_attributes_unique ON public.manychat_contact_attributes USING btree (manychat_id, attribute_key)
@@ -1425,6 +2217,7 @@ export const Constants = {
 //   CREATE INDEX idx_manychat_contatos_sla_status ON public.manychat_contatos USING btree (sla_status)
 //   CREATE INDEX idx_manychat_contatos_status ON public.manychat_contatos USING btree (last_update_status)
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
+//   CREATE UNIQUE INDEX unique_telefone ON public.manychat_contatos USING btree (telefone)
 // Table: manychat_servicos
 //   CREATE UNIQUE INDEX manychat_servicos_codigo_key ON public.manychat_servicos USING btree (codigo)
 //   CREATE UNIQUE INDEX unique_manychat_servicos_codigo ON public.manychat_servicos USING btree (codigo)

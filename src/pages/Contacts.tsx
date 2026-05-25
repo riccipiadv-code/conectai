@@ -224,7 +224,7 @@ export default function Contacts() {
       setDeletingContact(null)
       setContacts((prev) => prev.filter((c) => c.id !== contatoId))
 
-      toast({ title: 'Sucesso', description: 'Contato excluído com sucesso.' })
+      toast({ title: 'Sucesso', description: 'Contato excluído com sucesso' })
     } catch (error: any) {
       toast({
         title: 'Erro',
@@ -554,8 +554,8 @@ export default function Contacts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Deseja realmente excluir esse contato?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá remover o contato da lista principal, mas os dados originais serão
-              preservados no histórico.
+              Esta ação irá remover o contato permanentemente, incluindo todo o seu histórico e
+              dados associados. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -74,7 +74,7 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
 }
 
 export async function deleteContact(id: string) {
-  const { error } = await supabase.rpc('soft_delete_manychat_contato', {
+  const { error } = await supabase.rpc('hard_delete_manychat_contato', {
     p_contato_id: id,
   })
 
