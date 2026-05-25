@@ -2042,6 +2042,9 @@ export const Constants = {
 //   Policy "authenticated_update_manychat_contatos" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: manychat_deptos
+//   Policy "authenticated_select_manychat_deptos" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: manychat_servicos
 //   Policy "authenticated_select_manychat_servicos" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -2149,7 +2152,6 @@ export const Constants = {
 // You MUST create RLS policies for these tables to allow data access.
 //   - anexos
 //   - departamentos
-//   - manychat_deptos
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()

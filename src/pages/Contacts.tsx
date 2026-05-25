@@ -307,12 +307,12 @@ export default function Contacts() {
       </div>
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-zinc-800/50 bg-slate-50/30 dark:bg-zinc-900/20 pb-4">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-start gap-6 border-b border-slate-100 dark:border-zinc-800/50 bg-slate-50/30 dark:bg-zinc-900/20 pb-4">
           <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2 whitespace-nowrap">
             <Filter className="h-4 w-4 text-slate-400" />
             Filtros e Busca
           </CardTitle>
-          <div className="relative w-full flex-1 max-w-full sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
+          <div className="relative w-full sm:w-[350px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Buscar por nome, e-mail ou telefone..."
@@ -333,23 +333,23 @@ export default function Contacts() {
               <Table>
                 <TableHeader className="bg-slate-50/80 dark:bg-zinc-900/50">
                   <TableRow className="hover:bg-transparent border-slate-200/60 dark:border-zinc-800">
-                    <TableHead className="font-semibold text-slate-600 py-4 px-6 min-w-[250px] w-[20%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 px-6 min-w-[200px]">
                       Contato
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[200px] w-[20%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[180px]">
                       Serviço / Empresa
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[250px] w-[15%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[200px]">
                       Consulta
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[220px] w-[20%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 w-[180px]">
                       Estágio
                     </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[120px] w-[10%]">
-                      SLA
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 text-right px-6 min-w-[150px] w-[15%]">
+                    <TableHead className="font-semibold text-slate-600 py-4 w-[140px]">
                       Ações
+                    </TableHead>
+                    <TableHead className="font-semibold text-slate-600 py-4 px-6 w-[140px]">
+                      SLA
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -419,18 +419,7 @@ export default function Contacts() {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-5">
-                          <Badge
-                            variant="outline"
-                            className={`font-medium px-2.5 py-1 border shadow-sm flex inline-flex items-center gap-1.5 w-fit whitespace-nowrap ${getSlaColor(
-                              contact.sla_status || 'green',
-                            )}`}
-                          >
-                            {getSlaIcon(contact.sla_status || 'green')}
-                            {getSlaLabel(contact.sla_status || 'green')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-5 px-6 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center gap-1">
                             {contact.manychat_live_chat_url && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -492,6 +481,17 @@ export default function Contacts() {
                               <TooltipContent>Excluir</TooltipContent>
                             </Tooltip>
                           </div>
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          <Badge
+                            variant="outline"
+                            className={`font-medium px-2.5 py-1 border shadow-sm inline-flex items-center gap-1.5 w-fit whitespace-nowrap ${getSlaColor(
+                              contact.sla_status || 'green',
+                            )}`}
+                          >
+                            {getSlaIcon(contact.sla_status || 'green')}
+                            {getSlaLabel(contact.sla_status || 'green')}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))
