@@ -418,6 +418,7 @@ export type Database = {
           current_stage: string | null
           deleted_at: string | null
           deleted_by: string | null
+          depto_id: number | null
           external_transfers: Json | null
           first_name: string | null
           foto: string | null
@@ -461,6 +462,7 @@ export type Database = {
           current_stage?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          depto_id?: number | null
           external_transfers?: Json | null
           first_name?: string | null
           foto?: string | null
@@ -504,6 +506,7 @@ export type Database = {
           current_stage?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          depto_id?: number | null
           external_transfers?: Json | null
           first_name?: string | null
           foto?: string | null
@@ -543,6 +546,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: 'manychat_contatos_depto_id_fkey'
+            columns: ['depto_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_deptos'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'manychat_contatos_servico_id_fkey'
             columns: ['servico_id']
             isOneToOne: false
@@ -577,6 +587,7 @@ export type Database = {
           ativo: boolean
           codigo: string
           created_at: string
+          depto_id: number | null
           descricao: string
           id: string
           ordem_fluxo: number | null
@@ -585,6 +596,7 @@ export type Database = {
           ativo?: boolean
           codigo: string
           created_at?: string
+          depto_id?: number | null
           descricao: string
           id?: string
           ordem_fluxo?: number | null
@@ -593,11 +605,20 @@ export type Database = {
           ativo?: boolean
           codigo?: string
           created_at?: string
+          depto_id?: number | null
           descricao?: string
           id?: string
           ordem_fluxo?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'manychat_servicos_depto_id_fkey'
+            columns: ['depto_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_deptos'
+            referencedColumns: ['id']
+          },
+        ]
       }
       manychat_sync_control: {
         Row: {
@@ -1619,6 +1640,7 @@ export const Constants = {
 //   deleted_at: timestamp with time zone (nullable)
 //   deleted_by: uuid (nullable)
 //   cancel_reason: text (nullable)
+//   depto_id: integer (nullable)
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)
@@ -1631,6 +1653,7 @@ export const Constants = {
 //   ativo: boolean (not null, default: true)
 //   created_at: timestamp with time zone (not null, default: now())
 //   ordem_fluxo: integer (nullable)
+//   depto_id: integer (nullable)
 // Table: manychat_sync_control
 //   id: uuid (not null, default: gen_random_uuid())
 //   sync_type: text (not null)
@@ -1835,6 +1858,7 @@ export const Constants = {
 //   PRIMARY KEY manychat_contact_attributes_pkey: PRIMARY KEY (manychat_id, attribute_key)
 // Table: manychat_contatos
 //   FOREIGN KEY manychat_contatos_deleted_by_fkey: FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
+//   FOREIGN KEY manychat_contatos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_manual_updated_by_fkey: FOREIGN KEY (manual_updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
 //   UNIQUE manychat_contatos_manychat_id_key: UNIQUE (manychat_id)
 //   PRIMARY KEY manychat_contatos_pkey: PRIMARY KEY (id)
@@ -1846,6 +1870,7 @@ export const Constants = {
 //   PRIMARY KEY manychat_deptos_pkey: PRIMARY KEY (id)
 // Table: manychat_servicos
 //   UNIQUE manychat_servicos_codigo_key: UNIQUE (codigo)
+//   FOREIGN KEY manychat_servicos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id)
 //   PRIMARY KEY manychat_servicos_pkey: PRIMARY KEY (id)
 //   UNIQUE unique_manychat_servicos_codigo: UNIQUE (codigo)
 // Table: manychat_sync_control

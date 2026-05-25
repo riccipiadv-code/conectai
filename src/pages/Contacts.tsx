@@ -38,7 +38,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { getContacts, updateContact, deleteContact, Contact } from '@/services/contacts'
+import {
+  getContacts,
+  updateContact,
+  deleteContact,
+  Contact,
+  getServicos,
+  getDeptos,
+  getCancelReasons,
+  Servico,
+  Depto,
+  CancelReason,
+} from '@/services/contacts'
 import {
   Loader2,
   Search,
@@ -59,9 +70,9 @@ const getStageLabel = (stage: string) => {
     nivel_1_novo: 'Nível 1 - Novo',
     nivel_2_especialista: 'Nível 2 - Especialista',
     nivel_3_especial: 'Nível 3 - Especial',
-    reuniao_consulta_agendada: 'Reunião Consulta Agendada',
-    enviado_orcamento_ag_retorno: 'Enviado orçamento - Ag. Retorno',
-    orcamento_aprovado: 'Orçamento aprovado',
+    reuniao_consulta_agendada: 'Reunião/Consulta Agendada',
+    enviado_orcamento_ag_retorno: 'Enviado Orçamento / Aguardando Retorno',
+    orcamento_aprovado: 'Orçamento Aprovado',
     cancelado: 'Cancelado',
   }
   return map[stage] || stage.replace('_', ' ')
@@ -141,6 +152,10 @@ const getSlaIcon = (sla: string) => {
 
 export default function Contacts() {
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [servicos, setServicos] = useState<Servico[]>([])
+  const [deptos, setDeptos] = useState<Depto[]>([])
+  const [cancelReasons, setCancelReasons] = useState<CancelReason[]>([])
+
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
@@ -153,17 +168,25 @@ export default function Contacts() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const fetchContacts = async () => {
+    const fetchData = async () => {
       try {
-        const data = await getContacts()
-        setContacts(data)
+        const [contactsData, servicosData, deptosData, reasonsData] = await Promise.all([
+          getContacts(),
+          getServicos(),
+          getDeptos(),
+          getCancelReasons(),
+        ])
+        setContacts(contactsData)
+        setServicos(servicosData)
+        setDeptos(deptosData)
+        setCancelReasons(reasonsData)
       } catch (error) {
-        console.error('Failed to fetch contacts', error)
+        console.error('Failed to fetch data', error)
       } finally {
         setLoading(false)
       }
     }
-    fetchContacts()
+    fetchData()
   }, [])
 
   const filteredContacts = contacts.filter(
@@ -188,18 +211,33 @@ export default function Contacts() {
   const handleEdit = (contact: Contact) => {
     setUpdatingContact(contact)
     setUpdateForm({
-      lead_nome: contact.lead_nome || '',
-      lead_empresa_pf: contact.lead_empresa_pf || '',
+      nome: contact.nome || contact.lead_nome || '',
+      lead_nome: contact.lead_nome || contact.nome || '',
+      lead_empresa_pf: contact.lead_empresa_pf || 'Pessoa Física',
       lead_email: contact.lead_email || '',
+      servico_id: contact.servico_id || '',
+      depto_id: contact.depto_id || undefined,
       lead_servico: contact.lead_servico || '',
       lead_resumo: contact.lead_resumo || '',
       current_stage: contact.current_stage || 'nivel_1_novo',
       sla_status: contact.sla_status || 'green',
+      cancel_reason_id: contact.cancel_reason_id || '',
+      cancel_obs: contact.cancel_obs || '',
     })
   }
 
   const handleUpdate = async () => {
     if (!updatingContact) return
+
+    if (updateForm.current_stage === 'cancelado' && !updateForm.cancel_reason_id) {
+      toast({
+        title: 'Atenção',
+        description: 'Selecione um motivo para o cancelamento.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSaving(true)
     try {
       await updateContact(
@@ -208,7 +246,16 @@ export default function Contacts() {
         updatingContact.current_stage || 'nivel_1_novo',
       )
       toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
-      setContacts(contacts.map((c) => (c.id === updatingContact.id ? { ...c, ...updateForm } : c)))
+
+      const nullifiedForm = { ...updateForm }
+      if (nullifiedForm.current_stage !== 'cancelado') {
+        nullifiedForm.cancel_reason_id = null
+        nullifiedForm.cancel_obs = null
+      }
+
+      setContacts(
+        contacts.map((c) => (c.id === updatingContact.id ? { ...c, ...nullifiedForm } : c)),
+      )
       setUpdatingContact(null)
     } catch (error: any) {
       toast({
@@ -455,19 +502,30 @@ export default function Contacts() {
                 <Label className="text-slate-600">Nome</Label>
                 <Input
                   value={updateForm.lead_nome || ''}
-                  onChange={(e) => setUpdateForm({ ...updateForm, lead_nome: e.target.value })}
+                  onChange={(e) =>
+                    setUpdateForm({
+                      ...updateForm,
+                      lead_nome: e.target.value,
+                      nome: e.target.value,
+                    })
+                  }
                   placeholder="Nome"
                 />
               </div>
               <div className="space-y-2">
                 <Label className="text-slate-600">Empresa / PF</Label>
-                <Input
+                <Select
                   value={updateForm.lead_empresa_pf || ''}
-                  onChange={(e) =>
-                    setUpdateForm({ ...updateForm, lead_empresa_pf: e.target.value })
-                  }
-                  placeholder="Nome da empresa"
-                />
+                  onValueChange={(v) => setUpdateForm({ ...updateForm, lead_empresa_pf: v })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Empresa / PF" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Pessoa Física">Pessoa Física</SelectItem>
+                    <SelectItem value="Empresa">Empresa</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -481,17 +539,55 @@ export default function Contacts() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-slate-600">Serviço Selecionado</Label>
-              <Input
-                value={updateForm.lead_servico || ''}
-                onChange={(e) => setUpdateForm({ ...updateForm, lead_servico: e.target.value })}
-                placeholder="Ex: Consultoria"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-600">Serviço Selecionado</Label>
+                <Select
+                  value={updateForm.servico_id || ''}
+                  onValueChange={(val) => {
+                    const servico = servicos.find((s) => s.id === val)
+                    setUpdateForm({
+                      ...updateForm,
+                      servico_id: val,
+                      lead_servico: servico?.descricao || '',
+                      depto_id: servico?.depto_id || undefined,
+                    })
+                  }}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Selecione um serviço" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {servicos.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.descricao}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-600">Departamento</Label>
+                <Select
+                  value={updateForm.depto_id ? String(updateForm.depto_id) : ''}
+                  onValueChange={(val) => setUpdateForm({ ...updateForm, depto_id: Number(val) })}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Selecione um departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deptos.map((d) => (
+                      <SelectItem key={d.id} value={String(d.id)}>
+                        {d.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-600">Resumo da Solicitação (Consulta)</Label>
+              <Label className="text-slate-600">Resumo da Solicitação</Label>
               <Textarea
                 value={updateForm.lead_resumo || ''}
                 onChange={(e) => setUpdateForm({ ...updateForm, lead_resumo: e.target.value })}
@@ -516,12 +612,12 @@ export default function Contacts() {
                     <SelectItem value="nivel_2_especialista">Nível 2 - Especialista</SelectItem>
                     <SelectItem value="nivel_3_especial">Nível 3 - Especial</SelectItem>
                     <SelectItem value="reuniao_consulta_agendada">
-                      Reunião Consulta Agendada
+                      Reunião/Consulta Agendada
                     </SelectItem>
                     <SelectItem value="enviado_orcamento_ag_retorno">
-                      Enviado orçamento - Ag. Retorno
+                      Enviado Orçamento / Aguardando Retorno
                     </SelectItem>
-                    <SelectItem value="orcamento_aprovado">Orçamento aprovado</SelectItem>
+                    <SelectItem value="orcamento_aprovado">Orçamento Aprovado</SelectItem>
                     <SelectItem value="cancelado">Cancelado</SelectItem>
                   </SelectContent>
                 </Select>
@@ -545,6 +641,41 @@ export default function Contacts() {
                 </Select>
               </div>
             </div>
+
+            {updateForm.current_stage === 'cancelado' && (
+              <div className="grid grid-cols-1 gap-4 pt-4 border-t border-slate-100 dark:border-zinc-800 animate-fade-in-up duration-300">
+                <div className="space-y-2">
+                  <Label className="text-slate-600">
+                    Motivo do Cancelamento <span className="text-rose-500">*</span>
+                  </Label>
+                  <Select
+                    value={updateForm.cancel_reason_id || ''}
+                    onValueChange={(v) => setUpdateForm({ ...updateForm, cancel_reason_id: v })}
+                  >
+                    <SelectTrigger className="h-10 border-rose-200 focus:ring-rose-500/20">
+                      <SelectValue placeholder="Selecione um motivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cancelReasons.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.motivo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-600">Observação do Cancelamento</Label>
+                  <Textarea
+                    value={updateForm.cancel_obs || ''}
+                    onChange={(e) => setUpdateForm({ ...updateForm, cancel_obs: e.target.value })}
+                    placeholder="Adicione observações adicionais..."
+                    className="resize-none"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="p-6 pt-4 border-t border-slate-100 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/50">
             <Button variant="outline" onClick={() => setUpdatingContact(null)} className="h-10">

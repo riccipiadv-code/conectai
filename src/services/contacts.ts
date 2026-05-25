@@ -5,6 +5,54 @@ export type Contact = Database['public']['Tables']['manychat_contatos']['Row'] &
   current_stage?: string
   sla_status?: string
   manychat_servicos?: { descricao: string } | null
+  cancel_reason_id?: string | null
+  cancel_obs?: string | null
+}
+
+export interface Servico {
+  id: string
+  descricao: string
+  depto_id: number | null
+}
+
+export interface Depto {
+  id: number
+  nome: string
+}
+
+export interface CancelReason {
+  id: string
+  motivo: string
+}
+
+export async function getServicos(): Promise<Servico[]> {
+  const { data, error } = await supabase
+    .from('manychat_servicos')
+    .select('id, descricao, depto_id')
+    .eq('ativo', true)
+    .order('descricao')
+  if (error) throw error
+  return data
+}
+
+export async function getDeptos(): Promise<Depto[]> {
+  const { data, error } = await supabase
+    .from('manychat_deptos')
+    .select('id, nome')
+    .eq('ativo', true)
+    .order('nome')
+  if (error) throw error
+  return data
+}
+
+export async function getCancelReasons(): Promise<CancelReason[]> {
+  const { data, error } = await supabase
+    .from('manychat_cancel_reasons')
+    .select('id, motivo')
+    .eq('ativo', true)
+    .order('motivo')
+  if (error) throw error
+  return data
 }
 
 export async function getContacts() {
@@ -66,14 +114,19 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
     updates.last_stage_change_at = now
   }
 
-  const { error } = await supabase
-    .from('manychat_contatos')
-    .update({
-      ...updates,
-      manual_updated_at: now,
-      manual_updated_by: userId,
-    })
-    .eq('id', id)
+  if (updates.current_stage && updates.current_stage !== 'cancelado') {
+    updates.cancel_reason_id = null
+    updates.cancel_obs = null
+  }
+
+  const payload: any = {
+    ...updates,
+    manual_updated_at: now,
+    manual_updated_by: userId,
+    updated_at: now,
+  }
+
+  const { error } = await supabase.from('manychat_contatos').update(payload).eq('id', id)
 
   if (error) throw error
 
