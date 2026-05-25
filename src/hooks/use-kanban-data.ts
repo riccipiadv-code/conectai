@@ -52,11 +52,22 @@ export function useKanbanData() {
     const now = new Date().toISOString()
 
     setContacts((prev) =>
-      prev.map((c) =>
-        c.id === id
-          ? { ...c, current_stage: newStage, last_stage_change_at: now, updated_at: now }
-          : c,
-      ),
+      prev.map((c) => {
+        if (c.id === id) {
+          const updated = {
+            ...c,
+            current_stage: newStage,
+            last_stage_change_at: now,
+            updated_at: now,
+          }
+          if (newStage !== 'cancelado') {
+            updated.cancel_reason_id = null
+            updated.cancel_obs = null
+          }
+          return updated
+        }
+        return c
+      }),
     )
 
     try {

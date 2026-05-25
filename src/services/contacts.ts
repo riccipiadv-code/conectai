@@ -170,13 +170,20 @@ export async function updateContactStage(id: string, newStage: string) {
   const now = new Date().toISOString()
 
   // 3. Atualizar o contato
+  const updatePayload: any = {
+    current_stage: newStage,
+    last_stage_change_at: now,
+    updated_at: now,
+  }
+
+  if (newStage !== 'cancelado') {
+    updatePayload.cancel_reason_id = null
+    updatePayload.cancel_obs = null
+  }
+
   const { error: updateError } = await supabase
     .from('manychat_contatos')
-    .update({
-      current_stage: newStage,
-      last_stage_change_at: now,
-      updated_at: now,
-    })
+    .update(updatePayload)
     .eq('id', id)
 
   if (updateError) throw updateError
