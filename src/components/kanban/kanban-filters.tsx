@@ -37,24 +37,21 @@ export function KanbanFilters({
   totalContacts,
 }: KanbanFiltersProps) {
   return (
-    <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center mb-6 bg-white dark:bg-zinc-950 p-4 rounded-xl border border-slate-200/60 dark:border-zinc-800 shadow-sm animate-fade-in-up">
-      <div className="flex items-center gap-3 w-full xl:w-auto">
-        <div className="bg-primary/10 text-primary p-2 rounded-lg hidden sm:block shrink-0">
-          <Filter className="w-4 h-4" />
-        </div>
-        <div className="relative flex-1 xl:w-[300px]">
+    <div className="flex flex-wrap items-center gap-4 mb-6 shrink-0 animate-fade-in-up w-full justify-start">
+      <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="relative flex-1 sm:w-[300px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input
             placeholder="Buscar contatos..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 h-10 w-full"
+            className="pl-9 h-10 w-full bg-white dark:bg-zinc-950 border-slate-200/60 dark:border-zinc-800 shadow-sm"
           />
         </div>
       </div>
-      <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full xl:w-auto">
+      <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 w-full sm:w-auto">
         <Select value={deptoId} onValueChange={onDeptoChange}>
-          <SelectTrigger className="h-10 w-full sm:w-[160px]">
+          <SelectTrigger className="h-10 w-full sm:w-[180px] bg-white dark:bg-zinc-950 border-slate-200/60 dark:border-zinc-800 shadow-sm">
             <SelectValue placeholder="Departamento" />
           </SelectTrigger>
           <SelectContent>
@@ -68,7 +65,7 @@ export function KanbanFilters({
         </Select>
 
         <Select value={servicoId} onValueChange={onServicoChange}>
-          <SelectTrigger className="h-10 w-full sm:w-[160px]">
+          <SelectTrigger className="h-10 w-full sm:w-[180px] bg-white dark:bg-zinc-950 border-slate-200/60 dark:border-zinc-800 shadow-sm">
             <SelectValue placeholder="Serviço" />
           </SelectTrigger>
           <SelectContent>
@@ -82,7 +79,7 @@ export function KanbanFilters({
         </Select>
 
         <Select value={slaStatus} onValueChange={onSlaChange}>
-          <SelectTrigger className="h-10 w-full sm:w-[140px]">
+          <SelectTrigger className="h-10 w-full sm:w-[150px] bg-white dark:bg-zinc-950 border-slate-200/60 dark:border-zinc-800 shadow-sm">
             <SelectValue placeholder="Status SLA" />
           </SelectTrigger>
           <SelectContent>
@@ -94,8 +91,10 @@ export function KanbanFilters({
             <SelectItem value="done">Finalizado</SelectItem>
           </SelectContent>
         </Select>
+      </div>
 
-        <div className="pl-3 border-l border-slate-200 dark:border-zinc-800 flex flex-col items-end shrink-0 hidden sm:flex">
+      <div className="ml-auto hidden xl:flex items-center">
+        <div className="flex flex-col items-end">
           <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">
             Exibindo
           </span>

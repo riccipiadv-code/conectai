@@ -53,13 +53,13 @@ export function KanbanColumn({
 
   return (
     <div
-      className="flex flex-col min-w-[320px] w-[320px] bg-slate-100 dark:bg-zinc-900/40 rounded-xl p-3 border border-slate-200/60 dark:border-zinc-800 transition-colors"
+      className="flex flex-col min-w-[320px] w-[320px] max-h-full bg-slate-100 dark:bg-zinc-900/40 rounded-xl p-3 border border-slate-200/60 dark:border-zinc-800 transition-colors"
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex justify-between items-center mb-3 px-1">
+      <div className="flex justify-between items-center mb-3 px-1 shrink-0">
         <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm tracking-tight">
           {stage.label}
         </h3>
@@ -74,7 +74,7 @@ export function KanbanColumn({
           </span>
         </div>
       </div>
-      <div className="flex flex-col gap-3 overflow-y-auto max-h-[calc(100vh-220px)] pb-2 pr-1 custom-scrollbar">
+      <div className="flex flex-col gap-3 overflow-y-auto flex-1 pb-2 pr-1 custom-scrollbar">
         {contacts.map((c) => (
           <KanbanCard key={c.id} contact={c} deptos={deptos} onEdit={onEdit} onView={onView} />
         ))}

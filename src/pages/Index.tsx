@@ -51,7 +51,15 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col">
+    <div className="flex flex-col w-full h-[calc(100vh-4rem)] overflow-hidden px-4 md:px-6 lg:px-8 pt-4 md:pt-6">
+      <div className="flex flex-col gap-1 mb-6 shrink-0">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          CRM - Kanban
+        </h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Acompanhe e gerencie o fluxo de atendimento dos seus contatos.
+        </p>
+      </div>
       <KanbanFilters
         search={search}
         onSearchChange={setSearch}

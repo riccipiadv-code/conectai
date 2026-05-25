@@ -21,7 +21,7 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ contacts, deptos, onMoveContact, onEdit, onView }: KanbanBoardProps) {
   return (
-    <div className="flex gap-4 overflow-x-auto pb-6 pt-2 items-start custom-scrollbar flex-1 w-full">
+    <div className="flex gap-4 overflow-x-auto pb-6 pt-2 items-start custom-scrollbar flex-1 w-full h-full">
       {STAGES.map((stage) => (
         <KanbanColumn
           key={stage.id}
