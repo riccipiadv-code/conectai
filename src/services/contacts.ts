@@ -32,6 +32,7 @@ export async function getServicos(): Promise<Servico[]> {
     .eq('ativo', true)
     .order('ordem_fluxo', { ascending: true })
   if (error) throw error
+  console.log('servicosData', data)
   return data
 }
 
@@ -42,6 +43,7 @@ export async function getDeptos(): Promise<Depto[]> {
     .eq('ativo', true)
     .order('id', { ascending: true })
   if (error) throw error
+  console.log('deptosData', data)
   return data
 }
 
@@ -121,10 +123,15 @@ export async function updateContact(id: string, updates: Partial<Contact>, previ
 
   const payload: any = {
     ...updates,
-    depto_id: updates.depto_id !== undefined ? updates.depto_id : null,
     manual_updated_at: now,
     manual_updated_by: userId,
     updated_at: now,
+  }
+
+  if (updates.depto_id !== undefined) {
+    payload.depto_id = updates.depto_id
+  } else {
+    delete payload.depto_id
   }
 
   const { error } = await supabase.from('manychat_contatos').update(payload).eq('id', id)

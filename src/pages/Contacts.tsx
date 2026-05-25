@@ -583,7 +583,11 @@ export default function Contacts() {
               <div className="space-y-2">
                 <Label className="text-slate-600 dark:text-slate-400">Departamento</Label>
                 <Select
-                  value={updateForm.depto_id ? String(updateForm.depto_id) : ''}
+                  value={
+                    updateForm.depto_id !== null && updateForm.depto_id !== undefined
+                      ? String(updateForm.depto_id)
+                      : ''
+                  }
                   onValueChange={(val) =>
                     setUpdateForm({ ...updateForm, depto_id: val ? Number(val) : null })
                   }
