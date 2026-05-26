@@ -36,6 +36,7 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
     <div
       draggable
       onDragStart={(e) => {
+        console.log('Drag Start:', contact.id)
         e.dataTransfer.setData('text/plain', contact.id)
         e.dataTransfer.effectAllowed = 'move'
         setIsDragging(true)
@@ -56,13 +57,21 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
         </div>
         <div className="flex gap-1 shrink-0">
           <button
-            onClick={() => onView(contact)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onView(contact)
+            }}
+            onDragStart={(e) => e.stopPropagation()}
             className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
           <button
-            onClick={() => onEdit(contact)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(contact)
+            }}
+            onDragStart={(e) => e.stopPropagation()}
             className="p-1 text-slate-400 hover:text-primary transition-colors"
           >
             <Edit2 className="w-3.5 h-3.5" />

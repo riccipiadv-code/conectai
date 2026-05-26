@@ -29,7 +29,11 @@ export function KanbanColumn({
     e.preventDefault()
     e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-zinc-800/60')
     const contactId = e.dataTransfer.getData('text/plain')
+
+    console.log('Drop target:', stage.id, 'Received contact:', contactId)
+
     if (contactId) {
+      console.log('Moving contact:', contactId, 'to stage:', stage.id)
       onMoveContact(contactId, stage.id)
     }
   }
@@ -37,6 +41,7 @@ export function KanbanColumn({
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
+    console.log('Drag Over column:', stage.id)
   }
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
