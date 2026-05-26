@@ -51,7 +51,7 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-4rem)] overflow-hidden px-4 md:px-6 lg:px-8 pt-4 md:pt-6">
+    <div className="flex flex-col w-full h-full overflow-hidden px-4 md:px-5 lg:px-6 pt-4 md:pt-6 pb-2">
       <div className="flex flex-col gap-1 mb-6 shrink-0">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
           CRM - Kanban

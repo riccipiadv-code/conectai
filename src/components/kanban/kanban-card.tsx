@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useDraggable } from '@dnd-kit/core'
 import { Contact, Depto } from '@/services/contacts'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -14,7 +14,19 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps) {
-  const [isDragging, setIsDragging] = useState(false)
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: contact.id,
+    data: {
+      stageId: contact.current_stage || 'nivel_1_novo',
+    },
+  })
+
+  const style = transform
+    ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      }
+    : undefined
+
   const deptoName = deptos.find((d) => d.id === contact.depto_id)?.nome
 
   const slaColors: Record<string, string> = {
@@ -34,18 +46,14 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
 
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        console.log('Drag Start:', contact.id)
-        e.dataTransfer.setData('text/plain', contact.id)
-        e.dataTransfer.effectAllowed = 'move'
-        setIsDragging(true)
-      }}
-      onDragEnd={() => setIsDragging(false)}
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
       className={cn(
-        'bg-white dark:bg-zinc-950 p-3.5 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-800 border-l-4 hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2.5',
+        'bg-white dark:bg-zinc-950 p-3.5 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-800 border-l-4 hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2.5 relative',
         slaColors[contact.sla_status || 'green'] || slaColors.green,
-        isDragging && 'opacity-50',
+        isDragging && 'opacity-80 z-50 shadow-xl',
       )}
     >
       <div className="flex justify-between items-start gap-2">
@@ -55,14 +63,14 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
         >
           {contact.lead_nome || contact.nome || 'Sem nome'}
         </div>
-        <div className="flex gap-1 shrink-0">
+        <div className="flex gap-1 shrink-0 relative z-10">
           <button
             onClick={(e) => {
               e.stopPropagation()
               onView(contact)
             }}
-            onDragStart={(e) => e.stopPropagation()}
-            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+            onPointerDown={(e) => e.stopPropagation()}
+            className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors pointer-events-auto"
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
@@ -71,8 +79,8 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
               e.stopPropagation()
               onEdit(contact)
             }}
-            onDragStart={(e) => e.stopPropagation()}
-            className="p-1 text-slate-400 hover:text-primary transition-colors"
+            onPointerDown={(e) => e.stopPropagation()}
+            className="p-1 text-slate-400 hover:text-primary transition-colors pointer-events-auto"
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>

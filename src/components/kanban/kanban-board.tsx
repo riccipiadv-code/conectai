@@ -1,3 +1,11 @@
+import {
+  DndContext,
+  DragEndEvent,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
 import { Contact, Depto } from '@/services/contacts'
 import { KanbanColumn } from './kanban-column'
 
@@ -20,22 +28,51 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ contacts, deptos, onMoveContact, onEdit, onView }: KanbanBoardProps) {
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over) return
+
+    const contactId = String(active.id)
+    const targetStageId = String(over.id)
+    const currentStageId = String(active.data.current?.stageId)
+
+    if (currentStageId === targetStageId) return
+
+    onMoveContact(contactId, targetStageId)
+  }
+
   return (
-    <div className="flex gap-4 overflow-x-auto pb-6 pt-2 items-start custom-scrollbar flex-1 w-full h-full">
-      {STAGES.map((stage) => (
-        <KanbanColumn
-          key={stage.id}
-          stage={stage}
-          deptos={deptos}
-          contacts={contacts.filter(
-            (c) =>
-              c.current_stage === stage.id || (!c.current_stage && stage.id === 'nivel_1_novo'),
-          )}
-          onMoveContact={onMoveContact}
-          onEdit={onEdit}
-          onView={onView}
-        />
-      ))}
-    </div>
+    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+      <div className="flex gap-3 overflow-x-auto pb-6 pt-2 items-start custom-scrollbar flex-1 w-full h-full">
+        {STAGES.map((stage) => (
+          <KanbanColumn
+            key={stage.id}
+            stage={stage}
+            deptos={deptos}
+            contacts={contacts.filter(
+              (c) =>
+                c.current_stage === stage.id || (!c.current_stage && stage.id === 'nivel_1_novo'),
+            )}
+            onMoveContact={onMoveContact}
+            onEdit={onEdit}
+            onView={onView}
+          />
+        ))}
+      </div>
+    </DndContext>
   )
 }

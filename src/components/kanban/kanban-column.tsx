@@ -1,3 +1,4 @@
+import { useDroppable } from '@dnd-kit/core'
 import { Contact, Depto } from '@/services/contacts'
 import { KanbanCard } from './kanban-card'
 
@@ -23,46 +24,16 @@ export function KanbanColumn({
   onEdit,
   onView,
 }: KanbanColumnProps) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: stage.id,
+  })
+
   const expiredCount = contacts.filter((c) => c.sla_status === 'red').length
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-zinc-800/60')
-    const contactId = e.dataTransfer.getData('text/plain')
-
-    console.log('Drop target:', stage.id, 'Received contact:', contactId)
-
-    if (contactId) {
-      console.log('Moving contact:', contactId, 'to stage:', stage.id)
-      onMoveContact(contactId, stage.id)
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    console.log('Drag Over column:', stage.id)
-  }
-
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.currentTarget.classList.add('bg-slate-200/60', 'dark:bg-zinc-800/60')
-  }
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-zinc-800/60')
-    }
-  }
 
   return (
     <div
-      className="flex flex-col min-w-[320px] w-[320px] max-h-full bg-slate-100 dark:bg-zinc-900/40 rounded-xl p-3 border border-slate-200/60 dark:border-zinc-800 transition-colors"
-      onDragOver={handleDragOver}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      ref={setNodeRef}
+      className={`flex flex-col min-w-[280px] w-[280px] md:min-w-[300px] md:w-[300px] max-h-full bg-slate-100 dark:bg-zinc-900/40 rounded-xl p-3 border transition-colors ${isOver ? 'bg-slate-200/60 dark:bg-zinc-800/60 border-primary/50' : 'border-slate-200/60 dark:border-zinc-800'}`}
     >
       <div className="flex justify-between items-center mb-3 px-1 shrink-0">
         <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm tracking-tight">
