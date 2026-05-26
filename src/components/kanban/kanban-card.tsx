@@ -92,6 +92,22 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
       </div>
 
       <div className="flex flex-wrap gap-1 mt-1">
+        {contact.current_stage === 'nivel_2_especialista' && (
+          <Badge
+            variant="default"
+            className="text-[10px] px-1.5 py-0 font-semibold bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-500/20 dark:text-violet-400 border-none"
+          >
+            Nível 2
+          </Badge>
+        )}
+        {contact.current_stage === 'nivel_3_especial' && (
+          <Badge
+            variant="default"
+            className="text-[10px] px-1.5 py-0 font-semibold bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200 dark:bg-fuchsia-500/20 dark:text-fuchsia-400 border-none"
+          >
+            Nível 3
+          </Badge>
+        )}
         {contact.lead_empresa_pf && (
           <Badge
             variant="secondary"

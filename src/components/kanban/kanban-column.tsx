@@ -5,6 +5,7 @@ import { KanbanCard } from './kanban-card'
 interface Stage {
   id: string
   label: string
+  matches?: (stage: string | null | undefined) => boolean
 }
 
 interface KanbanColumnProps {

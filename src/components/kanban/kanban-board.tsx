@@ -9,14 +9,38 @@ import {
 import { Contact, Depto } from '@/services/contacts'
 import { KanbanColumn } from './kanban-column'
 
-const STAGES = [
-  { id: 'nivel_1_novo', label: 'Nível 1 - Novo' },
-  { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
-  { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
-  { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
-  { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
-  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
-  { id: 'cancelado', label: 'Cancelado' },
+const UI_STAGES = [
+  {
+    id: 'nivel_1_novo',
+    label: 'Nível 1 - Novo',
+    matches: (stage: string | null | undefined) => !stage || stage === 'nivel_1_novo',
+  },
+  {
+    id: 'nivel_2_especialista',
+    label: 'Nível 2/3 - Especialista/Especial',
+    matches: (stage: string | null | undefined) =>
+      stage === 'nivel_2_especialista' || stage === 'nivel_3_especial',
+  },
+  {
+    id: 'reuniao_consulta_agendada',
+    label: 'Reunião/Consulta Agendada',
+    matches: (stage: string | null | undefined) => stage === 'reuniao_consulta_agendada',
+  },
+  {
+    id: 'enviado_orcamento_ag_retorno',
+    label: 'Enviado Orçamento / Aguardando Retorno',
+    matches: (stage: string | null | undefined) => stage === 'enviado_orcamento_ag_retorno',
+  },
+  {
+    id: 'orcamento_aprovado',
+    label: 'Orçamento Aprovado',
+    matches: (stage: string | null | undefined) => stage === 'orcamento_aprovado',
+  },
+  {
+    id: 'cancelado',
+    label: 'Cancelado',
+    matches: (stage: string | null | undefined) => stage === 'cancelado',
+  },
 ]
 
 interface KanbanBoardProps {
@@ -50,6 +74,11 @@ export function KanbanBoard({ contacts, deptos, onMoveContact, onEdit, onView }:
     const targetStageId = String(over.id)
     const currentStageId = String(active.data.current?.stageId)
 
+    const targetUIColumn = UI_STAGES.find((s) => s.id === targetStageId)
+    if (targetUIColumn && targetUIColumn.matches(currentStageId)) {
+      return
+    }
+
     if (currentStageId === targetStageId) return
 
     onMoveContact(contactId, targetStageId)
@@ -58,15 +87,12 @@ export function KanbanBoard({ contacts, deptos, onMoveContact, onEdit, onView }:
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
       <div className="flex gap-3 overflow-x-auto pb-6 pt-2 items-start custom-scrollbar flex-1 w-full h-full">
-        {STAGES.map((stage) => (
+        {UI_STAGES.map((stage) => (
           <KanbanColumn
             key={stage.id}
             stage={stage}
             deptos={deptos}
-            contacts={contacts.filter(
-              (c) =>
-                c.current_stage === stage.id || (!c.current_stage && stage.id === 'nivel_1_novo'),
-            )}
+            contacts={contacts.filter((c) => stage.matches(c.current_stage))}
             onMoveContact={onMoveContact}
             onEdit={onEdit}
             onView={onView}
