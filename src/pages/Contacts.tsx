@@ -22,6 +22,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Separator } from '@/components/ui/separator'
 import { ContactModal } from '@/components/shared/contact-modal'
 import {
   getContacts,
@@ -51,17 +54,21 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
+const STAGES = [
+  { id: 'nivel_1_novo', label: 'Nível 1 - Novo' },
+  { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
+  { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
+  { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
+  { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
+  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
+  { id: 'cancelado', label: 'Cancelado' },
+]
+
+const DEFAULT_STAGES = STAGES.filter((s) => s.id !== 'cancelado').map((s) => s.id)
+
 const getStageLabel = (stage: string) => {
-  const map: Record<string, string> = {
-    nivel_1_novo: 'Nível 1 - Novo',
-    nivel_2_especialista: 'Nível 2 - Especialista',
-    nivel_3_especial: 'Nível 3 - Especialista',
-    reuniao_consulta_agendada: 'Reunião/Consulta Agendada',
-    enviado_orcamento_ag_retorno: 'Enviado Orçamento / Aguardando Retorno',
-    orcamento_aprovado: 'Orçamento Aprovado',
-    cancelado: 'Cancelado',
-  }
-  return map[stage] || stage.replace('_', ' ')
+  const stageObj = STAGES.find((s) => s.id === stage)
+  return stageObj ? stageObj.label : stage.replace('_', ' ')
 }
 
 const getStageColor = (stage: string) => {
@@ -143,6 +150,7 @@ export default function Contacts() {
   const [cancelReasons, setCancelReasons] = useState<CancelReason[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [selectedStages, setSelectedStages] = useState<string[]>(DEFAULT_STAGES)
   const [updatingContact, setUpdatingContact] = useState<Contact | null>(null)
   const [modalMode, setModalMode] = useState<'view' | 'edit'>('edit')
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null)
@@ -171,14 +179,20 @@ export default function Contacts() {
     fetchData()
   }, [])
 
-  const filteredContacts = contacts.filter(
-    (c) =>
-      (c.lead_nome?.toLowerCase() || '').includes(search.toLowerCase()) ||
-      (c.nome?.toLowerCase() || '').includes(search.toLowerCase()) ||
+  const filteredContacts = contacts.filter((c) => {
+    const searchLower = search.toLowerCase()
+    const matchesSearch =
+      (c.lead_nome?.toLowerCase() || '').includes(searchLower) ||
+      (c.nome?.toLowerCase() || '').includes(searchLower) ||
       (c.whatsapp_phone || '').includes(search) ||
       (c.telefone || '').includes(search) ||
-      (c.lead_email?.toLowerCase() || '').includes(search.toLowerCase()),
-  )
+      (c.lead_email?.toLowerCase() || '').includes(searchLower)
+
+    const effectiveStage = c.current_stage || 'nivel_1_novo'
+    const matchesStage = selectedStages.includes(effectiveStage)
+
+    return matchesSearch && matchesStage
+  })
 
   const getInitials = (name?: string | null) => {
     if (!name) return '??'
@@ -223,11 +237,107 @@ export default function Contacts() {
       </div>
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-start gap-6 border-b border-slate-100 dark:border-zinc-800/50 bg-slate-50/30 dark:bg-zinc-900/20 pb-4">
-          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2 whitespace-nowrap">
-            <Filter className="h-4 w-4 text-slate-400" /> Filtros e Busca
-          </CardTitle>
-          <div className="relative w-full sm:w-[350px]">
+        <CardHeader className="flex flex-col lg:flex-row lg:items-center justify-start gap-4 lg:gap-6 border-b border-slate-100 dark:border-zinc-800/50 bg-slate-50/30 dark:bg-zinc-900/20 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2 whitespace-nowrap">
+              <Filter className="h-4 w-4 text-slate-400" /> Filtros e Busca
+            </CardTitle>
+            <Separator orientation="vertical" className="hidden sm:block h-6" />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="border-dashed gap-2 h-9 px-3">
+                  Estágios
+                  {selectedStages.length > 0 && selectedStages.length < STAGES.length && (
+                    <>
+                      <Separator orientation="vertical" className="h-4 mx-1" />
+                      <Badge variant="secondary" className="rounded-sm px-1 font-normal lg:hidden">
+                        {selectedStages.length}
+                      </Badge>
+                      <div className="hidden lg:flex gap-1">
+                        {selectedStages.length > 2 ? (
+                          <Badge variant="secondary" className="rounded-sm px-1 font-normal">
+                            {selectedStages.length} selecionados
+                          </Badge>
+                        ) : (
+                          selectedStages.map((s) => (
+                            <Badge
+                              key={s}
+                              variant="secondary"
+                              className="rounded-sm px-1 font-normal truncate max-w-[120px]"
+                            >
+                              {getStageLabel(s)}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[340px] p-0" align="start">
+                <div className="p-3">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-3">
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      Estágios
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-[11px] text-slate-500 hover:text-primary"
+                        onClick={() => setSelectedStages(STAGES.map((s) => s.id))}
+                      >
+                        Selecionar todos
+                      </Button>
+                      <span className="text-slate-300 dark:text-slate-700 text-xs">|</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-[11px] text-slate-500 hover:text-primary"
+                        onClick={() => setSelectedStages(DEFAULT_STAGES)}
+                      >
+                        Padrão
+                      </Button>
+                      <span className="text-slate-300 dark:text-slate-700 text-xs">|</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 text-[11px] text-slate-500 hover:text-primary"
+                        onClick={() => setSelectedStages([])}
+                      >
+                        Limpar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                    {STAGES.map((stage) => (
+                      <div key={stage.id} className="flex items-start space-x-2.5">
+                        <Checkbox
+                          id={`stage-${stage.id}`}
+                          checked={selectedStages.includes(stage.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedStages([...selectedStages, stage.id])
+                            } else {
+                              setSelectedStages(selectedStages.filter((s) => s !== stage.id))
+                            }
+                          }}
+                          className="mt-0.5"
+                        />
+                        <label
+                          htmlFor={`stage-${stage.id}`}
+                          className="text-sm text-slate-700 dark:text-slate-300 leading-tight peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
+                        >
+                          {stage.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="relative w-full lg:max-w-[350px] lg:ml-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Buscar por nome, e-mail ou telefone..."
