@@ -42,7 +42,7 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
       }}
       onDragEnd={() => setIsDragging(false)}
       className={cn(
-        'bg-white dark:bg-zinc-950 p-3.5 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-800 border-l-4 hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2.5 group',
+        'bg-white dark:bg-zinc-950 p-3.5 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-800 border-l-4 hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2.5',
         slaColors[contact.sla_status || 'green'] || slaColors.green,
         isDragging && 'opacity-50',
       )}

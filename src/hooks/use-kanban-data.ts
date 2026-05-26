@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getContacts,
   getServicos,
@@ -19,6 +19,12 @@ export function useKanbanData() {
   const [cancelReasons, setCancelReasons] = useState<CancelReason[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+
+  const contactsRef = useRef<Contact[]>([])
+
+  useEffect(() => {
+    contactsRef.current = contacts
+  }, [contacts])
 
   const fetchData = useCallback(async () => {
     try {
@@ -44,44 +50,68 @@ export function useKanbanData() {
     fetchData()
   }, [fetchData])
 
-  const moveContact = async (id: string, newStage: string) => {
-    const contact = contacts.find((c) => c.id === id)
-    if (!contact || contact.current_stage === newStage) return
+  const moveContact = useCallback(
+    async (id: string, newStage: string) => {
+      const currentContacts = contactsRef.current
+      const contact = currentContacts.find((c) => c.id === id)
 
-    const previousContact = { ...contact }
-    const now = new Date().toISOString()
+      if (!contact || contact.current_stage === newStage) return
 
-    setContacts((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const updated = {
-            ...c,
-            current_stage: newStage,
-            last_stage_change_at: now,
-            updated_at: now,
+      const previousStage = contact.current_stage
+      const previousCancelReasonId = contact.cancel_reason_id
+      const previousCancelObs = contact.cancel_obs
+      const previousLastStageChangeAt = contact.last_stage_change_at
+      const previousUpdatedAt = contact.updated_at
+
+      const now = new Date().toISOString()
+
+      setContacts((prev) =>
+        prev.map((c) => {
+          if (c.id === id) {
+            const updated = {
+              ...c,
+              current_stage: newStage,
+              last_stage_change_at: now,
+              updated_at: now,
+            }
+            if (newStage !== 'cancelado') {
+              updated.cancel_reason_id = null
+              updated.cancel_obs = null
+            }
+            return updated
           }
-          if (newStage !== 'cancelado') {
-            updated.cancel_reason_id = null
-            updated.cancel_obs = null
-          }
-          return updated
-        }
-        return c
-      }),
-    )
+          return c
+        }),
+      )
 
-    try {
-      await updateContactStage(id, newStage)
-      toast({ title: 'Sucesso', description: 'Estágio atualizado.' })
-    } catch (error: any) {
-      setContacts((prev) => prev.map((c) => (c.id === id ? previousContact : c)))
-      toast({
-        title: 'Erro',
-        description: 'Não foi possível mover o contato.',
-        variant: 'destructive',
-      })
-    }
-  }
+      try {
+        await updateContactStage(id, newStage)
+        toast({ title: 'Sucesso', description: 'Estágio atualizado.' })
+      } catch (error: any) {
+        setContacts((prev) =>
+          prev.map((c) => {
+            if (c.id === id) {
+              return {
+                ...c,
+                current_stage: previousStage,
+                last_stage_change_at: previousLastStageChangeAt,
+                cancel_reason_id: previousCancelReasonId,
+                cancel_obs: previousCancelObs,
+                updated_at: previousUpdatedAt,
+              }
+            }
+            return c
+          }),
+        )
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível mover o contato.',
+          variant: 'destructive',
+        })
+      }
+    },
+    [toast],
+  )
 
   return { contacts, servicos, deptos, cancelReasons, loading, moveContact, setContacts }
 }
