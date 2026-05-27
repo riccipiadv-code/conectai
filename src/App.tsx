@@ -5,6 +5,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/hooks/use-auth'
 import Index from './pages/Index'
 import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
 import Contacts from './pages/Contacts'
 import Logs from './pages/Logs'
 import NotFound from './pages/NotFound'
@@ -20,6 +21,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/contatos" element={<Contacts />} />
             <Route path="/logs" element={<Logs />} />
           </Route>

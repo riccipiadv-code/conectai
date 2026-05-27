@@ -1,0 +1,106 @@
+import { useState, useEffect } from 'react'
+import { getDashboardData, DashboardFilters as FiltersType } from '@/services/dashboard'
+import { getResponsaveis, getServicos, getDeptos } from '@/services/contacts'
+import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
+import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs'
+import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
+import { DashboardTables } from '@/components/dashboard/DashboardTables'
+import { Button } from '@/components/ui/button'
+import { Download, Loader2 } from 'lucide-react'
+import { exportDashboardExcel } from '@/services/export-dashboard'
+
+export default function Dashboard() {
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [] })
+
+  const [filters, setFilters] = useState<FiltersType>({
+    period: 'current_month',
+    dateFrom: null,
+    dateTo: null,
+    origem: '',
+    servico_id: '',
+    depto_id: '',
+    responsavel_id: '',
+    current_stage: '',
+    orcamento: '',
+    sla_status: '',
+  })
+
+  useEffect(() => {
+    Promise.all([getResponsaveis(), getServicos(), getDeptos()]).then(([r, s, d]: any) =>
+      setMeta({ responsaveis: r, servicos: s, deptos: d }),
+    )
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    getDashboardData(filters)
+      .then((res) => {
+        setData(res)
+        setLoading(false)
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+      })
+  }, [filters])
+
+  const handleExport = () => {
+    exportDashboardExcel(data)
+  }
+
+  return (
+    <div className="space-y-2 animate-fade-in">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            Dashboard
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Análise de atendimentos, conversões e performance da equipe
+          </p>
+        </div>
+        <Button
+          onClick={handleExport}
+          disabled={loading || data.length === 0}
+          className="shadow-sm"
+        >
+          <Download className="mr-2 h-4 w-4" /> Exportar Excel
+        </Button>
+      </div>
+
+      <DashboardFilters filters={filters} setFilters={setFilters} meta={meta} />
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-32 space-y-4">
+          <Loader2 className="h-10 w-10 animate-spin text-primary/80" />
+          <p className="text-sm text-muted-foreground animate-pulse">
+            Carregando dados do dashboard...
+          </p>
+        </div>
+      ) : data.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-32 bg-white dark:bg-zinc-900 rounded-xl border border-dashed border-slate-300 dark:border-zinc-800">
+          <div className="h-16 w-16 bg-slate-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4">
+            <FileText className="h-8 w-8 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+            Nenhum dado encontrado
+          </h3>
+          <p className="text-muted-foreground mt-1 text-center max-w-sm">
+            Não existem solicitações correspondentes aos filtros selecionados. Tente ajustar o
+            período ou outras opções.
+          </p>
+        </div>
+      ) : (
+        <div className="animate-fade-in-up">
+          <DashboardKPIs data={data} />
+          <DashboardCharts data={data} />
+          <DashboardTables data={data} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+import { FileText } from 'lucide-react'

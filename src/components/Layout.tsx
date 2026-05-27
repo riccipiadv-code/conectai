@@ -17,7 +17,16 @@ import {
   SidebarInset,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
-import { Kanban, Users, LogOut, Loader2, Settings, ListIcon, Blocks } from 'lucide-react'
+import {
+  Kanban,
+  Users,
+  LogOut,
+  Loader2,
+  Settings,
+  ListIcon,
+  Blocks,
+  LayoutDashboard,
+} from 'lucide-react'
 
 export default function Layout() {
   const { user, loading, signOut } = useAuth()
@@ -67,6 +76,18 @@ export default function Layout() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === '/dashboard'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
+                  >
+                    <Link to="/dashboard">
+                      <LayoutDashboard className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -161,11 +182,13 @@ export default function Layout() {
             <h1 className="font-semibold text-lg tracking-tight text-slate-800 dark:text-slate-100">
               {location.pathname === '/'
                 ? 'Kanban'
-                : location.pathname === '/contatos'
-                  ? 'Gestão de Atendimentos'
-                  : location.pathname === '/logs'
-                    ? 'Monitoramento de Logs'
-                    : 'Sistema'}
+                : location.pathname === '/dashboard'
+                  ? 'Dashboard Analítico'
+                  : location.pathname === '/contatos'
+                    ? 'Gestão de Atendimentos'
+                    : location.pathname === '/logs'
+                      ? 'Monitoramento de Logs'
+                      : 'Sistema'}
             </h1>
           </div>
         </header>
@@ -174,7 +197,7 @@ export default function Layout() {
             className={
               location.pathname === '/'
                 ? 'w-full flex-1 flex flex-col'
-                : location.pathname === '/contatos'
+                : location.pathname === '/contatos' || location.pathname === '/dashboard'
                   ? 'w-full mx-auto p-6 md:p-8'
                   : 'max-w-7xl mx-auto p-6 md:p-8'
             }
