@@ -57,13 +57,45 @@ export async function getCancelReasons(): Promise<CancelReason[]> {
   return data
 }
 
-export async function getContacts() {
-  const { data, error } = await supabase
+export interface GetContactsOptions {
+  search?: string
+  stages?: string[]
+  limit?: number
+  offset?: number
+}
+
+export async function getContacts(options?: GetContactsOptions) {
+  const { search, stages, limit = 1000, offset = 0 } = options || {}
+
+  let query = supabase
     .from('manychat_contatos')
     .select('*, manychat_servicos(descricao)')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
-    .limit(100)
+    .range(offset, offset + limit - 1)
+
+  if (stages) {
+    if (stages.length === 0) {
+      query = query.in('current_stage', ['__EMPTY__'])
+    } else if (stages.includes('nivel_1_novo')) {
+      query = query.or(
+        `current_stage.in.(${stages.join(',')}),current_stage.is.null,current_stage.eq.`,
+      )
+    } else {
+      query = query.in('current_stage', stages)
+    }
+  }
+
+  if (search) {
+    const cleanSearch = search.trim().replace(/,/g, ' ')
+    if (cleanSearch) {
+      query = query.or(
+        `lead_nome.ilike.%${cleanSearch}%,nome.ilike.%${cleanSearch}%,lead_email.ilike.%${cleanSearch}%,telefone.ilike.%${cleanSearch}%,whatsapp_phone.ilike.%${cleanSearch}%`,
+      )
+    }
+  }
+
+  const { data, error } = await query
 
   if (error) throw error
   return data as Contact[]

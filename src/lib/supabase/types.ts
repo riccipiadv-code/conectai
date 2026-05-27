@@ -468,6 +468,7 @@ export type Database = {
           messages_payload: Json | null
           nome: string | null
           payload_bruto: Json | null
+          porte_empresa: string | null
           responsible_user_id: string | null
           servico_id: string | null
           sla_due_at: string | null
@@ -514,6 +515,7 @@ export type Database = {
           messages_payload?: Json | null
           nome?: string | null
           payload_bruto?: Json | null
+          porte_empresa?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
           sla_due_at?: string | null
@@ -560,6 +562,7 @@ export type Database = {
           messages_payload?: Json | null
           nome?: string | null
           payload_bruto?: Json | null
+          porte_empresa?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
           sla_due_at?: string | null
@@ -1682,6 +1685,7 @@ export const Constants = {
 //   depto_id: integer (nullable)
 //   cancel_reason_id: uuid (nullable)
 //   cancel_obs: text (nullable)
+//   porte_empresa: text (nullable)
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)

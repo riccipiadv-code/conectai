@@ -29,7 +29,7 @@ export function useKanbanData() {
   const fetchData = useCallback(async () => {
     try {
       const [c, s, d, r] = await Promise.all([
-        getContacts(),
+        getContacts({ limit: 1000 }),
         getServicos(),
         getDeptos(),
         getCancelReasons(),

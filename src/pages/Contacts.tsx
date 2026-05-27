@@ -150,6 +150,7 @@ export default function Contacts() {
   const [cancelReasons, setCancelReasons] = useState<CancelReason[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedStages, setSelectedStages] = useState<string[]>(DEFAULT_STAGES)
   const [updatingContact, setUpdatingContact] = useState<Contact | null>(null)
   const [modalMode, setModalMode] = useState<'view' | 'edit'>('edit')
@@ -158,41 +159,49 @@ export default function Contacts() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const fetchData = async () => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    const fetchStaticData = async () => {
       try {
-        const [contactsData, servicosData, deptosData, reasonsData] = await Promise.all([
-          getContacts(),
+        const [servicosData, deptosData, reasonsData] = await Promise.all([
           getServicos(),
           getDeptos(),
           getCancelReasons(),
         ])
-        setContacts(contactsData)
         setServicos(servicosData)
         setDeptos(deptosData)
         setCancelReasons(reasonsData)
       } catch (error) {
-        console.error('Failed to fetch data', error)
+        console.error('Failed to fetch static data', error)
+      }
+    }
+    fetchStaticData()
+  }, [])
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      setLoading(true)
+      try {
+        const contactsData = await getContacts({
+          search: debouncedSearch,
+          stages: selectedStages,
+          limit: 1000,
+        })
+        setContacts(contactsData)
+      } catch (error) {
+        console.error('Failed to fetch contacts', error)
+        toast({ title: 'Erro', description: 'Falha ao carregar contatos', variant: 'destructive' })
       } finally {
         setLoading(false)
       }
     }
-    fetchData()
-  }, [])
-
-  const filteredContacts = contacts.filter((c) => {
-    const searchLower = search.toLowerCase()
-    const matchesSearch =
-      (c.lead_nome?.toLowerCase() || '').includes(searchLower) ||
-      (c.nome?.toLowerCase() || '').includes(searchLower) ||
-      (c.whatsapp_phone || '').includes(search) ||
-      (c.telefone || '').includes(search) ||
-      (c.lead_email?.toLowerCase() || '').includes(searchLower)
-
-    const effectiveStage = c.current_stage || 'nivel_1_novo'
-    const matchesStage = selectedStages.includes(effectiveStage)
-
-    return matchesSearch && matchesStage
-  })
+    fetchContacts()
+  }, [debouncedSearch, selectedStages, toast])
 
   const getInitials = (name?: string | null) => {
     if (!name) return '??'
@@ -379,7 +388,7 @@ export default function Contacts() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredContacts.length === 0 ? (
+                  {contacts.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-32 text-center text-slate-500">
                         <div className="flex flex-col items-center justify-center gap-2">
@@ -389,7 +398,7 @@ export default function Contacts() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredContacts.map((contact) => (
+                    contacts.map((contact) => (
                       <TableRow
                         key={contact.id}
                         className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/60 transition-colors border-slate-100 dark:border-zinc-800/50 group"
