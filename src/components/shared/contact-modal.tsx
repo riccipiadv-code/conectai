@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { format } from 'date-fns'
+import { CalendarIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +20,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Contact, Servico, Depto, CancelReason } from '@/services/contacts'
+import { Calendar } from '@/components/ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Contact,
+  Servico,
+  Depto,
+  CancelReason,
+  getResponsaveis,
+  Responsavel,
+} from '@/services/contacts'
 
 interface ContactModalProps {
   contact: Contact | null
@@ -42,6 +54,11 @@ export function ContactModal({
 }: ContactModalProps) {
   const [updateForm, setUpdateForm] = useState<Partial<Contact>>({})
   const [saving, setSaving] = useState(false)
+  const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
+
+  useEffect(() => {
+    getResponsaveis().then(setResponsaveis).catch(console.error)
+  }, [])
 
   useEffect(() => {
     if (contact && isOpen) {
@@ -58,6 +75,12 @@ export function ContactModal({
         sla_status: contact.sla_status || 'green',
         cancel_reason_id: contact.cancel_reason_id || '',
         cancel_obs: contact.cancel_obs || '',
+        origem: contact.origem || '',
+        responsavel_id: contact.responsavel_id || '',
+        orcamento: contact.orcamento || '',
+        valor: contact.valor ?? null,
+        observacoes: contact.observacoes || '',
+        data_follow_up: contact.data_follow_up || null,
       })
     }
   }, [contact, isOpen])
@@ -71,25 +94,102 @@ export function ContactModal({
         payload.cancel_reason_id = null
         payload.cancel_obs = null
       }
+
+      if (payload.responsavel_id === '') payload.responsavel_id = null
+      if (payload.origem === '') payload.origem = null
+      if (payload.orcamento === '') payload.orcamento = null
+      if (payload.servico_id === '') payload.servico_id = null
+
       await onSave(contact.id, payload, contact.current_stage || 'nivel_1_novo')
     } finally {
       setSaving(false)
     }
   }
 
+  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/\D/g, '')
+    if (!rawValue) {
+      setUpdateForm({ ...updateForm, valor: null })
+      return
+    }
+    const floatValue = parseInt(rawValue, 10) / 100
+    setUpdateForm({ ...updateForm, valor: floatValue })
+  }
+
   const isView = mode === 'view'
+
+  const formatDateSafe = (dateString?: string | null) => {
+    if (!dateString) return '-'
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy HH:mm')
+    } catch (e) {
+      return '-'
+    }
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-[800px] p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-zinc-800">
           <DialogTitle className="text-xl">
             {isView ? 'Visualizar Contato' : 'Atualizar Contato'}
           </DialogTitle>
         </DialogHeader>
-        <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+          {/* Row 1 */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-4 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Origem</Label>
+              <Select
+                value={updateForm.origem || ''}
+                onValueChange={(val) => setUpdateForm({ ...updateForm, origem: val })}
+                disabled={isView}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Agente">Agente</SelectItem>
+                  <SelectItem value="Cliente">Cliente</SelectItem>
+                  <SelectItem value="E-mail">E-mail</SelectItem>
+                  <SelectItem value="Indicação">Indicação</SelectItem>
+                  <SelectItem value="Whatsapp">Whatsapp</SelectItem>
+                  <SelectItem value="Telefone">Telefone</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Data Entrada</Label>
+              <Input
+                value={formatDateSafe(contact?.created_at)}
+                disabled
+                className="bg-slate-50 dark:bg-zinc-800"
+              />
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Responsável</Label>
+              <Select
+                value={updateForm.responsavel_id || ''}
+                onValueChange={(val) => setUpdateForm({ ...updateForm, responsavel_id: val })}
+                disabled={isView}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione um responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  {responsaveis.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Row 2 */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-4 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Nome</Label>
               <Input
                 value={updateForm.lead_nome || ''}
@@ -100,7 +200,7 @@ export function ContactModal({
                 disabled={isView}
               />
             </div>
-            <div className="space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Empresa / PF</Label>
               <Input
                 value={updateForm.lead_empresa_pf || ''}
@@ -109,21 +209,21 @@ export function ContactModal({
                 disabled={isView}
               />
             </div>
+            <div className="md:col-span-4 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">E-mail</Label>
+              <Input
+                type="email"
+                value={updateForm.lead_email || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, lead_email: e.target.value })}
+                placeholder="email@exemplo.com"
+                disabled={isView}
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-slate-600 dark:text-slate-400">E-mail</Label>
-            <Input
-              type="email"
-              value={updateForm.lead_email || ''}
-              onChange={(e) => setUpdateForm({ ...updateForm, lead_email: e.target.value })}
-              placeholder="email@exemplo.com"
-              disabled={isView}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+          {/* Row 3 */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-3 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Serviço Selecionado</Label>
               <Select
                 value={updateForm.servico_id || ''}
@@ -139,7 +239,7 @@ export function ContactModal({
                 disabled={isView}
               >
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione um serviço" />
+                  <SelectValue placeholder="Serviço..." />
                 </SelectTrigger>
                 <SelectContent>
                   {servicos.map((s) => (
@@ -150,7 +250,7 @@ export function ContactModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="md:col-span-3 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Departamento</Label>
               <Select
                 value={
@@ -164,7 +264,7 @@ export function ContactModal({
                 disabled={isView}
               >
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione um departamento" />
+                  <SelectValue placeholder="Depto..." />
                 </SelectTrigger>
                 <SelectContent>
                   {deptos.map((d) => (
@@ -175,22 +275,68 @@ export function ContactModal({
                 </SelectContent>
               </Select>
             </div>
+            <div className="md:col-span-3 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Orçamento</Label>
+              <Select
+                value={updateForm.orcamento || ''}
+                onValueChange={(val) => setUpdateForm({ ...updateForm, orcamento: val })}
+                disabled={isView}
+              >
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Tabela">Tabela</SelectItem>
+                  <SelectItem value="Personalizado">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="md:col-span-3 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Valor</Label>
+              <Input
+                value={
+                  updateForm.valor != null
+                    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                        updateForm.valor,
+                      )
+                    : ''
+                }
+                onChange={handleValorChange}
+                disabled={isView}
+                placeholder="R$ 0,00"
+              />
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-slate-600 dark:text-slate-400">Resumo da Solicitação</Label>
-            <Textarea
-              value={updateForm.lead_resumo || ''}
-              onChange={(e) => setUpdateForm({ ...updateForm, lead_resumo: e.target.value })}
-              placeholder="Detalhes da consulta..."
-              className="resize-none"
-              rows={4}
-              disabled={isView}
-            />
+          {/* Row 4 */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+            <div className="md:col-span-6 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Resumo da Solicitação</Label>
+              <Textarea
+                value={updateForm.lead_resumo || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, lead_resumo: e.target.value })}
+                placeholder="Detalhes da consulta..."
+                className="resize-none"
+                rows={4}
+                disabled={isView}
+              />
+            </div>
+            <div className="md:col-span-6 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Observações</Label>
+              <Textarea
+                value={updateForm.observacoes || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, observacoes: e.target.value })}
+                placeholder="Anotações adicionais..."
+                className="resize-none"
+                rows={4}
+                disabled={isView}
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-zinc-800">
-            <div className="space-y-2">
+          {/* Row 5 */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2 border-t border-slate-100 dark:border-zinc-800">
+            <div className="md:col-span-4 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Estágio</Label>
               <Select
                 value={updateForm.current_stage || 'nivel_1_novo'}
@@ -215,7 +361,7 @@ export function ContactModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="md:col-span-4 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">SLA</Label>
               <Select
                 value={updateForm.sla_status || 'green'}
@@ -233,6 +379,44 @@ export function ContactModal({
                   <SelectItem value="done">Finalizado</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="md:col-span-4 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Data Follow Up</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'h-10 w-full justify-start text-left font-normal',
+                      !updateForm.data_follow_up && 'text-slate-500',
+                      isView && 'opacity-50 cursor-not-allowed',
+                    )}
+                    disabled={isView}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {updateForm.data_follow_up ? (
+                      format(new Date(updateForm.data_follow_up), 'dd/MM/yyyy')
+                    ) : (
+                      <span>Selecione uma data</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={
+                      updateForm.data_follow_up ? new Date(updateForm.data_follow_up) : undefined
+                    }
+                    onSelect={(date) =>
+                      setUpdateForm({
+                        ...updateForm,
+                        data_follow_up: date ? date.toISOString() : null,
+                      })
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 

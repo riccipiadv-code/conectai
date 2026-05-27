@@ -25,6 +25,21 @@ export interface CancelReason {
   motivo: string
 }
 
+export interface Responsavel {
+  id: string
+  nome: string
+}
+
+export async function getResponsaveis(): Promise<Responsavel[]> {
+  const { data, error } = await supabase
+    .from('legaldesk_usuarios')
+    .select('id, nome')
+    .eq('ativo', true)
+    .order('nome', { ascending: true })
+  if (error) throw error
+  return data
+}
+
 export async function getServicos(): Promise<Servico[]> {
   const { data, error } = await supabase
     .from('manychat_servicos')

@@ -439,6 +439,7 @@ export type Database = {
           cancel_reason_id: string | null
           created_at: string
           current_stage: string | null
+          data_follow_up: string | null
           deleted_at: string | null
           deleted_by: string | null
           depto_id: number | null
@@ -467,8 +468,12 @@ export type Database = {
           manychat_live_chat_url: string | null
           messages_payload: Json | null
           nome: string | null
+          observacoes: string | null
+          orcamento: string | null
+          origem: string | null
           payload_bruto: Json | null
           porte_empresa: string | null
+          responsavel_id: string | null
           responsible_user_id: string | null
           servico_id: string | null
           sla_due_at: string | null
@@ -478,6 +483,7 @@ export type Database = {
           subscribed_at: string | null
           telefone: string | null
           updated_at: string
+          valor: number | null
           whatsapp_phone: string | null
         }
         Insert: {
@@ -486,6 +492,7 @@ export type Database = {
           cancel_reason_id?: string | null
           created_at?: string
           current_stage?: string | null
+          data_follow_up?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           depto_id?: number | null
@@ -514,8 +521,12 @@ export type Database = {
           manychat_live_chat_url?: string | null
           messages_payload?: Json | null
           nome?: string | null
+          observacoes?: string | null
+          orcamento?: string | null
+          origem?: string | null
           payload_bruto?: Json | null
           porte_empresa?: string | null
+          responsavel_id?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
           sla_due_at?: string | null
@@ -525,6 +536,7 @@ export type Database = {
           subscribed_at?: string | null
           telefone?: string | null
           updated_at?: string
+          valor?: number | null
           whatsapp_phone?: string | null
         }
         Update: {
@@ -533,6 +545,7 @@ export type Database = {
           cancel_reason_id?: string | null
           created_at?: string
           current_stage?: string | null
+          data_follow_up?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           depto_id?: number | null
@@ -561,8 +574,12 @@ export type Database = {
           manychat_live_chat_url?: string | null
           messages_payload?: Json | null
           nome?: string | null
+          observacoes?: string | null
+          orcamento?: string | null
+          origem?: string | null
           payload_bruto?: Json | null
           porte_empresa?: string | null
+          responsavel_id?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
           sla_due_at?: string | null
@@ -572,6 +589,7 @@ export type Database = {
           subscribed_at?: string | null
           telefone?: string | null
           updated_at?: string
+          valor?: number | null
           whatsapp_phone?: string | null
         }
         Relationships: [
@@ -587,6 +605,13 @@ export type Database = {
             columns: ['depto_id']
             isOneToOne: false
             referencedRelation: 'manychat_deptos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'manychat_contatos_responsavel_id_fkey'
+            columns: ['responsavel_id']
+            isOneToOne: false
+            referencedRelation: 'legaldesk_usuarios'
             referencedColumns: ['id']
           },
           {
@@ -1686,6 +1711,12 @@ export const Constants = {
 //   cancel_reason_id: uuid (nullable)
 //   cancel_obs: text (nullable)
 //   porte_empresa: text (nullable)
+//   origem: text (nullable)
+//   responsavel_id: uuid (nullable)
+//   orcamento: text (nullable)
+//   valor: numeric (nullable)
+//   observacoes: text (nullable)
+//   data_follow_up: timestamp with time zone (nullable)
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)
@@ -1910,7 +1941,10 @@ export const Constants = {
 //   FOREIGN KEY manychat_contatos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_manual_updated_by_fkey: FOREIGN KEY (manual_updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
 //   UNIQUE manychat_contatos_manychat_id_key: UNIQUE (manychat_id)
+//   CHECK manychat_contatos_orcamento_check: CHECK (((orcamento IS NULL) OR (orcamento = ANY (ARRAY['Tabela'::text, 'Personalizado'::text]))))
+//   CHECK manychat_contatos_origem_check: CHECK (((origem IS NULL) OR (origem = ANY (ARRAY['Agente'::text, 'Cliente'::text, 'E-mail'::text, 'Indicação'::text, 'Whatsapp'::text, 'Telefone'::text]))))
 //   PRIMARY KEY manychat_contatos_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY manychat_contatos_responsavel_id_fkey: FOREIGN KEY (responsavel_id) REFERENCES legaldesk_usuarios(id)
 //   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
 //   UNIQUE unique_telefone: UNIQUE (telefone)
@@ -2328,7 +2362,10 @@ export const Constants = {
 // Table: manychat_contatos
 //   CREATE INDEX idx_manychat_contatos_created_at ON public.manychat_contatos USING btree (created_at)
 //   CREATE INDEX idx_manychat_contatos_current_stage ON public.manychat_contatos USING btree (current_stage)
+//   CREATE INDEX idx_manychat_contatos_data_follow_up ON public.manychat_contatos USING btree (data_follow_up)
 //   CREATE INDEX idx_manychat_contatos_manychat_id ON public.manychat_contatos USING btree (manychat_id)
+//   CREATE INDEX idx_manychat_contatos_origem ON public.manychat_contatos USING btree (origem)
+//   CREATE INDEX idx_manychat_contatos_responsavel_id ON public.manychat_contatos USING btree (responsavel_id)
 //   CREATE INDEX idx_manychat_contatos_sla_status ON public.manychat_contatos USING btree (sla_status)
 //   CREATE INDEX idx_manychat_contatos_status ON public.manychat_contatos USING btree (last_update_status)
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
