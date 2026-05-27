@@ -47,7 +47,6 @@ export async function getServicos(): Promise<Servico[]> {
     .eq('ativo', true)
     .order('ordem_fluxo', { ascending: true })
   if (error) throw error
-  console.log('servicosData', data)
   return data
 }
 
@@ -58,7 +57,6 @@ export async function getDeptos(): Promise<Depto[]> {
     .eq('ativo', true)
     .order('id', { ascending: true })
   if (error) throw error
-  console.log('deptosData', data)
   return data
 }
 
@@ -126,6 +124,66 @@ const OFFICIAL_STAGES = [
   'cancelado',
 ]
 
+export async function createContact(payload: Partial<Contact>) {
+  const { data: userData } = await supabase.auth.getUser()
+  const userId = userData?.user?.id || null
+  const now = new Date().toISOString()
+
+  const { data: idsData, error: idsError } = await supabase
+    .from('manychat_contatos')
+    .select('manychat_id')
+
+  if (idsError) throw idsError
+
+  let maxId = 0
+  if (idsData && idsData.length > 0) {
+    for (const row of idsData) {
+      const num = parseInt(row.manychat_id, 10)
+      if (!isNaN(num) && num > maxId) {
+        maxId = num
+      }
+    }
+  }
+  const nextManychatId = (maxId + 1).toString()
+
+  const insertPayload: any = {
+    ...payload,
+    manychat_id: nextManychatId,
+    manual_updated_at: now,
+    manual_updated_by: userId,
+    updated_at: now,
+  }
+
+  if (!insertPayload.responsavel_id) insertPayload.responsavel_id = null
+  if (!insertPayload.origem) insertPayload.origem = null
+  if (!insertPayload.orcamento) insertPayload.orcamento = null
+  if (!insertPayload.servico_id) insertPayload.servico_id = null
+  if (insertPayload.depto_id === '') insertPayload.depto_id = null
+  if (!insertPayload.cancel_reason_id) insertPayload.cancel_reason_id = null
+  if (!insertPayload.cancel_obs) insertPayload.cancel_obs = null
+
+  const { data, error } = await supabase
+    .from('manychat_contatos')
+    .insert(insertPayload)
+    .select('*, manychat_servicos(descricao)')
+    .single()
+
+  if (error) throw error
+
+  if (insertPayload.current_stage) {
+    await supabase.from('mc_kanban_history').insert({
+      contato_id: data.id,
+      manychat_id: data.manychat_id,
+      previous_stage: null,
+      new_stage: insertPayload.current_stage,
+      changed_by: userId,
+      created_at: now,
+    })
+  }
+
+  return data as Contact
+}
+
 export async function updateContact(id: string, updates: Partial<Contact>, previousStage?: string) {
   const { data: userData } = await supabase.auth.getUser()
   const userId = userData?.user?.id || null
@@ -192,7 +250,6 @@ export async function deleteContact(id: string) {
 }
 
 export async function updateContactStage(id: string, newStage: string) {
-  // 1. Obter contato atual
   const { data: contact, error: fetchError } = await supabase
     .from('manychat_contatos')
     .select('id, manychat_id, current_stage')
@@ -206,7 +263,6 @@ export async function updateContactStage(id: string, newStage: string) {
 
   if (currentStage === newStage) return
 
-  // 2. Validar transição de estágio
   if (!OFFICIAL_STAGES.includes(newStage)) {
     throw new Error(`Estágio inválido: '${newStage}'`)
   }
@@ -216,7 +272,6 @@ export async function updateContactStage(id: string, newStage: string) {
 
   const now = new Date().toISOString()
 
-  // 3. Atualizar o contato
   const updatePayload: any = {
     current_stage: newStage,
     last_stage_change_at: now,
@@ -235,7 +290,6 @@ export async function updateContactStage(id: string, newStage: string) {
 
   if (updateError) throw updateError
 
-  // 4. Registrar histórico
   const { error: historyError } = await supabase.from('mc_kanban_history').insert({
     contato_id: contact.id,
     manychat_id: contact.manychat_id,

@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { ContactModal } from '@/components/shared/contact-modal'
 import {
   getContacts,
+  createContact,
   updateContact,
   deleteContact,
   Contact,
@@ -51,6 +52,7 @@ import {
   Clock,
   CheckCircle,
   Eye,
+  Plus,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -153,7 +155,8 @@ export default function Contacts() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedStages, setSelectedStages] = useState<string[]>(DEFAULT_STAGES)
   const [updatingContact, setUpdatingContact] = useState<Contact | null>(null)
-  const [modalMode, setModalMode] = useState<'view' | 'edit'>('edit')
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('create')
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [deletingContact, setDeletingContact] = useState<Contact | null>(null)
   const [saving, setSaving] = useState(false)
   const { toast } = useToast()
@@ -243,6 +246,17 @@ export default function Contacts() {
             Gerencie os contatos sincronizados em formato de lista.
           </p>
         </div>
+        <Button
+          onClick={() => {
+            setUpdatingContact(null)
+            setModalMode('create')
+            setIsModalOpen(true)
+          }}
+          className="gap-2"
+        >
+          <Plus className="h-4 w-4" />
+          Criar Novo
+        </Button>
       </div>
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm overflow-hidden">
@@ -481,6 +495,7 @@ export default function Contacts() {
                                   onClick={() => {
                                     setUpdatingContact(contact)
                                     setModalMode('view')
+                                    setIsModalOpen(true)
                                   }}
                                   className="h-8 w-8 text-slate-400 hover:text-slate-900 hover:bg-slate-100"
                                 >
@@ -497,6 +512,7 @@ export default function Contacts() {
                                   onClick={() => {
                                     setUpdatingContact(contact)
                                     setModalMode('edit')
+                                    setIsModalOpen(true)
                                   }}
                                   className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/10"
                                 >
@@ -542,14 +558,24 @@ export default function Contacts() {
       <ContactModal
         contact={updatingContact}
         mode={modalMode}
-        isOpen={!!updatingContact}
-        onClose={() => setUpdatingContact(null)}
-        onSave={async (id, payload, prevStage) => {
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setTimeout(() => setUpdatingContact(null), 200)
+        }}
+        onSave={async (payload, id, prevStage) => {
           try {
-            await updateContact(id, payload, prevStage)
-            toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
-            setContacts(contacts.map((c) => (c.id === id ? { ...c, ...payload } : c)))
-            setUpdatingContact(null)
+            if (modalMode === 'create') {
+              const newContact = await createContact(payload)
+              setContacts([newContact, ...contacts])
+              toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
+            } else if (id) {
+              await updateContact(id, payload, prevStage)
+              setContacts(contacts.map((c) => (c.id === id ? { ...c, ...payload } : c)))
+              toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
+            }
+            setIsModalOpen(false)
+            setTimeout(() => setUpdatingContact(null), 200)
           } catch (error: any) {
             toast({ title: 'Erro', description: error.message, variant: 'destructive' })
           }

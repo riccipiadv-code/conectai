@@ -437,6 +437,7 @@ export type Database = {
           cancel_obs: string | null
           cancel_reason: string | null
           cancel_reason_id: string | null
+          controle: number | null
           created_at: string
           current_stage: string | null
           data_follow_up: string | null
@@ -490,6 +491,7 @@ export type Database = {
           cancel_obs?: string | null
           cancel_reason?: string | null
           cancel_reason_id?: string | null
+          controle?: number | null
           created_at?: string
           current_stage?: string | null
           data_follow_up?: string | null
@@ -543,6 +545,7 @@ export type Database = {
           cancel_obs?: string | null
           cancel_reason?: string | null
           cancel_reason_id?: string | null
+          controle?: number | null
           created_at?: string
           current_stage?: string | null
           data_follow_up?: string | null
@@ -1717,6 +1720,7 @@ export const Constants = {
 //   valor: numeric (nullable)
 //   observacoes: text (nullable)
 //   data_follow_up: timestamp with time zone (nullable)
+//   controle: bigint (nullable, default: nextval('manychat_contatos_controle_seq'::regclass))
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)
@@ -1937,6 +1941,7 @@ export const Constants = {
 //   PRIMARY KEY manychat_contact_attributes_pkey: PRIMARY KEY (manychat_id, attribute_key)
 // Table: manychat_contatos
 //   FOREIGN KEY manychat_contatos_cancel_reason_id_fkey: FOREIGN KEY (cancel_reason_id) REFERENCES manychat_cancel_reasons(id) ON DELETE SET NULL
+//   UNIQUE manychat_contatos_controle_unique: UNIQUE (controle)
 //   FOREIGN KEY manychat_contatos_deleted_by_fkey: FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_manual_updated_by_fkey: FOREIGN KEY (manual_updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
@@ -2368,6 +2373,7 @@ export const Constants = {
 //   CREATE INDEX idx_manychat_contatos_responsavel_id ON public.manychat_contatos USING btree (responsavel_id)
 //   CREATE INDEX idx_manychat_contatos_sla_status ON public.manychat_contatos USING btree (sla_status)
 //   CREATE INDEX idx_manychat_contatos_status ON public.manychat_contatos USING btree (last_update_status)
+//   CREATE UNIQUE INDEX manychat_contatos_controle_unique ON public.manychat_contatos USING btree (controle)
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
 //   CREATE UNIQUE INDEX unique_telefone ON public.manychat_contatos USING btree (telefone)
 // Table: manychat_deptos

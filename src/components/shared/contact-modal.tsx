@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useToast } from '@/hooks/use-toast'
 import {
   Contact,
   Servico,
@@ -33,10 +34,10 @@ import {
 
 interface ContactModalProps {
   contact: Contact | null
-  mode: 'view' | 'edit'
+  mode: 'view' | 'edit' | 'create'
   isOpen: boolean
   onClose: () => void
-  onSave: (id: string, payload: Partial<Contact>, prevStage: string) => Promise<void>
+  onSave: (payload: Partial<Contact>, id?: string, prevStage?: string) => Promise<void>
   servicos: Servico[]
   deptos: Depto[]
   cancelReasons: CancelReason[]
@@ -55,38 +56,86 @@ export function ContactModal({
   const [updateForm, setUpdateForm] = useState<Partial<Contact>>({})
   const [saving, setSaving] = useState(false)
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
+  const { toast } = useToast()
+
+  const isView = mode === 'view'
+  const isCreate = mode === 'create'
 
   useEffect(() => {
     getResponsaveis().then(setResponsaveis).catch(console.error)
   }, [])
 
   useEffect(() => {
-    if (contact && isOpen) {
-      setUpdateForm({
-        nome: contact.nome || contact.lead_nome || '',
-        lead_nome: contact.lead_nome || contact.nome || '',
-        lead_empresa_pf: contact.lead_empresa_pf || '',
-        lead_email: contact.lead_email || '',
-        servico_id: contact.servico_id || '',
-        depto_id: contact.depto_id ?? null,
-        lead_servico: contact.lead_servico || '',
-        lead_resumo: contact.lead_resumo || '',
-        current_stage: contact.current_stage || 'nivel_1_novo',
-        sla_status: contact.sla_status || 'green',
-        cancel_reason_id: contact.cancel_reason_id || '',
-        cancel_obs: contact.cancel_obs || '',
-        origem: contact.origem || '',
-        responsavel_id: contact.responsavel_id || '',
-        orcamento: contact.orcamento || '',
-        valor: contact.valor ?? null,
-        observacoes: contact.observacoes || '',
-        data_follow_up: contact.data_follow_up || null,
-      })
+    if (isOpen) {
+      if (isCreate) {
+        setUpdateForm({
+          nome: '',
+          lead_nome: '',
+          telefone: '',
+          lead_empresa_pf: '',
+          lead_email: '',
+          servico_id: '',
+          depto_id: null,
+          lead_servico: '',
+          lead_resumo: '',
+          current_stage: 'nivel_1_novo',
+          sla_status: 'green',
+          cancel_reason_id: '',
+          cancel_obs: '',
+          origem: 'Whatsapp',
+          responsavel_id: '',
+          orcamento: '',
+          valor: null,
+          observacoes: '',
+          data_follow_up: null,
+        })
+      } else if (contact) {
+        setUpdateForm({
+          nome: contact.nome || contact.lead_nome || '',
+          lead_nome: contact.lead_nome || contact.nome || '',
+          telefone: contact.telefone || contact.whatsapp_phone || '',
+          lead_empresa_pf: contact.lead_empresa_pf || '',
+          lead_email: contact.lead_email || '',
+          servico_id: contact.servico_id || '',
+          depto_id: contact.depto_id ?? null,
+          lead_servico: contact.lead_servico || '',
+          lead_resumo: contact.lead_resumo || '',
+          current_stage: contact.current_stage || 'nivel_1_novo',
+          sla_status: contact.sla_status || 'green',
+          cancel_reason_id: contact.cancel_reason_id || '',
+          cancel_obs: contact.cancel_obs || '',
+          origem: contact.origem || '',
+          responsavel_id: contact.responsavel_id || '',
+          orcamento: contact.orcamento || '',
+          valor: contact.valor ?? null,
+          observacoes: contact.observacoes || '',
+          data_follow_up: contact.data_follow_up || null,
+        })
+      }
     }
-  }, [contact, isOpen])
+  }, [contact, isOpen, isCreate])
+
+  useEffect(() => {
+    if (isOpen && isCreate && responsaveis.length > 0 && !updateForm.responsavel_id) {
+      const anaEdith = responsaveis.find((r) => r.nome.toLowerCase().includes('ana edith'))
+      if (anaEdith) {
+        setUpdateForm((prev) => ({ ...prev, responsavel_id: anaEdith.id }))
+      } else {
+        console.warn('Usuário "Ana Edith" não encontrado para seleção padrão.')
+      }
+    }
+  }, [isOpen, isCreate, responsaveis])
 
   const handleSave = async () => {
-    if (!contact) return
+    if (!updateForm.lead_nome?.trim()) {
+      toast({
+        title: 'Atenção',
+        description: 'O campo Nome é obrigatório.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSaving(true)
     try {
       const payload = { ...updateForm }
@@ -100,7 +149,7 @@ export function ContactModal({
       if (payload.orcamento === '') payload.orcamento = null
       if (payload.servico_id === '') payload.servico_id = null
 
-      await onSave(contact.id, payload, contact.current_stage || 'nivel_1_novo')
+      await onSave(payload, contact?.id, contact?.current_stage)
     } finally {
       setSaving(false)
     }
@@ -116,8 +165,6 @@ export function ContactModal({
     setUpdateForm({ ...updateForm, valor: floatValue })
   }
 
-  const isView = mode === 'view'
-
   const formatDateSafe = (dateString?: string | null) => {
     if (!dateString) return '-'
     try {
@@ -132,7 +179,7 @@ export function ContactModal({
       <DialogContent className="sm:max-w-[800px] p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-4 border-b border-slate-100 dark:border-zinc-800">
           <DialogTitle className="text-xl">
-            {isView ? 'Visualizar Contato' : 'Atualizar Contato'}
+            {isCreate ? 'Criar Novo Contato' : isView ? 'Visualizar Contato' : 'Atualizar Contato'}
           </DialogTitle>
         </DialogHeader>
         <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
@@ -161,7 +208,7 @@ export function ContactModal({
             <div className="md:col-span-4 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Data Entrada</Label>
               <Input
-                value={formatDateSafe(contact?.created_at)}
+                value={isCreate ? 'Agora' : formatDateSafe(contact?.created_at)}
                 disabled
                 className="bg-slate-50 dark:bg-zinc-800"
               />
@@ -189,33 +236,44 @@ export function ContactModal({
 
           {/* Row 2 */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-            <div className="md:col-span-4 space-y-2">
-              <Label className="text-slate-600 dark:text-slate-400">Nome</Label>
+            <div className="md:col-span-3 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">
+                Nome <span className="text-rose-500">*</span>
+              </Label>
               <Input
                 value={updateForm.lead_nome || ''}
                 onChange={(e) =>
                   setUpdateForm({ ...updateForm, lead_nome: e.target.value, nome: e.target.value })
                 }
-                placeholder="Nome"
+                placeholder="Nome completo"
                 disabled={isView}
               />
             </div>
-            <div className="md:col-span-4 space-y-2">
+            <div className="md:col-span-3 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">Empresa / PF</Label>
               <Input
                 value={updateForm.lead_empresa_pf || ''}
                 onChange={(e) => setUpdateForm({ ...updateForm, lead_empresa_pf: e.target.value })}
-                placeholder="Nome da empresa ou PF"
+                placeholder="Empresa ou PF"
                 disabled={isView}
               />
             </div>
-            <div className="md:col-span-4 space-y-2">
+            <div className="md:col-span-3 space-y-2">
               <Label className="text-slate-600 dark:text-slate-400">E-mail</Label>
               <Input
                 type="email"
                 value={updateForm.lead_email || ''}
                 onChange={(e) => setUpdateForm({ ...updateForm, lead_email: e.target.value })}
                 placeholder="email@exemplo.com"
+                disabled={isView}
+              />
+            </div>
+            <div className="md:col-span-3 space-y-2">
+              <Label className="text-slate-600 dark:text-slate-400">Telefone</Label>
+              <Input
+                value={updateForm.telefone || ''}
+                onChange={(e) => setUpdateForm({ ...updateForm, telefone: e.target.value })}
+                placeholder="(00) 00000-0000"
                 disabled={isView}
               />
             </div>
@@ -465,7 +523,7 @@ export function ContactModal({
           </Button>
           {!isView && (
             <Button onClick={handleSave} disabled={saving} className="h-10 px-8">
-              {saving ? 'Salvando...' : 'Salvar Alterações'}
+              {saving ? 'Salvando...' : isCreate ? 'Criar Contato' : 'Salvar Alterações'}
             </Button>
           )}
         </DialogFooter>
