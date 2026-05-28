@@ -183,3 +183,44 @@ export function normalizeManyChatPayload(payload: any) {
     },
   }
 }
+
+let cachedAnaEdithId: string | null | undefined = undefined
+
+export async function getDefaultResponsavelId(supabase: any): Promise<string | null> {
+  if (cachedAnaEdithId !== undefined) {
+    return cachedAnaEdithId
+  }
+
+  const { data: user } = await supabase
+    .from('legaldesk_usuarios')
+    .select('id')
+    .eq('nome', 'Ana Edith')
+    .limit(1)
+    .maybeSingle()
+
+  if (user) {
+    cachedAnaEdithId = user.id
+  } else {
+    console.warn('Default responsible user "Ana Edith" not found in legaldesk_usuarios')
+    cachedAnaEdithId = null
+  }
+
+  return cachedAnaEdithId
+}
+
+export async function enrichManyChatRecord(
+  supabase: any,
+  record: any,
+  existingContact: any | null,
+) {
+  if (!existingContact || !existingContact.origem) {
+    record.origem = 'Whatsapp'
+  }
+
+  if (!existingContact || !existingContact.responsavel_id) {
+    const responsavelId = await getDefaultResponsavelId(supabase)
+    if (responsavelId) {
+      record.responsavel_id = responsavelId
+    }
+  }
+}

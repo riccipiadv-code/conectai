@@ -1,6 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { normalizeManyChatPayload } from '../_shared/manychat.ts'
+import { normalizeManyChatPayload, enrichManyChatRecord } from '../_shared/manychat.ts'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
 
             const { data: existing } = await supabase
               .from('manychat_contatos')
-              .select('id')
+              .select('id, origem, responsavel_id')
               .eq('manychat_id', manychatIdStr)
               .maybeSingle()
 
@@ -222,6 +222,8 @@ Deno.serve(async (req: Request) => {
                 record.servico_id = servico.id
               }
             }
+
+            await enrichManyChatRecord(supabase, record, existing)
 
             const { error: upsertError } = await supabase
               .from('manychat_contatos')
