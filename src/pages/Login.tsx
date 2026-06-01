@@ -50,8 +50,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md animate-fade-in-up">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">Sistema Geral</CardTitle>
-          <CardDescription>Entre com suas credenciais para acessar o painel</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight">ManySkip</CardTitle>
+          <CardDescription>Entre com suas credenciais para acessar o sistema</CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
