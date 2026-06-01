@@ -184,6 +184,119 @@ export type Database = {
         }
         Relationships: []
       }
+      email_secrets: {
+        Row: {
+          created_at: string | null
+          secret_value: string
+          setting_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          secret_value: string
+          setting_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          secret_value?: string
+          setting_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'email_secrets_setting_id_fkey'
+            columns: ['setting_id']
+            isOneToOne: true
+            referencedRelation: 'email_settings'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      email_send_logs: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          error_message: string | null
+          id: string
+          status: string
+          subject: string | null
+          to_email: string
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          status: string
+          subject?: string | null
+          to_email: string
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          id?: string
+          status?: string
+          subject?: string | null
+          to_email?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      email_settings: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          id: string
+          provider: string
+          reply_to: string | null
+          secret_configured: boolean | null
+          sender_email: string
+          sender_name: string
+          smtp_host: string | null
+          smtp_port: number | null
+          smtp_secure: boolean | null
+          smtp_user: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          provider?: string
+          reply_to?: string | null
+          secret_configured?: boolean | null
+          sender_email: string
+          sender_name: string
+          smtp_host?: string | null
+          smtp_port?: number | null
+          smtp_secure?: boolean | null
+          smtp_user?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          id?: string
+          provider?: string
+          reply_to?: string | null
+          secret_configured?: boolean | null
+          sender_email?: string
+          sender_name?: string
+          smtp_host?: string | null
+          smtp_port?: number | null
+          smtp_secure?: boolean | null
+          smtp_user?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       historico_tarefas: {
         Row: {
           acao: string
@@ -1605,6 +1718,35 @@ export const Constants = {
 // Table: departamentos
 //   id: uuid (not null, default: gen_random_uuid())
 //   nome: text (not null)
+// Table: email_secrets
+//   setting_id: uuid (not null)
+//   secret_value: text (not null)
+//   created_at: timestamp with time zone (nullable, default: now())
+//   updated_at: timestamp with time zone (nullable, default: now())
+// Table: email_send_logs
+//   id: uuid (not null, default: gen_random_uuid())
+//   type: text (not null)
+//   to_email: text (not null)
+//   subject: text (nullable)
+//   status: text (not null)
+//   error_message: text (nullable)
+//   created_by: uuid (nullable)
+//   created_at: timestamp with time zone (nullable, default: now())
+// Table: email_settings
+//   id: uuid (not null, default: gen_random_uuid())
+//   provider: text (not null, default: 'smtp'::text)
+//   sender_name: text (not null)
+//   sender_email: text (not null)
+//   reply_to: text (nullable)
+//   smtp_host: text (nullable)
+//   smtp_port: integer (nullable)
+//   smtp_user: text (nullable)
+//   smtp_secure: boolean (nullable, default: true)
+//   secret_configured: boolean (nullable, default: false)
+//   active: boolean (nullable, default: true)
+//   created_at: timestamp with time zone (nullable, default: now())
+//   updated_at: timestamp with time zone (nullable, default: now())
+//   updated_by: uuid (nullable)
 // Table: historico_tarefas
 //   id: uuid (not null, default: gen_random_uuid())
 //   tarefa_id: uuid (not null)
@@ -1921,6 +2063,15 @@ export const Constants = {
 // Table: departamentos
 //   UNIQUE departamentos_nome_key: UNIQUE (nome)
 //   PRIMARY KEY departamentos_pkey: PRIMARY KEY (id)
+// Table: email_secrets
+//   PRIMARY KEY email_secrets_pkey: PRIMARY KEY (setting_id)
+//   FOREIGN KEY email_secrets_setting_id_fkey: FOREIGN KEY (setting_id) REFERENCES email_settings(id) ON DELETE CASCADE
+// Table: email_send_logs
+//   FOREIGN KEY email_send_logs_created_by_fkey: FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE SET NULL
+//   PRIMARY KEY email_send_logs_pkey: PRIMARY KEY (id)
+// Table: email_settings
+//   PRIMARY KEY email_settings_pkey: PRIMARY KEY (id)
+//   FOREIGN KEY email_settings_updated_by_fkey: FOREIGN KEY (updated_by) REFERENCES auth.users(id) ON DELETE SET NULL
 // Table: historico_tarefas
 //   PRIMARY KEY historico_tarefas_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY historico_tarefas_tarefa_id_fkey: FOREIGN KEY (tarefa_id) REFERENCES tarefas(id) ON DELETE CASCADE
@@ -2052,6 +2203,29 @@ export const Constants = {
 //   Policy "authenticated_insert_comentarios" (INSERT, PERMISSIVE) roles={authenticated}
 //     WITH CHECK: true
 //   Policy "authenticated_select_comentarios" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: email_secrets
+//   Policy "Authenticated users can insert email secrets" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "admin_delete_email_secrets" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//   Policy "admin_insert_email_secrets" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//   Policy "admin_update_email_secrets" (UPDATE, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//   Policy "no_select_email_secrets" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: false
+// Table: email_send_logs
+//   Policy "auth_insert_email_send_logs" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "auth_select_email_send_logs" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: email_settings
+//   Policy "admin_all_email_settings" (ALL, PERMISSIVE) roles={authenticated}
+//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
+//   Policy "auth_select_email_settings" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: historico_tarefas
 //   Policy "authenticated_historico_insert" (INSERT, PERMISSIVE) roles={authenticated}

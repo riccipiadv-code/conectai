@@ -1,5 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import nodemailer from 'nodemailer'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,20 +76,63 @@ Deno.serve(async (req: Request) => {
     if (!secret && setting.secret_configured) {
       throw new Error('Configuração de e-mail possui senha, mas não foi possível carregá-la.')
     }
+    if (!secret) {
+      throw new Error('A senha do e-mail não foi configurada.')
+    }
 
-    // In a real scenario we would integrate with SMTP or Resend API here.
-    // For this context, we will simulate a successful send and persist the log to the DB.
+    const transporterOptions: any = {
+      host: setting.smtp_host,
+      port: setting.smtp_port,
+      secure: setting.smtp_secure,
+      auth: {
+        user: setting.smtp_user,
+        pass: secret,
+      },
+    }
+
+    if (setting.smtp_host === 'smtp.office365.com') {
+      transporterOptions.port = 587
+      transporterOptions.secure = false
+      transporterOptions.requireTLS = true
+      transporterOptions.tls = { ciphers: 'SSLv3' }
+    }
+
+    const transporter = nodemailer.createTransport(transporterOptions)
+
+    const mailOptions = {
+      from: `"${setting.sender_name}" <${setting.sender_email}>`,
+      to: to_email,
+      replyTo: setting.reply_to || undefined,
+      subject: 'Teste de envio - ManySkip',
+      text: 'Este é um e-mail de teste do sistema ManySkip. Se você recebeu isso, a configuração está correta!',
+      html: '<h3>Teste ManySkip</h3><p>Este é um e-mail de teste do sistema ManySkip.</p><p>Se você recebeu isso, a configuração está correta!</p>',
+    }
+
+    try {
+      await transporter.sendMail(mailOptions)
+    } catch (sendError: any) {
+      await supabase.from('email_send_logs').insert({
+        type: 'test',
+        to_email,
+        subject: mailOptions.subject,
+        status: 'error',
+        error_message: sendError.message || String(sendError),
+        created_by: user.id,
+        created_at: new Date().toISOString(),
+      })
+      throw new Error(`Erro ao enviar e-mail pelo provedor: ${sendError.message}`)
+    }
 
     const { error: logError } = await supabase.from('email_send_logs').insert({
       type: 'test',
       to_email,
-      subject: 'Teste de envio - ManySkip',
+      subject: mailOptions.subject,
       status: 'success',
       created_by: user.id,
       created_at: new Date().toISOString(),
     })
 
-    if (logError) throw logError
+    if (logError) console.error('Erro ao logar envio com sucesso', logError)
 
     return new Response(
       JSON.stringify({ success: true, message: 'E-mail de teste enviado com sucesso!' }),

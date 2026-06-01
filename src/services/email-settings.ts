@@ -25,60 +25,17 @@ export const getEmailSettings = async () => {
 
 export const saveEmailSetting = async (setting: EmailSetting, secret?: string) => {
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('User not found')
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) throw new Error('Unauthorized')
 
-  let savedSetting
-  const payload = {
-    provider: setting.provider,
-    sender_name: setting.sender_name,
-    sender_email: setting.sender_email,
-    reply_to: setting.reply_to || null,
-    smtp_host: setting.smtp_host || null,
-    smtp_port: setting.smtp_port || null,
-    smtp_user: setting.smtp_user || null,
-    smtp_secure: setting.smtp_secure,
-    active: setting.active,
-    updated_by: user.id,
-    updated_at: new Date().toISOString(),
-  }
+  const { data, error } = await supabase.functions.invoke('save-email-settings', {
+    body: { setting, secret },
+  })
 
-  if (setting.id) {
-    const { data, error } = await supabase
-      .from('email_settings' as any)
-      .update(payload)
-      .eq('id', setting.id)
-      .select()
-      .single()
-    if (error) throw error
-    savedSetting = data
-  } else {
-    const { data, error } = await supabase
-      .from('email_settings' as any)
-      .insert([{ ...payload, created_at: new Date().toISOString() }])
-      .select()
-      .single()
-    if (error) throw error
-    savedSetting = data
-  }
-
-  if (secret) {
-    const { error: secretError } = await supabase
-      .from('email_secrets' as any)
-      .upsert(
-        { setting_id: savedSetting.id, secret_value: secret, updated_at: new Date().toISOString() },
-        { onConflict: 'setting_id' },
-      )
-    if (secretError) throw secretError
-
-    await supabase
-      .from('email_settings' as any)
-      .update({ secret_configured: true })
-      .eq('id', savedSetting.id)
-  }
-
-  return savedSetting
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data.setting
 }
 
 export const sendTestEmail = async (toEmail: string) => {
@@ -92,5 +49,6 @@ export const sendTestEmail = async (toEmail: string) => {
   })
 
   if (error) throw error
+  if (data?.error) throw new Error(data.error)
   return data
 }
