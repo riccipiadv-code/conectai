@@ -139,12 +139,12 @@ export default function Layout() {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    disabled
-                    className="rounded-lg px-3 py-2.5 h-auto opacity-50"
+                    isActive={location.pathname === '/configuracoes/email'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
                   >
-                    <Link to="#">
-                      <Settings className="h-5 w-5" />
-                      <span className="text-[15px]">Configurações</span>
+                    <Link to="/configuracoes/email">
+                      <Settings className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Configurações de E-mail</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -188,7 +188,9 @@ export default function Layout() {
                     ? 'Gestão de Atendimentos'
                     : location.pathname === '/logs'
                       ? 'Monitoramento de Logs'
-                      : 'Sistema'}
+                      : location.pathname === '/configuracoes/email'
+                        ? 'Configurações de E-mail'
+                        : 'Sistema'}
             </h1>
           </div>
         </header>

@@ -1,6 +1,7 @@
 {
   "_versions": {
     "sync-manychat": 24,
-    "manychat-webhook": 24
+    "manychat-webhook": 24,
+    "send-test-email": 1
   }
 }

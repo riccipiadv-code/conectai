@@ -19,7 +19,8 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn } = useAuth()
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const { signIn, resetPassword } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
@@ -44,6 +45,78 @@ export default function Login() {
     }
 
     setIsLoading(false)
+  }
+
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    const { error } = await resetPassword(email)
+
+    if (error) {
+      toast({
+        title: 'Erro na recuperação',
+        description: error.message || 'Ocorreu um erro ao enviar o link.',
+        variant: 'destructive',
+      })
+    } else {
+      toast({
+        title: 'E-mail enviado',
+        description:
+          'Se o e-mail existir em nossa base, você receberá um link para redefinir a senha.',
+      })
+      setIsRecoveryMode(false)
+    }
+
+    setIsLoading(false)
+  }
+
+  if (isRecoveryMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-md animate-fade-in-up">
+          <CardHeader className="space-y-1 text-center">
+            <CardTitle className="text-2xl font-bold tracking-tight">Recuperar Senha</CardTitle>
+            <CardDescription>
+              Informe seu e-mail para receber um link de recuperação
+            </CardDescription>
+          </CardHeader>
+          <form onSubmit={handleRecovery}>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="recovery-email">E-mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="recovery-email"
+                    type="email"
+                    placeholder="seu.email@exemplo.com"
+                    className="pl-9"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-2">
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Enviando...' : 'Enviar Link de Recuperação'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setIsRecoveryMode(false)}
+                disabled={isLoading}
+              >
+                Voltar ao login
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -71,7 +144,17 @@ export default function Login() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Senha</Label>
+                <button
+                  type="button"
+                  onClick={() => setIsRecoveryMode(true)}
+                  className="text-sm font-medium text-primary hover:underline"
+                  tabIndex={-1}
+                >
+                  Esqueci minha senha
+                </button>
+              </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
