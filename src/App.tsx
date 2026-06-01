@@ -9,6 +9,7 @@ import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import EmailSettings from './pages/EmailSettings'
 import Contacts from './pages/Contacts'
+import UserManagement from './pages/UserManagement'
 import Logs from './pages/Logs'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/contatos" element={<Contacts />} />
             <Route path="/logs" element={<Logs />} />
             <Route path="/configuracoes/email" element={<EmailSettings />} />
+            <Route path="/administracao/usuarios" element={<UserManagement />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

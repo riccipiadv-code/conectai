@@ -26,6 +26,7 @@ import {
   ListIcon,
   Blocks,
   LayoutDashboard,
+  UserCog,
 } from 'lucide-react'
 
 export default function Layout() {
@@ -112,18 +113,6 @@ export default function Layout() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={location.pathname === '/logs'}
-                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
-                  >
-                    <Link to="/logs">
-                      <ListIcon className="h-5 w-5 opacity-70" />
-                      <span className="text-[15px]">Logs Webhook</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -136,6 +125,30 @@ export default function Layout() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="space-y-1">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === '/administracao/usuarios'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
+                  >
+                    <Link to="/administracao/usuarios">
+                      <UserCog className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Gestão de Usuários</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname === '/logs'}
+                    className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
+                  >
+                    <Link to="/logs">
+                      <ListIcon className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Logs Webhook</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -190,7 +203,9 @@ export default function Layout() {
                       ? 'Monitoramento de Logs'
                       : location.pathname === '/configuracoes/email'
                         ? 'Configurações de E-mail'
-                        : 'Sistema'}
+                        : location.pathname === '/administracao/usuarios'
+                          ? 'Gestão de Usuários'
+                          : 'Sistema'}
             </h1>
           </div>
         </header>

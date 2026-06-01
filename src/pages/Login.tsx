@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
+import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,11 +38,26 @@ export default function Login() {
         variant: 'destructive',
       })
     } else {
-      toast({
-        title: 'Bem-vindo!',
-        description: 'Login realizado com sucesso.',
-      })
-      navigate('/')
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('ativo')
+        .eq('email', email)
+        .maybeSingle()
+
+      if (!profile || profile.ativo === false) {
+        await supabase.auth.signOut()
+        toast({
+          title: 'Acesso Negado',
+          description: 'Usuário sem acesso ativo ao sistema. Contate o administrador.',
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Bem-vindo!',
+          description: 'Login realizado com sucesso.',
+        })
+        navigate('/')
+      }
     }
 
     setIsLoading(false)

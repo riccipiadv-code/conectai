@@ -1321,6 +1321,7 @@ export type Database = {
           ferias_fim: string | null
           ferias_inicio: string | null
           id: string
+          legaldesk_usuario_id: string | null
           name: string
           perfil: string | null
           substituto_id: string | null
@@ -1333,6 +1334,7 @@ export type Database = {
           ferias_fim?: string | null
           ferias_inicio?: string | null
           id: string
+          legaldesk_usuario_id?: string | null
           name: string
           perfil?: string | null
           substituto_id?: string | null
@@ -1345,6 +1347,7 @@ export type Database = {
           ferias_fim?: string | null
           ferias_inicio?: string | null
           id?: string
+          legaldesk_usuario_id?: string | null
           name?: string
           perfil?: string | null
           substituto_id?: string | null
@@ -1355,6 +1358,13 @@ export type Database = {
             columns: ['area_id']
             isOneToOne: false
             referencedRelation: 'areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profiles_legaldesk_usuario_id_fkey'
+            columns: ['legaldesk_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'legaldesk_usuarios'
             referencedColumns: ['id']
           },
           {
@@ -2009,6 +2019,7 @@ export const Constants = {
 //   ferias_inicio: timestamp with time zone (nullable)
 //   ferias_fim: timestamp with time zone (nullable)
 //   substituto_id: uuid (nullable)
+//   legaldesk_usuario_id: uuid (nullable)
 // Table: skip_tarefas
 //   id: uuid (not null, default: gen_random_uuid())
 //   titulo: text (not null)
@@ -2159,6 +2170,7 @@ export const Constants = {
 // Table: profiles
 //   FOREIGN KEY profiles_area_id_fkey: FOREIGN KEY (area_id) REFERENCES areas(id) ON DELETE SET NULL
 //   FOREIGN KEY profiles_id_fkey: FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE
+//   FOREIGN KEY profiles_legaldesk_usuario_id_fkey: FOREIGN KEY (legaldesk_usuario_id) REFERENCES legaldesk_usuarios(id)
 //   CHECK profiles_perfil_check: CHECK ((perfil = ANY (ARRAY['socio_gestor'::text, 'gestor_area'::text, 'advogado'::text, 'estagiario'::text, 'administrativo'::text])))
 //   PRIMARY KEY profiles_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY profiles_substituto_id_fkey: FOREIGN KEY (substituto_id) REFERENCES profiles(id) ON DELETE SET NULL
@@ -2204,18 +2216,6 @@ export const Constants = {
 //     WITH CHECK: true
 //   Policy "authenticated_select_comentarios" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
-// Table: email_secrets
-//   Policy "Authenticated users can insert email secrets" (INSERT, PERMISSIVE) roles={authenticated}
-//     WITH CHECK: true
-//   Policy "admin_delete_email_secrets" (DELETE, PERMISSIVE) roles={authenticated}
-//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
-//   Policy "admin_insert_email_secrets" (INSERT, PERMISSIVE) roles={authenticated}
-//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
-//   Policy "admin_update_email_secrets" (UPDATE, PERMISSIVE) roles={authenticated}
-//     USING: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
-//     WITH CHECK: (EXISTS ( SELECT 1    FROM profiles   WHERE ((profiles.id = auth.uid()) AND (profiles.perfil = 'socio_gestor'::text))))
-//   Policy "no_select_email_secrets" (SELECT, PERMISSIVE) roles={authenticated}
-//     USING: false
 // Table: email_send_logs
 //   Policy "auth_insert_email_send_logs" (INSERT, PERMISSIVE) roles={authenticated}
 //     WITH CHECK: true
@@ -2369,6 +2369,7 @@ export const Constants = {
 // You MUST create RLS policies for these tables to allow data access.
 //   - anexos
 //   - departamentos
+//   - email_secrets
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()
@@ -2532,6 +2533,7 @@ export const Constants = {
 //   CREATE UNIQUE INDEX legaldesk_tarefas_source_id_key ON public.legaldesk_tarefas USING btree (source_id)
 // Table: legaldesk_usuarios
 //   CREATE INDEX idx_legaldesk_usuarios_email ON public.legaldesk_usuarios USING btree (email)
+//   CREATE INDEX idx_legaldesk_usuarios_email_lower ON public.legaldesk_usuarios USING btree (lower(email))
 //   CREATE UNIQUE INDEX legaldesk_usuarios_source_id_key ON public.legaldesk_usuarios USING btree (source_id)
 // Table: manychat_cancel_reasons
 //   CREATE UNIQUE INDEX manychat_cancel_reasons_motivo_key ON public.manychat_cancel_reasons USING btree (motivo)
@@ -2575,3 +2577,5 @@ export const Constants = {
 //   CREATE INDEX idx_prazos_manychat_contato_id ON public.prazos USING btree (manychat_contato_id)
 //   CREATE INDEX idx_prazos_status ON public.prazos USING btree (status)
 //   CREATE UNIQUE INDEX prazos_totvs_id_key ON public.prazos USING btree (totvs_id)
+// Table: profiles
+//   CREATE INDEX idx_profiles_email_lower ON public.profiles USING btree (lower(email))

@@ -3,6 +3,7 @@
     "sync-manychat": 24,
     "manychat-webhook": 24,
     "send-test-email": 2,
-    "save-email-settings": 1
+    "save-email-settings": 1,
+    "admin-user-access": 1
   }
 }
