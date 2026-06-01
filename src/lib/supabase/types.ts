@@ -1543,6 +1543,7 @@ export type Database = {
         Args: { p_contato_id: string }
         Returns: undefined
       }
+      is_socio_gestor: { Args: never; Returns: boolean }
       soft_delete_manychat_contato: {
         Args: { p_contato_id: string }
         Returns: undefined
@@ -2334,6 +2335,8 @@ export const Constants = {
 //   Policy "authenticated_update" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: (auth.uid() = id)
 //     WITH CHECK: (auth.uid() = id)
+//   Policy "socio_gestor_select_all_profiles" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: is_socio_gestor()
 // Table: skip_tarefas
 //   Policy "authenticated_delete_skip_tarefas" (DELETE, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -2440,6 +2443,19 @@ export const Constants = {
 //
 //     DELETE FROM public.manychat_contatos
 //     WHERE id = p_contato_id;
+//   END;
+//   $function$
+//
+// FUNCTION is_socio_gestor()
+//   CREATE OR REPLACE FUNCTION public.is_socio_gestor()
+//    RETURNS boolean
+//    LANGUAGE plpgsql
+//    SECURITY DEFINER
+//   AS $function$
+//   BEGIN
+//     RETURN EXISTS (
+//       SELECT 1 FROM public.profiles WHERE id = auth.uid() AND perfil = 'socio_gestor'
+//     );
 //   END;
 //   $function$
 //
