@@ -44,6 +44,7 @@ export async function getContacts(
       nome, first_name, last_name, telefone, whatsapp_phone,
       lead_servico, lead_empresa_pf, lead_resumo, observacoes,
       current_stage, data_follow_up, sla_status, origem,
+      foto, manychat_live_chat_url,
       manychat_servicos(descricao),
       manychat_deptos(nome)
     `)

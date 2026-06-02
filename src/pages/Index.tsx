@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Eye, Edit, Trash2, MessageSquare } from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
@@ -110,15 +111,13 @@ export default function Index() {
           <Table className="w-full">
             <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
               <TableRow>
-                <TableHead className="w-[220px] min-w-[220px] max-w-[220px]">Contato</TableHead>
-                <TableHead className="w-[180px] min-w-[180px] max-w-[180px]">
-                  Serviço / Empresa
-                </TableHead>
-                <TableHead className="w-[350px] min-w-[350px] max-w-[350px]">Consulta</TableHead>
-                <TableHead className="whitespace-nowrap">Estágio</TableHead>
-                <TableHead className="w-[110px] min-w-[110px] max-w-[110px]">Dt. FUP</TableHead>
-                <TableHead className="whitespace-nowrap">Ações</TableHead>
-                <TableHead className="text-right whitespace-nowrap pr-4">SLA</TableHead>
+                <TableHead className="w-[220px] max-w-[220px] pl-6">Contato</TableHead>
+                <TableHead className="w-[180px] max-w-[180px]">Serviço / Empresa</TableHead>
+                <TableHead className="w-[350px] max-w-[350px]">Consulta</TableHead>
+                <TableHead>Estágio</TableHead>
+                <TableHead className="w-[110px]">Dt. FUP</TableHead>
+                <TableHead className="min-w-[160px] text-center">Ações</TableHead>
+                <TableHead className="text-right pr-6">SLA</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -137,20 +136,18 @@ export default function Index() {
               ) : (
                 data.map((contato) => (
                   <TableRow key={contato.id} className="hover:bg-muted/30">
-                    {/* 1. Contato */}
-                    <TableCell className="w-[220px] min-w-[220px] max-w-[220px] align-top py-3">
-                      <div className="flex flex-col whitespace-normal break-words">
+                    <TableCell className="w-[220px] max-w-[220px] pl-6 align-top py-3">
+                      <div className="flex flex-col whitespace-normal break-words overflow-hidden">
                         <span className="font-semibold text-sm text-foreground">
                           {contato.nome || contato.first_name || 'Sem nome'}
                         </span>
-                        <span className="text-xs text-muted-foreground mt-1 font-medium">
+                        <span className="text-xs text-muted-foreground mt-0.5 font-medium truncate">
                           {contato.whatsapp_phone || contato.telefone || 'Sem telefone'}
                         </span>
                       </div>
                     </TableCell>
 
-                    {/* 2. Serviço / Empresa */}
-                    <TableCell className="w-[180px] min-w-[180px] max-w-[180px] align-top py-3">
+                    <TableCell className="w-[180px] max-w-[180px] align-top py-3">
                       <div className="flex flex-col whitespace-normal break-words">
                         <span className="text-sm font-medium text-foreground">
                           {contato.lead_servico || '-'}
@@ -161,8 +158,7 @@ export default function Index() {
                       </div>
                     </TableCell>
 
-                    {/* 3. Consulta */}
-                    <TableCell className="w-[350px] min-w-[350px] max-w-[350px] align-top py-3">
+                    <TableCell className="w-[350px] max-w-[350px] align-top py-3">
                       <div
                         className="text-sm whitespace-normal break-words line-clamp-3 text-muted-foreground leading-relaxed"
                         title={contato.lead_resumo || ''}
@@ -171,7 +167,6 @@ export default function Index() {
                       </div>
                     </TableCell>
 
-                    {/* 4. Estágio */}
                     <TableCell className="align-top py-3">
                       <Badge
                         variant="outline"
@@ -181,8 +176,7 @@ export default function Index() {
                       </Badge>
                     </TableCell>
 
-                    {/* 5. Dt. FUP */}
-                    <TableCell className="w-[110px] min-w-[110px] max-w-[110px] align-top py-3">
+                    <TableCell className="w-[110px] align-top py-3">
                       <span className="text-sm whitespace-nowrap font-medium text-muted-foreground">
                         {contato.data_follow_up
                           ? format(parseISO(contato.data_follow_up), 'dd/MM/yyyy', { locale: ptBR })
@@ -190,50 +184,70 @@ export default function Index() {
                       </span>
                     </TableCell>
 
-                    {/* 6. Ações */}
-                    <TableCell className="align-top py-3">
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
-                          onClick={() => handleComments(contato)}
-                          title="Comentários"
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                          onClick={() => handleView(contato)}
-                          title="Visualizar"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
-                          onClick={() => handleEdit(contato)}
-                          title="Editar"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
-                          onClick={() => handleDelete(contato)}
-                          title="Excluir"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                    <TableCell className="min-w-[160px] align-top py-3 text-center">
+                      <div className="flex justify-center items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                              onClick={() => {
+                                if (contato.manychat_live_chat_url) {
+                                  window.open(contato.manychat_live_chat_url, '_blank')
+                                } else {
+                                  handleComments(contato)
+                                }
+                              }}
+                            >
+                              <MessageSquare className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Abrir ManyChat</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                              onClick={() => handleView(contato)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Visualizar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                              onClick={() => handleEdit(contato)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
+                              onClick={() => handleDelete(contato)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Excluir</TooltipContent>
+                        </Tooltip>
                       </div>
                     </TableCell>
 
-                    {/* 7. SLA */}
-                    <TableCell className="text-right align-top py-3 pr-4">
+                    <TableCell className="text-right align-top py-3 pr-6">
                       <Badge variant={getSlaVariant(contato.sla_status)}>
                         {contato.sla_status?.toUpperCase() || 'OK'}
                       </Badge>

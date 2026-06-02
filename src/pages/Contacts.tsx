@@ -24,20 +24,32 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { format, isBefore, parseISO, startOfDay } from 'date-fns'
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, FileText, Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ptBR } from 'date-fns/locale'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  MessageSquare,
+  Eye,
+  Edit,
+  Trash2,
+  FileText,
+  Loader2,
+  Plus,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function Contacts() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [] })
+  const [searchTerm, setSearchTerm] = useState('')
 
   const [filters, setFilters] = useState<ContactsFilters>({
     stage: 'all',
@@ -53,6 +65,12 @@ export default function Contacts() {
     column: 'data_follow_up',
     ascending: true,
   })
+
+  // Modals for actions
+  const [viewOpen, setViewOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<any>(null)
 
   useEffect(() => {
     Promise.all([getResponsaveis(), getServicos(), getDeptos()]).then(([r, s, d]: any) => {
@@ -84,6 +102,18 @@ export default function Contacts() {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
+  const filteredData = data.filter((c: any) => {
+    if (!searchTerm) return true
+    const term = searchTerm.toLowerCase()
+    return (
+      c.nome?.toLowerCase().includes(term) ||
+      c.first_name?.toLowerCase().includes(term) ||
+      c.whatsapp_phone?.toLowerCase().includes(term) ||
+      c.telefone?.toLowerCase().includes(term) ||
+      c.lead_empresa_pf?.toLowerCase().includes(term)
+    )
+  })
+
   const renderSortIcon = (col: string) => {
     if (sort.column !== col) return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground" />
     return sort.ascending ? (
@@ -93,25 +123,51 @@ export default function Contacts() {
     )
   }
 
-  const formatPhone = (p: string) => {
-    if (!p) return '-'
-    return p
+  const formatPhone = (p: string) => (p ? p : '-')
+
+  const handleManyChat = (c: any) => {
+    if (c.manychat_live_chat_url) {
+      window.open(c.manychat_live_chat_url, '_blank')
+    }
+  }
+
+  const getSlaVariant = (sla: string | null) => {
+    if (sla === 'red') return 'destructive'
+    if (sla === 'yellow') return 'default'
+    return 'secondary'
   }
 
   return (
     <div className="space-y-4 animate-fade-in p-4 sm:p-6 lg:p-8">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-          Atendimentos
-        </h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Gerencie os registros e acompanhe os follow-ups.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            Atendimentos
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">
+            Gerencie os registros e acompanhe os follow-ups.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" /> Criar Novo
+          </Button>
+        </div>
       </div>
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm">
         <CardContent className="p-4 sm:p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Buscar</Label>
+              <Input
+                placeholder="Nome, telefone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Estágio</Label>
               <Select value={filters.stage} onValueChange={(v) => updateFilter('stage', v)}>
@@ -119,7 +175,7 @@ export default function Contacts() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Estágios</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="nivel_1_novo">Novo</SelectItem>
                   <SelectItem value="orcamento_aprovado">Aprovado</SelectItem>
                   <SelectItem value="cancelado">Cancelado</SelectItem>
@@ -137,7 +193,7 @@ export default function Contacts() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {meta.responsaveis?.map((r: any) => (
                     <SelectItem key={r.id} value={r.id}>
                       {r.nome}
@@ -157,7 +213,7 @@ export default function Contacts() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Serviços</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {meta.servicos?.map((s: any) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.descricao}
@@ -174,7 +230,7 @@ export default function Contacts() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos os Departamentos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {meta.deptos?.map((d: any) => (
                     <SelectItem key={d.id} value={d.id.toString()}>
                       {d.nome}
@@ -222,7 +278,7 @@ export default function Contacts() {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas as Origens</SelectItem>
+                  <SelectItem value="all">Todas</SelectItem>
                   <SelectItem value="Agente">Agente</SelectItem>
                   <SelectItem value="Cliente">Cliente</SelectItem>
                   <SelectItem value="E-mail">E-mail</SelectItem>
@@ -243,15 +299,17 @@ export default function Contacts() {
           </div>
         )}
         <div className="overflow-x-auto w-full">
-          <Table className="table-fixed w-full min-w-[950px]">
+          <Table className="w-full">
             <TableHeader>
               <TableRow className="bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50">
-                <TableHead className="w-[180px] sm:w-[200px] pl-6 font-semibold">Contato</TableHead>
-                <TableHead className="w-[150px] sm:w-[170px] font-semibold">
+                <TableHead className="w-[220px] max-w-[220px] pl-6 font-semibold">
+                  Contato
+                </TableHead>
+                <TableHead className="w-[180px] max-w-[180px] font-semibold">
                   Serviço / Empresa
                 </TableHead>
-                <TableHead className="font-semibold">Consulta</TableHead>
-                <TableHead className="w-[120px] font-semibold">Estágio</TableHead>
+                <TableHead className="w-[350px] max-w-[350px] font-semibold">Consulta</TableHead>
+                <TableHead className="font-semibold">Estágio</TableHead>
                 <TableHead
                   className="w-[110px] cursor-pointer font-semibold select-none hover:text-primary transition-colors"
                   onClick={() => toggleSort('data_follow_up')}
@@ -261,12 +319,12 @@ export default function Contacts() {
                     {renderSortIcon('data_follow_up')}
                   </div>
                 </TableHead>
-                <TableHead className="w-[80px] font-semibold text-center">Ações</TableHead>
-                <TableHead className="w-[80px] font-semibold pr-6 text-center">SLA</TableHead>
+                <TableHead className="min-w-[160px] font-semibold text-center">Ações</TableHead>
+                <TableHead className="pr-6 font-semibold text-right">SLA</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.length === 0 && !loading ? (
+              {filteredData.length === 0 && !loading ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center space-y-2">
@@ -276,13 +334,14 @@ export default function Contacts() {
                   </TableCell>
                 </TableRow>
               ) : (
-                data.map((c: any) => {
+                filteredData.map((c: any) => {
                   const fupDate = c.data_follow_up ? parseISO(c.data_follow_up) : null
                   const isOverdue = fupDate && isBefore(startOfDay(fupDate), startOfDay(new Date()))
 
                   const contactName =
                     c.nome || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Desconhecido'
                   const phone = formatPhone(c.whatsapp_phone || c.telefone)
+                  const initials = contactName.substring(0, 2).toUpperCase()
 
                   let stageLabel = c.current_stage || '-'
                   if (stageLabel === 'nivel_1_novo') stageLabel = 'Novo'
@@ -298,84 +357,135 @@ export default function Contacts() {
                       key={c.id}
                       className="group hover:bg-slate-50/80 dark:hover:bg-zinc-800/50 transition-colors"
                     >
-                      <TableCell className="pl-6 w-[180px] sm:w-[200px] align-top py-3">
-                        <div className="flex flex-col space-y-1">
-                          <span className="font-medium text-sm text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
-                            {contactName}
-                          </span>
-                          <span className="text-xs text-muted-foreground truncate">{phone}</span>
+                      <TableCell className="w-[220px] max-w-[220px] pl-6 align-top py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarImage src={c.foto} />
+                            <AvatarFallback>{initials}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col whitespace-normal break-words overflow-hidden">
+                            <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                              {contactName}
+                            </span>
+                            <span className="text-xs text-muted-foreground mt-0.5 font-medium truncate">
+                              {phone}
+                            </span>
+                          </div>
                         </div>
                       </TableCell>
 
-                      <TableCell className="w-[150px] sm:w-[170px] align-top py-3 overflow-hidden">
-                        <div className="flex flex-col space-y-1">
-                          <span className="font-medium text-sm text-slate-700 dark:text-slate-300 truncate">
+                      <TableCell className="w-[180px] max-w-[180px] align-top py-3">
+                        <div className="flex flex-col whitespace-normal break-words">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {c.lead_servico || c.manychat_servicos?.descricao || '-'}
                           </span>
-                          <span className="text-xs text-muted-foreground break-words whitespace-normal leading-tight line-clamp-2">
+                          <span className="text-xs text-muted-foreground mt-1">
                             {c.lead_empresa_pf || '-'}
                           </span>
                         </div>
                       </TableCell>
 
-                      <TableCell className="align-top py-3">
-                        <div className="line-clamp-3 text-xs text-slate-600 dark:text-slate-400 break-words whitespace-normal leading-relaxed">
+                      <TableCell className="w-[350px] max-w-[350px] align-top py-3">
+                        <div
+                          className="text-sm whitespace-normal break-words line-clamp-3 text-slate-600 dark:text-slate-400 leading-relaxed"
+                          title={c.lead_resumo || c.observacoes || ''}
+                        >
                           {c.lead_resumo || c.observacoes || '-'}
                         </div>
                       </TableCell>
 
-                      <TableCell className="w-[120px] align-top py-3">
-                        <div className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-full">
+                      <TableCell className="align-top py-3">
+                        <Badge
+                          variant="outline"
+                          className="whitespace-nowrap bg-background font-medium"
+                        >
                           {stageLabel}
-                        </div>
+                        </Badge>
                       </TableCell>
 
                       <TableCell className="w-[110px] align-top py-3">
-                        {fupDate ? (
-                          <div
-                            className={cn(
-                              'text-sm font-medium',
-                              isOverdue
-                                ? 'text-red-600 dark:text-red-500'
-                                : 'text-slate-700 dark:text-slate-300',
-                            )}
-                          >
-                            {format(fupDate, 'dd/MM/yyyy')}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
+                        <span
+                          className={cn(
+                            'text-sm whitespace-nowrap font-medium',
+                            isOverdue
+                              ? 'text-red-600 dark:text-red-500'
+                              : 'text-slate-700 dark:text-slate-300',
+                          )}
+                        >
+                          {fupDate ? format(fupDate, 'dd/MM/yyyy', { locale: ptBR }) : '-'}
+                        </span>
                       </TableCell>
 
-                      <TableCell className="w-[80px] align-top py-3 text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Abrir menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                            <DropdownMenuItem>Atualizar Estágio</DropdownMenuItem>
-                            <DropdownMenuItem>Agendar FUP</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-
-                      <TableCell className="w-[80px] pr-6 align-top py-3 text-center">
-                        <div className="flex justify-center items-center h-full pt-1">
-                          <div
-                            className={cn(
-                              'h-3 w-3 rounded-full shadow-sm',
-                              c.sla_status === 'red'
-                                ? 'bg-red-500 ring-2 ring-red-500/20'
-                                : c.sla_status === 'yellow'
-                                  ? 'bg-amber-400 ring-2 ring-amber-400/20'
-                                  : 'bg-emerald-500 ring-2 ring-emerald-500/20',
-                            )}
-                          />
+                      <TableCell className="min-w-[160px] align-top py-3 text-center">
+                        <div className="flex justify-center items-center gap-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                                onClick={() => handleManyChat(c)}
+                              >
+                                <MessageSquare className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Abrir ManyChat</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                                onClick={() => {
+                                  setSelectedContact(c)
+                                  setViewOpen(true)
+                                }}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Visualizar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                                onClick={() => {
+                                  setSelectedContact(c)
+                                  setEditOpen(true)
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
+                                onClick={() => {
+                                  setSelectedContact(c)
+                                  setDeleteOpen(true)
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Excluir</TooltipContent>
+                          </Tooltip>
                         </div>
+                      </TableCell>
+
+                      <TableCell className="pr-6 align-top py-3 text-right">
+                        <Badge variant={getSlaVariant(c.sla_status)}>
+                          {c.sla_status?.toUpperCase() || 'OK'}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   )
@@ -385,6 +495,57 @@ export default function Contacts() {
           </Table>
         </div>
       </Card>
+
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Visualizar Contato</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm">
+            Visualizando dados de{' '}
+            <span className="font-semibold">
+              {selectedContact?.nome || selectedContact?.first_name}
+            </span>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Contato</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm">
+            Editando dados de{' '}
+            <span className="font-semibold">
+              {selectedContact?.nome || selectedContact?.first_name}
+            </span>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir Contato</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm">
+            Tem certeza que deseja excluir o contato{' '}
+            <span className="font-semibold">
+              {selectedContact?.nome || selectedContact?.first_name}
+            </span>
+            ?
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={() => setDeleteOpen(false)}>
+              Excluir
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
