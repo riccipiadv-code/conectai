@@ -11,6 +11,71 @@ export interface ContactsFilters {
   origem: string
 }
 
+export interface Contact {
+  id: string
+  created_at?: string
+  nome?: string
+  lead_nome?: string
+  telefone?: string
+  whatsapp_phone?: string
+  lead_empresa_pf?: string
+  lead_email?: string
+  servico_id?: string | null
+  depto_id?: number | null
+  lead_servico?: string
+  lead_resumo?: string
+  current_stage?: string
+  sla_status?: string
+  cancel_reason_id?: string | null
+  cancel_obs?: string | null
+  origem?: string | null
+  responsavel_id?: string | null
+  orcamento?: string | null
+  valor?: number | null
+  observacoes?: string
+  data_follow_up?: string | null
+  [key: string]: any
+}
+
+export interface Servico {
+  id: string
+  descricao: string
+  depto_id?: number | null
+}
+
+export interface Depto {
+  id: number
+  nome: string
+}
+
+export interface CancelReason {
+  id: string
+  motivo: string
+}
+
+export interface Responsavel {
+  id: string
+  nome: string
+}
+
+export async function createContact(payload: Partial<Contact>) {
+  if (!payload.manychat_id) {
+    payload.manychat_id = 'manual_' + new Date().getTime()
+  }
+  const { data, error } = await supabase
+    .from('manychat_contatos')
+    .insert([payload])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteContact(id: string) {
+  const { error } = await supabase.rpc('hard_delete_manychat_contato', { p_contato_id: id })
+  if (error) throw error
+}
+
 export async function getResponsaveis() {
   const { data } = await supabase
     .from('profiles')
@@ -90,10 +155,15 @@ export async function getContacts(
   return data || []
 }
 
-export async function updateContact(id: string, updates: any) {
+export async function updateContact(id: string, updates: any, previousStage?: string) {
+  const payload = { ...updates }
+  if (previousStage && payload.current_stage && previousStage !== payload.current_stage) {
+    payload.last_stage_change_at = new Date().toISOString()
+  }
+
   const { data, error } = await supabase
     .from('manychat_contatos')
-    .update(updates)
+    .update(payload)
     .eq('id', id)
     .select()
     .single()
@@ -125,16 +195,16 @@ export async function updateContactStage(
 
 export async function getCancelReasons() {
   const { data, error } = await supabase
-    .from('manychat_motivos_cancelamento')
-    .select('id, descricao')
-    .order('descricao')
+    .from('manychat_cancel_reasons')
+    .select('id, motivo')
+    .order('motivo')
 
   if (error) {
     return [
-      { id: '1', descricao: 'Preço' },
-      { id: '2', descricao: 'Concorrente' },
-      { id: '3', descricao: 'Não responde' },
-      { id: '4', descricao: 'Outro' },
+      { id: '1', motivo: 'Preço' },
+      { id: '2', motivo: 'Concorrente' },
+      { id: '3', motivo: 'Não responde' },
+      { id: '4', motivo: 'Outro' },
     ]
   }
   return data || []

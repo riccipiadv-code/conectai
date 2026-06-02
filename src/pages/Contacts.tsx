@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   getContacts,
   getResponsaveis,
   getServicos,
   getDeptos,
+  getCancelReasons,
+  updateContact,
+  createContact,
+  deleteContact,
   ContactsFilters,
 } from '@/services/contacts'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,7 +32,16 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { format, isBefore, parseISO, startOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import {
@@ -42,13 +55,25 @@ import {
   FileText,
   Loader2,
   Plus,
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  Clock,
+  CheckCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ContactModal } from '@/components/shared/contact-modal'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Contacts() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [] })
+  const [meta, setMeta] = useState({
+    responsaveis: [],
+    servicos: [],
+    deptos: [],
+    cancelReasons: [],
+  })
   const [searchTerm, setSearchTerm] = useState('')
 
   const [filters, setFilters] = useState<ContactsFilters>({
@@ -66,19 +91,25 @@ export default function Contacts() {
     ascending: true,
   })
 
+  const { toast } = useToast()
+
   // Modals for actions
-  const [viewOpen, setViewOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [selectedContact, setSelectedContact] = useState<any>(null)
+  const [updatingContact, setUpdatingContact] = useState<any | null>(null)
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('create')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const [deletingContact, setDeletingContact] = useState<any | null>(null)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
-    Promise.all([getResponsaveis(), getServicos(), getDeptos()]).then(([r, s, d]: any) => {
-      setMeta({ responsaveis: r, servicos: s, deptos: d })
-    })
+    Promise.all([getResponsaveis(), getServicos(), getDeptos(), getCancelReasons()]).then(
+      ([r, s, d, c]: any) => {
+        setMeta({ responsaveis: r, servicos: s, deptos: d, cancelReasons: c })
+      },
+    )
   }, [])
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     setLoading(true)
     getContacts(filters, sort)
       .then((res) => {
@@ -90,6 +121,10 @@ export default function Contacts() {
         setLoading(false)
       })
   }, [filters, sort])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const toggleSort = (col: string) => {
     setSort((prev) => ({
@@ -131,10 +166,135 @@ export default function Contacts() {
     }
   }
 
-  const getSlaVariant = (sla: string | null) => {
-    if (sla === 'red') return 'destructive'
-    if (sla === 'yellow') return 'default'
-    return 'secondary'
+  const renderSlaBadge = (status: string | null) => {
+    switch (status) {
+      case 'green':
+        return (
+          <Badge
+            variant="outline"
+            className="shadow-sm gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            No prazo
+          </Badge>
+        )
+      case 'yellow':
+        return (
+          <Badge
+            variant="outline"
+            className="shadow-sm gap-1.5 border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            Atenção
+          </Badge>
+        )
+      case 'red':
+        return (
+          <Badge
+            variant="outline"
+            className="shadow-sm gap-1.5 border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20"
+          >
+            <AlertCircle className="h-3.5 w-3.5" />
+            Atrasado
+          </Badge>
+        )
+      case 'paused':
+        return (
+          <Badge
+            variant="outline"
+            className="shadow-sm gap-1.5 border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Pausado
+          </Badge>
+        )
+      case 'done':
+        return (
+          <Badge
+            variant="outline"
+            className="shadow-sm gap-1.5 border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"
+          >
+            <CheckCircle className="h-3.5 w-3.5" />
+            Finalizado
+          </Badge>
+        )
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="shadow-sm gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            No prazo
+          </Badge>
+        )
+    }
+  }
+
+  const handleCreateNew = () => {
+    setUpdatingContact(null)
+    setModalMode('create')
+    setIsModalOpen(true)
+  }
+
+  const handleView = (c: any) => {
+    setUpdatingContact(c)
+    setModalMode('view')
+    setIsModalOpen(true)
+  }
+
+  const handleEdit = (c: any) => {
+    setUpdatingContact(c)
+    setModalMode('edit')
+    setIsModalOpen(true)
+  }
+
+  const handleDelete = (c: any) => {
+    setDeletingContact(c)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (deletingContact) {
+      try {
+        await deleteContact(deletingContact.id)
+        toast({ title: 'Sucesso', description: 'Contato excluído.' })
+        fetchData()
+      } catch (error) {
+        console.error(error)
+        toast({ title: 'Erro', description: 'Erro ao excluir contato.', variant: 'destructive' })
+      }
+    }
+    setIsDeleteDialogOpen(false)
+    setDeletingContact(null)
+  }
+
+  const handleSaveModal = async (payload: any, id?: string, prevStage?: string) => {
+    try {
+      if (modalMode === 'create') {
+        await createContact(payload)
+        toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
+      } else if (modalMode === 'edit' && id) {
+        await updateContact(id, payload, prevStage)
+        toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
+      }
+
+      fetchData()
+      setIsModalOpen(false)
+      setTimeout(() => setUpdatingContact(null), 200)
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: error.message || 'Ocorreu um erro.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setTimeout(() => setUpdatingContact(null), 200)
   }
 
   return (
@@ -149,7 +309,7 @@ export default function Contacts() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button>
+          <Button onClick={handleCreateNew}>
             <Plus className="mr-2 h-4 w-4" /> Criar Novo
           </Button>
         </div>
@@ -249,8 +409,10 @@ export default function Contacts() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="green">No Prazo</SelectItem>
-                  <SelectItem value="yellow">Vencendo Hoje</SelectItem>
+                  <SelectItem value="yellow">Atenção</SelectItem>
                   <SelectItem value="red">Atrasado</SelectItem>
+                  <SelectItem value="paused">Pausado</SelectItem>
+                  <SelectItem value="done">Finalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -437,10 +599,7 @@ export default function Contacts() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                                onClick={() => {
-                                  setSelectedContact(c)
-                                  setViewOpen(true)
-                                }}
+                                onClick={() => handleView(c)}
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
@@ -453,10 +612,7 @@ export default function Contacts() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
-                                onClick={() => {
-                                  setSelectedContact(c)
-                                  setEditOpen(true)
-                                }}
+                                onClick={() => handleEdit(c)}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
@@ -469,10 +625,7 @@ export default function Contacts() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
-                                onClick={() => {
-                                  setSelectedContact(c)
-                                  setDeleteOpen(true)
-                                }}
+                                onClick={() => handleDelete(c)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -483,9 +636,7 @@ export default function Contacts() {
                       </TableCell>
 
                       <TableCell className="pr-6 align-top py-3 text-right">
-                        <Badge variant={getSlaVariant(c.sla_status)}>
-                          {c.sla_status?.toUpperCase() || 'OK'}
-                        </Badge>
+                        {renderSlaBadge(c.sla_status)}
                       </TableCell>
                     </TableRow>
                   )
@@ -496,56 +647,40 @@ export default function Contacts() {
         </div>
       </Card>
 
-      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Visualizar Contato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-sm">
-            Visualizando dados de{' '}
-            <span className="font-semibold">
-              {selectedContact?.nome || selectedContact?.first_name}
-            </span>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        mode={modalMode}
+        contact={updatingContact}
+        onSave={handleSaveModal}
+        servicos={meta.servicos}
+        deptos={meta.deptos}
+        cancelReasons={meta.cancelReasons}
+      />
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Contato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-sm">
-            Editando dados de{' '}
-            <span className="font-semibold">
-              {selectedContact?.nome || selectedContact?.first_name}
-            </span>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir Contato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-sm">
-            Tem certeza que deseja excluir o contato{' '}
-            <span className="font-semibold">
-              {selectedContact?.nome || selectedContact?.first_name}
-            </span>
-            ?
-          </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={() => setDeleteOpen(false)}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Contato</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o contato{' '}
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                {deletingContact?.nome || deletingContact?.first_name}
+              </span>
+              ? Esta ação não poderá ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingContact(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700 text-white"
+              onClick={confirmDelete}
+            >
               Excluir
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
