@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
 import {
+  getContacts,
+  getResponsaveis,
+  getServicos,
+  getDeptos,
+  ContactsFilters,
+} from '@/services/contacts'
+import { Card, CardContent } from '@/components/ui/card'
+import {
   Table,
   TableBody,
   TableCell,
@@ -7,603 +15,376 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { format, isBefore, parseISO, startOfDay } from 'date-fns'
+import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, FileText, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Separator } from '@/components/ui/separator'
-import { ContactModal } from '@/components/shared/contact-modal'
-import {
-  getContacts,
-  createContact,
-  updateContact,
-  deleteContact,
-  Contact,
-  getServicos,
-  getDeptos,
-  getCancelReasons,
-  Servico,
-  Depto,
-  CancelReason,
-} from '@/services/contacts'
-import {
-  Loader2,
-  Search,
-  Edit2,
-  MessageCircle,
-  Filter,
-  Trash2,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  Clock,
-  CheckCircle,
-  Eye,
-  Plus,
-} from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
-
-const STAGES = [
-  { id: 'nivel_1_novo', label: 'Nível 1 - Novo' },
-  { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
-  { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
-  { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
-  { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
-  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
-  { id: 'cancelado', label: 'Cancelado' },
-]
-
-const DEFAULT_STAGES = STAGES.filter((s) => s.id !== 'cancelado').map((s) => s.id)
-
-const getStageLabel = (stage: string) => {
-  const stageObj = STAGES.find((s) => s.id === stage)
-  return stageObj ? stageObj.label : stage.replace('_', ' ')
-}
-
-const getStageColor = (stage: string) => {
-  switch (stage) {
-    case 'nivel_1_novo':
-      return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-    case 'nivel_2_especialista':
-      return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800'
-    case 'nivel_3_especial':
-      return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800'
-    case 'reuniao_consulta_agendada':
-      return 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800'
-    case 'enviado_orcamento_ag_retorno':
-      return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/50 dark:text-orange-300 dark:border-orange-800'
-    case 'orcamento_aprovado':
-      return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800'
-    case 'cancelado':
-      return 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/50 dark:text-rose-300 dark:border-rose-800'
-    default:
-      return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700'
-  }
-}
-
-const getSlaLabel = (sla: string) => {
-  switch (sla) {
-    case 'green':
-      return 'No prazo'
-    case 'yellow':
-      return 'Atenção'
-    case 'red':
-      return 'Atrasado'
-    case 'paused':
-      return 'Pausado'
-    case 'done':
-      return 'Finalizado'
-    default:
-      return 'N/A'
-  }
-}
-
-const getSlaColor = (sla: string) => {
-  switch (sla) {
-    case 'green':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-900'
-    case 'yellow':
-      return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-400 dark:border-amber-900'
-    case 'red':
-      return 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-400 dark:border-rose-900'
-    case 'paused':
-      return 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800'
-    case 'done':
-      return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-400 dark:border-blue-900'
-    default:
-      return 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-400 dark:border-gray-800'
-  }
-}
-
-const getSlaIcon = (sla: string) => {
-  switch (sla) {
-    case 'green':
-      return <CheckCircle2 className="h-3.5 w-3.5" />
-    case 'yellow':
-      return <AlertTriangle className="h-3.5 w-3.5" />
-    case 'red':
-      return <AlertCircle className="h-3.5 w-3.5" />
-    case 'paused':
-      return <Clock className="h-3.5 w-3.5" />
-    case 'done':
-      return <CheckCircle className="h-3.5 w-3.5" />
-    default:
-      return null
-  }
-}
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 export default function Contacts() {
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [servicos, setServicos] = useState<Servico[]>([])
-  const [deptos, setDeptos] = useState<Depto[]>([])
-  const [cancelReasons, setCancelReasons] = useState<CancelReason[]>([])
+  const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [selectedStages, setSelectedStages] = useState<string[]>(DEFAULT_STAGES)
-  const [updatingContact, setUpdatingContact] = useState<Contact | null>(null)
-  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('create')
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [deletingContact, setDeletingContact] = useState<Contact | null>(null)
-  const [saving, setSaving] = useState(false)
-  const { toast } = useToast()
+  const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [] })
+
+  const [filters, setFilters] = useState<ContactsFilters>({
+    stage: 'all',
+    responsavel_id: 'all',
+    servico_id: 'all',
+    depto_id: 'all',
+    sla: 'all',
+    follow_up: 'all',
+    origem: 'all',
+  })
+
+  const [sort, setSort] = useState<{ column: string; ascending: boolean }>({
+    column: 'data_follow_up',
+    ascending: true,
+  })
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [search])
-
-  useEffect(() => {
-    const fetchStaticData = async () => {
-      try {
-        const [servicosData, deptosData, reasonsData] = await Promise.all([
-          getServicos(),
-          getDeptos(),
-          getCancelReasons(),
-        ])
-        setServicos(servicosData)
-        setDeptos(deptosData)
-        setCancelReasons(reasonsData)
-      } catch (error) {
-        console.error('Failed to fetch static data', error)
-      }
-    }
-    fetchStaticData()
+    Promise.all([getResponsaveis(), getServicos(), getDeptos()]).then(([r, s, d]: any) => {
+      setMeta({ responsaveis: r, servicos: s, deptos: d })
+    })
   }, [])
 
   useEffect(() => {
-    const fetchContacts = async () => {
-      setLoading(true)
-      try {
-        const contactsData = await getContacts({
-          search: debouncedSearch,
-          stages: selectedStages,
-          limit: 1000,
-        })
-        setContacts(contactsData)
-      } catch (error) {
-        console.error('Failed to fetch contacts', error)
-        toast({ title: 'Erro', description: 'Falha ao carregar contatos', variant: 'destructive' })
-      } finally {
+    setLoading(true)
+    getContacts(filters, sort)
+      .then((res) => {
+        setData(res)
         setLoading(false)
-      }
-    }
-    fetchContacts()
-  }, [debouncedSearch, selectedStages, toast])
+      })
+      .catch((err) => {
+        console.error(err)
+        setLoading(false)
+      })
+  }, [filters, sort])
 
-  const getInitials = (name?: string | null) => {
-    if (!name) return '??'
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .substring(0, 2)
-      .toUpperCase()
+  const toggleSort = (col: string) => {
+    setSort((prev) => ({
+      column: col,
+      ascending: prev.column === col ? !prev.ascending : true,
+    }))
   }
 
-  const handleDelete = async () => {
-    if (!deletingContact) return
-    setSaving(true)
-    try {
-      await deleteContact(deletingContact.id)
-      setDeletingContact(null)
-      setContacts((prev) => prev.filter((c) => c.id !== deletingContact.id))
-      toast({ title: 'Sucesso', description: 'Contato excluído com sucesso' })
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Não foi possível excluir o contato.',
-        variant: 'destructive',
-      })
-    } finally {
-      setSaving(false)
-    }
+  const updateFilter = (key: keyof ContactsFilters, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const renderSortIcon = (col: string) => {
+    if (sort.column !== col) return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground" />
+    return sort.ascending ? (
+      <ArrowUp className="ml-2 h-4 w-4" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4" />
+    )
+  }
+
+  const formatPhone = (p: string) => {
+    if (!p) return '-'
+    return p
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-            CRM - Atendimentos
-          </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Gerencie os contatos sincronizados em formato de lista.
-          </p>
-        </div>
-        <Button
-          onClick={() => {
-            setUpdatingContact(null)
-            setModalMode('create')
-            setIsModalOpen(true)
-          }}
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Criar Novo
-        </Button>
+    <div className="space-y-4 animate-fade-in p-4 sm:p-6 lg:p-8">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+          Atendimentos
+        </h2>
+        <p className="text-muted-foreground text-sm mt-1">
+          Gerencie os registros e acompanhe os follow-ups.
+        </p>
       </div>
 
-      <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm overflow-hidden">
-        <CardHeader className="flex flex-col lg:flex-row lg:items-center justify-start gap-4 lg:gap-6 border-b border-slate-100 dark:border-zinc-800/50 bg-slate-50/30 dark:bg-zinc-900/20 pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2 whitespace-nowrap">
-              <Filter className="h-4 w-4 text-slate-400" /> Filtros e Busca
-            </CardTitle>
-            <Separator orientation="vertical" className="hidden sm:block h-6" />
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="border-dashed gap-2 h-9 px-3">
-                  Estágios
-                  {selectedStages.length > 0 && selectedStages.length < STAGES.length && (
-                    <>
-                      <Separator orientation="vertical" className="h-4 mx-1" />
-                      <Badge variant="secondary" className="rounded-sm px-1 font-normal lg:hidden">
-                        {selectedStages.length}
-                      </Badge>
-                      <div className="hidden lg:flex gap-1">
-                        {selectedStages.length > 2 ? (
-                          <Badge variant="secondary" className="rounded-sm px-1 font-normal">
-                            {selectedStages.length} selecionados
-                          </Badge>
-                        ) : (
-                          selectedStages.map((s) => (
-                            <Badge
-                              key={s}
-                              variant="secondary"
-                              className="rounded-sm px-1 font-normal truncate max-w-[120px]"
-                            >
-                              {getStageLabel(s)}
-                            </Badge>
-                          ))
-                        )}
-                      </div>
-                    </>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[340px] p-0" align="start">
-                <div className="p-3">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-zinc-800 mb-3">
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                      Estágios
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto p-0 text-[11px] text-slate-500 hover:text-primary"
-                        onClick={() => setSelectedStages(STAGES.map((s) => s.id))}
-                      >
-                        Selecionar todos
-                      </Button>
-                      <span className="text-slate-300 dark:text-slate-700 text-xs">|</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto p-0 text-[11px] text-slate-500 hover:text-primary"
-                        onClick={() => setSelectedStages(DEFAULT_STAGES)}
-                      >
-                        Padrão
-                      </Button>
-                      <span className="text-slate-300 dark:text-slate-700 text-xs">|</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-auto p-0 text-[11px] text-slate-500 hover:text-primary"
-                        onClick={() => setSelectedStages([])}
-                      >
-                        Limpar
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
-                    {STAGES.map((stage) => (
-                      <div key={stage.id} className="flex items-start space-x-2.5">
-                        <Checkbox
-                          id={`stage-${stage.id}`}
-                          checked={selectedStages.includes(stage.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedStages([...selectedStages, stage.id])
-                            } else {
-                              setSelectedStages(selectedStages.filter((s) => s !== stage.id))
-                            }
-                          }}
-                          className="mt-0.5"
-                        />
-                        <label
-                          htmlFor={`stage-${stage.id}`}
-                          className="text-sm text-slate-700 dark:text-slate-300 leading-tight peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
-                        >
-                          {stage.label}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="relative w-full lg:max-w-[350px] lg:ml-auto">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Buscar por nome, e-mail ou telefone..."
-              className="pl-9 bg-white dark:bg-zinc-950 border-slate-200 shadow-sm focus-visible:ring-primary/20 h-10 w-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex py-20 items-center justify-center flex-col gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary/60" />
-              <p className="text-sm text-slate-500 font-medium">Carregando contatos...</p>
+      <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm">
+        <CardContent className="p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Estágio</Label>
+              <Select value={filters.stage} onValueChange={(v) => updateFilter('stage', v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Estágios</SelectItem>
+                  <SelectItem value="nivel_1_novo">Novo</SelectItem>
+                  <SelectItem value="orcamento_aprovado">Aprovado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/80 dark:bg-zinc-900/50">
-                  <TableRow className="hover:bg-transparent border-slate-200/60 dark:border-zinc-800">
-                    <TableHead className="font-semibold text-slate-600 py-4 px-6 min-w-[200px]">
-                      Contato
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[180px]">
-                      Serviço / Empresa
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 min-w-[200px]">
-                      Consulta
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 w-[180px]">
-                      Estágio
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 w-[140px]">
-                      Ações
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-600 py-4 px-6 w-[140px]">
-                      SLA
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {contacts.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="h-32 text-center text-slate-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <Search className="h-8 w-8 text-slate-300" />
-                          <p>Nenhum contato encontrado para a busca atual.</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    contacts.map((contact) => (
-                      <TableRow
-                        key={contact.id}
-                        className="hover:bg-slate-50/80 dark:hover:bg-zinc-800/60 transition-colors border-slate-100 dark:border-zinc-800/50 group"
-                      >
-                        <TableCell className="px-6 py-5">
-                          <div className="flex items-center gap-4">
-                            <Avatar className="h-10 w-10 border border-slate-200/50 shadow-sm shrink-0">
-                              <AvatarImage src={contact.foto || ''} alt={contact.nome || ''} />
-                              <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                                {getInitials(contact.lead_nome || contact.nome)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col min-w-0">
-                              <span className="font-semibold text-slate-900 dark:text-slate-100 text-base truncate">
-                                {contact.lead_nome || contact.nome || 'Sem nome'}
-                              </span>
-                              <span className="text-sm text-slate-500 mt-0.5 flex items-center gap-1 truncate">
-                                {contact.whatsapp_phone || contact.telefone || 'Sem telefone'}
-                              </span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-5">
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-semibold text-slate-800 dark:text-slate-200 text-[15px] truncate">
-                              {contact.manychat_servicos?.descricao ||
-                                contact.lead_servico ||
-                                'Não informado'}
-                            </span>
-                            <span className="text-sm text-slate-500 mt-0.5 truncate">
-                              {contact.lead_empresa_pf || 'Pessoa Física'}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-5">
-                          {contact.lead_resumo ? (
-                            <div className="text-[14px] text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-relaxed max-w-full line-clamp-3">
-                              {contact.lead_resumo}
-                            </div>
-                          ) : (
-                            <div className="text-[14px] text-slate-500">-</div>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-5">
-                          <Badge
-                            variant="outline"
-                            className={`font-medium px-2.5 py-1 border shadow-sm whitespace-nowrap ${getStageColor(contact.current_stage || 'nivel_1_novo')}`}
-                          >
-                            {getStageLabel(contact.current_stage || 'nivel_1_novo')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-5">
-                          <div className="flex items-center gap-1">
-                            {contact.manychat_live_chat_url && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    asChild
-                                    className="h-8 w-8 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                                  >
-                                    <a
-                                      href={contact.manychat_live_chat_url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      <MessageCircle className="h-4 w-4" />
-                                    </a>
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Abrir conversa</TooltipContent>
-                              </Tooltip>
-                            )}
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setUpdatingContact(contact)
-                                    setModalMode('view')
-                                    setIsModalOpen(true)
-                                  }}
-                                  className="h-8 w-8 text-slate-400 hover:text-slate-900 hover:bg-slate-100"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Visualizar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setUpdatingContact(contact)
-                                    setModalMode('edit')
-                                    setIsModalOpen(true)
-                                  }}
-                                  className="h-8 w-8 text-slate-400 hover:text-primary hover:bg-primary/10"
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Editar</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setDeletingContact(contact)}
-                                  className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Excluir</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-5 px-6">
-                          <Badge
-                            variant="outline"
-                            className={`font-medium px-2.5 py-1 border shadow-sm inline-flex items-center gap-1.5 w-fit whitespace-nowrap ${getSlaColor(contact.sla_status || 'green')}`}
-                          >
-                            {getSlaIcon(contact.sla_status || 'green')}{' '}
-                            {getSlaLabel(contact.sla_status || 'green')}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Responsável</Label>
+              <Select
+                value={filters.responsavel_id}
+                onValueChange={(v) => updateFilter('responsavel_id', v)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Responsáveis</SelectItem>
+                  {meta.responsaveis?.map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Serviço</Label>
+              <Select
+                value={filters.servico_id}
+                onValueChange={(v) => updateFilter('servico_id', v)}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Serviços</SelectItem>
+                  {meta.servicos?.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.descricao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Departamento</Label>
+              <Select value={filters.depto_id} onValueChange={(v) => updateFilter('depto_id', v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Departamentos</SelectItem>
+                  {meta.deptos?.map((d: any) => (
+                    <SelectItem key={d.id} value={d.id.toString()}>
+                      {d.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">SLA</Label>
+              <Select value={filters.sla} onValueChange={(v) => updateFilter('sla', v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="green">No Prazo</SelectItem>
+                  <SelectItem value="yellow">Vencendo Hoje</SelectItem>
+                  <SelectItem value="red">Atrasado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Follow Up</Label>
+              <Select value={filters.follow_up} onValueChange={(v) => updateFilter('follow_up', v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="today">Hoje</SelectItem>
+                  <SelectItem value="next_7_days">Próximos 7 dias</SelectItem>
+                  <SelectItem value="overdue">Atrasados</SelectItem>
+                  <SelectItem value="none">Sem Follow Up</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold uppercase text-slate-500">Origem</Label>
+              <Select value={filters.origem} onValueChange={(v) => updateFilter('origem', v)}>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as Origens</SelectItem>
+                  <SelectItem value="Agente">Agente</SelectItem>
+                  <SelectItem value="Cliente">Cliente</SelectItem>
+                  <SelectItem value="E-mail">E-mail</SelectItem>
+                  <SelectItem value="Indicação">Indicação</SelectItem>
+                  <SelectItem value="Whatsapp">Whatsapp</SelectItem>
+                  <SelectItem value="Telefone">Telefone</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      <ContactModal
-        contact={updatingContact}
-        mode={modalMode}
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setTimeout(() => setUpdatingContact(null), 200)
-        }}
-        onSave={async (payload, id, prevStage) => {
-          try {
-            if (modalMode === 'create') {
-              const newContact = await createContact(payload)
-              setContacts([newContact, ...contacts])
-              toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
-            } else if (id) {
-              await updateContact(id, payload, prevStage)
-              setContacts(contacts.map((c) => (c.id === id ? { ...c, ...payload } : c)))
-              toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
-            }
-            setIsModalOpen(false)
-            setTimeout(() => setUpdatingContact(null), 200)
-          } catch (error: any) {
-            toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-          }
-        }}
-        servicos={servicos}
-        deptos={deptos}
-        cancelReasons={cancelReasons}
-      />
+      <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm overflow-hidden flex flex-col relative min-h-[400px]">
+        {loading && (
+          <div className="absolute inset-0 z-10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        <div className="overflow-x-auto w-full">
+          <Table className="table-fixed w-full min-w-[950px]">
+            <TableHeader>
+              <TableRow className="bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50">
+                <TableHead className="w-[180px] sm:w-[200px] pl-6 font-semibold">Contato</TableHead>
+                <TableHead className="w-[150px] sm:w-[170px] font-semibold">
+                  Serviço / Empresa
+                </TableHead>
+                <TableHead className="font-semibold">Consulta</TableHead>
+                <TableHead className="w-[120px] font-semibold">Estágio</TableHead>
+                <TableHead
+                  className="w-[110px] cursor-pointer font-semibold select-none hover:text-primary transition-colors"
+                  onClick={() => toggleSort('data_follow_up')}
+                >
+                  <div className="flex items-center">
+                    Dt. FUP
+                    {renderSortIcon('data_follow_up')}
+                  </div>
+                </TableHead>
+                <TableHead className="w-[80px] font-semibold text-center">Ações</TableHead>
+                <TableHead className="w-[80px] font-semibold pr-6 text-center">SLA</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.length === 0 && !loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <FileText className="h-8 w-8 text-slate-300" />
+                      <span>Nenhum atendimento encontrado para os filtros selecionados.</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.map((c: any) => {
+                  const fupDate = c.data_follow_up ? parseISO(c.data_follow_up) : null
+                  const isOverdue = fupDate && isBefore(startOfDay(fupDate), startOfDay(new Date()))
 
-      <AlertDialog
-        open={!!deletingContact}
-        onOpenChange={(open) => !open && setDeletingContact(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deseja realmente excluir esse contato?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação irá remover o contato permanentemente. Não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
-            <Button variant="destructive" onClick={handleDelete} disabled={saving}>
-              {saving ? 'Excluindo...' : 'Excluir'}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                  const contactName =
+                    c.nome || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Desconhecido'
+                  const phone = formatPhone(c.whatsapp_phone || c.telefone)
+
+                  let stageLabel = c.current_stage || '-'
+                  if (stageLabel === 'nivel_1_novo') stageLabel = 'Novo'
+                  else if (stageLabel === 'orcamento_aprovado') stageLabel = 'Aprovado'
+                  else if (stageLabel === 'cancelado') stageLabel = 'Cancelado'
+                  else
+                    stageLabel = stageLabel
+                      .replace(/_/g, ' ')
+                      .replace(/\b\w/g, (l: any) => l.toUpperCase())
+
+                  return (
+                    <TableRow
+                      key={c.id}
+                      className="group hover:bg-slate-50/80 dark:hover:bg-zinc-800/50 transition-colors"
+                    >
+                      <TableCell className="pl-6 w-[180px] sm:w-[200px] align-top py-3">
+                        <div className="flex flex-col space-y-1">
+                          <span className="font-medium text-sm text-slate-900 dark:text-slate-100 break-words whitespace-normal leading-tight">
+                            {contactName}
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate">{phone}</span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="w-[150px] sm:w-[170px] align-top py-3 overflow-hidden">
+                        <div className="flex flex-col space-y-1">
+                          <span className="font-medium text-sm text-slate-700 dark:text-slate-300 truncate">
+                            {c.lead_servico || c.manychat_servicos?.descricao || '-'}
+                          </span>
+                          <span className="text-xs text-muted-foreground break-words whitespace-normal leading-tight line-clamp-2">
+                            {c.lead_empresa_pf || '-'}
+                          </span>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="align-top py-3">
+                        <div className="line-clamp-3 text-xs text-slate-600 dark:text-slate-400 break-words whitespace-normal leading-relaxed">
+                          {c.lead_resumo || c.observacoes || '-'}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="w-[120px] align-top py-3">
+                        <div className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 dark:bg-zinc-800 text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-full">
+                          {stageLabel}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="w-[110px] align-top py-3">
+                        {fupDate ? (
+                          <div
+                            className={cn(
+                              'text-sm font-medium',
+                              isOverdue
+                                ? 'text-red-600 dark:text-red-500'
+                                : 'text-slate-700 dark:text-slate-300',
+                            )}
+                          >
+                            {format(fupDate, 'dd/MM/yyyy')}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="w-[80px] align-top py-3 text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Abrir menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
+                            <DropdownMenuItem>Atualizar Estágio</DropdownMenuItem>
+                            <DropdownMenuItem>Agendar FUP</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+
+                      <TableCell className="w-[80px] pr-6 align-top py-3 text-center">
+                        <div className="flex justify-center items-center h-full pt-1">
+                          <div
+                            className={cn(
+                              'h-3 w-3 rounded-full shadow-sm',
+                              c.sla_status === 'red'
+                                ? 'bg-red-500 ring-2 ring-red-500/20'
+                                : c.sla_status === 'yellow'
+                                  ? 'bg-amber-400 ring-2 ring-amber-400/20'
+                                  : 'bg-emerald-500 ring-2 ring-emerald-500/20',
+                            )}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   )
 }
