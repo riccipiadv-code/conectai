@@ -88,3 +88,53 @@ export async function getContacts(
   if (error) throw error
   return data || []
 }
+
+export async function updateContact(id: string, updates: any) {
+  const { data, error } = await supabase
+    .from('manychat_contatos')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function updateContactStage(
+  id: string,
+  stage: string,
+  cancelReasonId?: string,
+  cancelObservation?: string,
+) {
+  const updates: any = { current_stage: stage }
+  if (cancelReasonId) updates.motivo_cancelamento_id = cancelReasonId
+  if (cancelObservation) updates.observacao_cancelamento = cancelObservation
+
+  const { data, error } = await supabase
+    .from('manychat_contatos')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function getCancelReasons() {
+  const { data, error } = await supabase
+    .from('manychat_motivos_cancelamento')
+    .select('id, descricao')
+    .order('descricao')
+
+  if (error) {
+    return [
+      { id: '1', descricao: 'Preço' },
+      { id: '2', descricao: 'Concorrente' },
+      { id: '3', descricao: 'Não responde' },
+      { id: '4', descricao: 'Outro' },
+    ]
+  }
+  return data || []
+}
