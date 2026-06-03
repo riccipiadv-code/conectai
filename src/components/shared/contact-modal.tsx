@@ -65,7 +65,12 @@ export function ContactModal({
   useEffect(() => {
     if (isOpen) {
       if (contact && mode !== 'create') {
-        setFormData({ ...contact })
+        setFormData({
+          ...contact,
+          nome: contact.nome || contact.lead_nome || contact.first_name || '',
+          lead_nome: contact.lead_nome || contact.nome || contact.first_name || '',
+          telefone: contact.telefone || contact.whatsapp_phone || '',
+        })
       } else {
         setFormData({
           origem: 'Whatsapp',
@@ -120,6 +125,11 @@ export function ContactModal({
         payload.cancel_reason_id = null
         payload.cancel_obs = null
       }
+      if (payload.responsavel_id === '') payload.responsavel_id = null
+      if (payload.origem === '') payload.origem = null
+      if (payload.orcamento === '') payload.orcamento = null
+      if (payload.servico_id === '') payload.servico_id = null
+      if ((payload.depto_id as any) === '') payload.depto_id = null
       await onSave(payload, mode === 'create' ? undefined : contact?.id, contact?.current_stage)
     } finally {
       setLoading(false)
@@ -216,7 +226,7 @@ export function ContactModal({
                 <Label>Departamento</Label>
                 <Select
                   disabled={isView}
-                  value={formData.depto_id ? String(formData.depto_id) : 'none'}
+                  value={formData.depto_id != null ? String(formData.depto_id) : 'none'}
                   onValueChange={(val) =>
                     handleChange('depto_id', val === 'none' ? null : Number(val))
                   }
@@ -238,7 +248,7 @@ export function ContactModal({
                 <Label>Responsável</Label>
                 <Select
                   disabled={isView}
-                  value={formData.responsavel_id || 'none'}
+                  value={formData.responsavel_id || formData.responsible_user_id || 'none'}
                   onValueChange={(val) =>
                     handleChange('responsavel_id', val === 'none' ? null : val)
                   }
@@ -325,7 +335,7 @@ export function ContactModal({
                 <Label>Estágio</Label>
                 <Select
                   disabled={isView}
-                  value={formData.current_stage || 'none'}
+                  value={formData.current_stage || 'nivel_1_novo'}
                   onValueChange={(val) =>
                     handleChange('current_stage', val === 'none' ? null : val)
                   }
@@ -347,7 +357,7 @@ export function ContactModal({
                 <Label>SLA</Label>
                 <Select
                   disabled={isView}
-                  value={formData.sla_status || 'none'}
+                  value={formData.sla_status || 'green'}
                   onValueChange={(val) => handleChange('sla_status', val === 'none' ? null : val)}
                 >
                   <SelectTrigger>

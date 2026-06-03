@@ -82,11 +82,11 @@ export async function deleteContact(id: string) {
 
 export async function getResponsaveis() {
   const { data } = await supabase
-    .from('profiles')
-    .select('id, name, legaldesk_usuario_id')
+    .from('legaldesk_usuarios')
+    .select('id, nome')
     .eq('ativo', true)
-    .order('name')
-  return data?.map((d: any) => ({ id: d.legaldesk_usuario_id || d.id, nome: d.name })) || []
+    .order('nome')
+  return data?.map((d: any) => ({ id: d.id, nome: d.nome })) || []
 }
 
 export async function getServicos() {
@@ -109,11 +109,7 @@ export async function getContacts(
   let query = supabase
     .from('manychat_contatos')
     .select(`
-      id, created_at,
-      nome, first_name, last_name, telefone, whatsapp_phone,
-      lead_servico, lead_empresa_pf, lead_resumo, observacoes,
-      current_stage, data_follow_up, sla_status, origem,
-      foto, manychat_live_chat_url,
+      *,
       manychat_servicos(descricao),
       manychat_deptos(nome),
       legaldesk_usuarios(nome),
