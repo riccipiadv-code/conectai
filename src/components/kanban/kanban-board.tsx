@@ -37,6 +37,11 @@ const UI_STAGES = [
     matches: (stage: string | null | undefined) => stage === 'orcamento_aprovado',
   },
   {
+    id: 'cliente',
+    label: 'Cliente',
+    matches: (stage: string | null | undefined) => stage === 'cliente',
+  },
+  {
     id: 'cancelado',
     label: 'Cancelado',
     matches: (stage: string | null | undefined) => stage === 'cancelado',

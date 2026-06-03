@@ -1,318 +1,91 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Eye, Edit, Trash2, MessageSquare } from 'lucide-react'
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { format, parseISO } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
-import { useToast } from '@/hooks/use-toast'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useState, useMemo } from 'react'
+import { useKanbanData } from '@/hooks/use-kanban-data'
+import { KanbanBoard } from '@/components/kanban/kanban-board'
+import { KanbanFilters } from '@/components/kanban/kanban-filters'
+import { ContactModal } from '@/components/shared/contact-modal'
+import { Contact } from '@/services/contacts'
 
 export default function Index() {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const { toast } = useToast()
+  const { contacts, servicos, deptos, loading, moveContact } = useKanbanData()
 
-  // Modals state mock for preserving actions
-  const [viewOpen, setViewOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [commentsOpen, setCommentsOpen] = useState(false)
-  const [selectedContact, setSelectedContact] = useState<any>(null)
+  const [search, setSearch] = useState('')
+  const [deptoId, setDeptoId] = useState('all')
+  const [servicoId, setServicoId] = useState('all')
+  const [slaStatus, setSlaStatus] = useState('all')
 
-  useEffect(() => {
-    fetchData()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view')
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
 
-    const channel = supabase
-      .channel('manychat_contatos_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'manychat_contatos' }, () => {
-        fetchData()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
-
-  async function fetchData() {
-    try {
-      setLoading(true)
-      const { data: contacts, error } = await supabase
-        .from('manychat_contatos')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100)
-
-      if (error) throw error
-      setData(contacts || [])
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao carregar atendimentos',
-        description: error.message,
-        variant: 'destructive',
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleComments = (contact: any) => {
+  const handleView = (contact: Contact) => {
     setSelectedContact(contact)
-    setCommentsOpen(true)
+    setModalMode('view')
+    setModalOpen(true)
   }
 
-  const handleView = (contact: any) => {
+  const handleEdit = (contact: Contact) => {
     setSelectedContact(contact)
-    setViewOpen(true)
+    setModalMode('edit')
+    setModalOpen(true)
   }
 
-  const handleEdit = (contact: any) => {
-    setSelectedContact(contact)
-    setEditOpen(true)
-  }
-
-  const handleDelete = (contact: any) => {
-    setSelectedContact(contact)
-    setDeleteOpen(true)
-  }
-
-  const formatStage = (stage: string | null) => {
-    if (!stage) return 'Novo'
-    return stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-  }
-
-  const getSlaVariant = (sla: string | null) => {
-    if (sla === 'red') return 'destructive'
-    if (sla === 'yellow') return 'default'
-    return 'secondary'
-  }
+  const filteredContacts = useMemo(() => {
+    return contacts.filter((c) => {
+      if (
+        search &&
+        !c.nome?.toLowerCase().includes(search.toLowerCase()) &&
+        !c.lead_nome?.toLowerCase().includes(search.toLowerCase())
+      )
+        return false
+      if (deptoId !== 'all' && String(c.depto_id) !== deptoId) return false
+      if (servicoId !== 'all' && c.servico_id !== servicoId) return false
+      if (slaStatus !== 'all' && c.sla_status !== slaStatus) return false
+      return true
+    })
+  }, [contacts, search, deptoId, servicoId, slaStatus])
 
   return (
-    <div className="p-6 w-full max-w-[100vw] overflow-hidden flex flex-col h-[calc(100vh-4rem)]">
+    <div className="p-6 w-full max-w-[100vw] overflow-hidden flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50 dark:bg-zinc-950/50">
       <div className="mb-4 flex items-center justify-between shrink-0">
-        <h1 className="text-2xl font-bold tracking-tight">Atendimentos</h1>
-        <Button onClick={fetchData} variant="outline" size="sm">
-          Atualizar
-        </Button>
+        <h1 className="text-2xl font-bold tracking-tight">Kanban</h1>
       </div>
 
-      <div className="bg-card border border-border rounded-lg shadow-sm flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-auto">
-          <Table className="w-full">
-            <TableHeader className="bg-muted/50 sticky top-0 z-10 shadow-sm">
-              <TableRow>
-                <TableHead className="w-[220px] max-w-[220px] pl-6">Contato</TableHead>
-                <TableHead className="w-[180px] max-w-[180px]">Serviço / Empresa</TableHead>
-                <TableHead className="w-[350px] max-w-[350px]">Consulta</TableHead>
-                <TableHead>Estágio</TableHead>
-                <TableHead className="w-[110px]">Dt. FUP</TableHead>
-                <TableHead className="min-w-[160px] text-center">Ações</TableHead>
-                <TableHead className="text-right pr-6">SLA</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Carregando atendimentos...
-                  </TableCell>
-                </TableRow>
-              ) : data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                    Nenhum atendimento encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((contato) => (
-                  <TableRow key={contato.id} className="hover:bg-muted/30">
-                    <TableCell className="w-[220px] max-w-[220px] pl-6 align-top py-3">
-                      <div className="flex flex-col whitespace-normal break-words overflow-hidden">
-                        <span className="font-semibold text-sm text-foreground">
-                          {contato.nome || contato.first_name || 'Sem nome'}
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-0.5 font-medium truncate">
-                          {contato.whatsapp_phone || contato.telefone || 'Sem telefone'}
-                        </span>
-                      </div>
-                    </TableCell>
+      <KanbanFilters
+        search={search}
+        onSearchChange={setSearch}
+        deptoId={deptoId}
+        onDeptoChange={setDeptoId}
+        servicoId={servicoId}
+        onServicoChange={setServicoId}
+        slaStatus={slaStatus}
+        onSlaChange={setSlaStatus}
+        deptos={deptos}
+        servicos={servicos}
+        totalContacts={filteredContacts.length}
+      />
 
-                    <TableCell className="w-[180px] max-w-[180px] align-top py-3">
-                      <div className="flex flex-col whitespace-normal break-words">
-                        <span className="text-sm font-medium text-foreground">
-                          {contato.lead_servico || '-'}
-                        </span>
-                        <span className="text-xs text-muted-foreground mt-1">
-                          {contato.lead_empresa_pf || '-'}
-                        </span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="w-[350px] max-w-[350px] align-top py-3">
-                      <div
-                        className="text-sm whitespace-normal break-words line-clamp-3 text-muted-foreground leading-relaxed"
-                        title={contato.lead_resumo || ''}
-                      >
-                        {contato.lead_resumo || '-'}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="align-top py-3">
-                      <Badge
-                        variant="outline"
-                        className="whitespace-nowrap bg-background font-medium"
-                      >
-                        {formatStage(contato.current_stage)}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="w-[110px] align-top py-3">
-                      <span className="text-sm whitespace-nowrap font-medium text-muted-foreground">
-                        {contato.data_follow_up
-                          ? format(parseISO(contato.data_follow_up), 'dd/MM/yyyy', { locale: ptBR })
-                          : '-'}
-                      </span>
-                    </TableCell>
-
-                    <TableCell className="min-w-[160px] align-top py-3 text-center">
-                      <div className="flex justify-center items-center gap-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
-                              onClick={() => {
-                                if (contato.manychat_live_chat_url) {
-                                  window.open(contato.manychat_live_chat_url, '_blank')
-                                } else {
-                                  handleComments(contato)
-                                }
-                              }}
-                            >
-                              <MessageSquare className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Abrir ManyChat</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                              onClick={() => handleView(contato)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Visualizar</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
-                              onClick={() => handleEdit(contato)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Editar</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
-                              onClick={() => handleDelete(contato)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Excluir</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-right align-top py-3 pr-6">
-                      <Badge variant={getSlaVariant(contato.sla_status)}>
-                        {contato.sla_status?.toUpperCase() || 'OK'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white dark:bg-zinc-950 rounded-xl border shadow-sm">
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-muted-foreground animate-pulse">Carregando kanban...</p>
+          </div>
+        ) : (
+          <KanbanBoard
+            contacts={filteredContacts}
+            deptos={deptos}
+            onMoveContact={moveContact}
+            onEdit={handleEdit}
+            onView={handleView}
+          />
+        )}
       </div>
 
-      {/* Preservation of Original Modals logic */}
-      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Visualizar Contato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            Visualizando dados de {selectedContact?.nome || selectedContact?.first_name}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Contato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            Editando dados de {selectedContact?.nome || selectedContact?.first_name}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir Contato</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            Tem certeza que deseja excluir o contato{' '}
-            {selectedContact?.nome || selectedContact?.first_name}?
-          </div>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="destructive" onClick={() => setDeleteOpen(false)}>
-              Excluir
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={commentsOpen} onOpenChange={setCommentsOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Comentários</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            Gerenciar comentários de {selectedContact?.nome || selectedContact?.first_name}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ContactModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        contact={selectedContact}
+        mode={modalMode}
+      />
     </div>
   )
 }

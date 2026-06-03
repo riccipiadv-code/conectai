@@ -1,10 +1,10 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Contact, Depto } from '@/services/contacts'
-import { formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Eye, Edit2, Clock } from 'lucide-react'
+import { Eye, Edit2, Clock, Calendar, User } from 'lucide-react'
 
 interface KanbanCardProps {
   contact: Contact
@@ -37,12 +37,24 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
     done: 'border-l-blue-500',
   }
 
+  const getSlaVariant = (sla: string | null) => {
+    if (sla === 'red') return 'destructive'
+    if (sla === 'yellow') return 'default'
+    return 'secondary'
+  }
+
   const timeInStage = contact.last_stage_change_at
     ? formatDistanceToNow(new Date(contact.last_stage_change_at), {
         addSuffix: false,
         locale: ptBR,
       })
     : '-'
+
+  const followUpDate = contact.data_follow_up
+    ? format(parseISO(contact.data_follow_up), 'dd/MM/yyyy', { locale: ptBR })
+    : null
+
+  const responsavel = contact.profiles?.name || contact.legaldesk_usuarios?.nome || null
 
   return (
     <div
@@ -92,22 +104,6 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
       </div>
 
       <div className="flex flex-wrap gap-1 mt-1">
-        {contact.current_stage === 'nivel_2_especialista' && (
-          <Badge
-            variant="default"
-            className="text-[10px] px-1.5 py-0 font-semibold bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-500/20 dark:text-violet-400 border-none"
-          >
-            Nível 2
-          </Badge>
-        )}
-        {contact.current_stage === 'nivel_3_especial' && (
-          <Badge
-            variant="default"
-            className="text-[10px] px-1.5 py-0 font-semibold bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200 dark:bg-fuchsia-500/20 dark:text-fuchsia-400 border-none"
-          >
-            Nível 3
-          </Badge>
-        )}
         {contact.lead_empresa_pf && (
           <Badge
             variant="secondary"
@@ -124,6 +120,12 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
             {deptoName}
           </Badge>
         )}
+        <Badge
+          variant={getSlaVariant(contact.sla_status)}
+          className="text-[10px] px-1.5 py-0 font-semibold tracking-wide"
+        >
+          SLA: {contact.sla_status?.toUpperCase() || 'OK'}
+        </Badge>
       </div>
 
       {contact.lead_resumo && (
@@ -132,11 +134,25 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
         </p>
       )}
 
-      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-zinc-800/50">
-        <div className="flex items-center gap-1 shrink-0">
-          <Clock className="w-3 h-3" /> {timeInStage}
-        </div>
-        <div className="truncate pl-2">{contact.whatsapp_phone || contact.telefone || '-'}</div>
+      <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-slate-100 dark:border-zinc-800/50">
+        {followUpDate && (
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+            <Calendar className="w-3 h-3 text-blue-500" /> FUP: {followUpDate}
+          </div>
+        )}
+        {responsavel && (
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 truncate font-medium">
+            <User className="w-3 h-3 text-indigo-500 shrink-0" /> {responsavel}
+          </div>
+        )}
+        {!responsavel && !followUpDate && (
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <div className="truncate">{contact.whatsapp_phone || contact.telefone || '-'}</div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Clock className="w-3 h-3" /> {timeInStage}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -111,7 +111,9 @@ export async function getContacts(
       current_stage, data_follow_up, sla_status, origem,
       foto, manychat_live_chat_url,
       manychat_servicos(descricao),
-      manychat_deptos(nome)
+      manychat_deptos(nome),
+      legaldesk_usuarios(nome),
+      profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
     `)
     .is('deleted_at', null)
     .limit(300)
@@ -178,9 +180,15 @@ export async function updateContactStage(
   cancelReasonId?: string,
   cancelObservation?: string,
 ) {
-  const updates: any = { current_stage: stage }
-  if (cancelReasonId) updates.motivo_cancelamento_id = cancelReasonId
-  if (cancelObservation) updates.observacao_cancelamento = cancelObservation
+  const { data: currentContact } = await supabase
+    .from('manychat_contatos')
+    .select('manychat_id, current_stage')
+    .eq('id', id)
+    .single()
+
+  const updates: any = { current_stage: stage, last_stage_change_at: new Date().toISOString() }
+  if (cancelReasonId) updates.cancel_reason_id = cancelReasonId
+  if (cancelObservation) updates.cancel_obs = cancelObservation
 
   const { data, error } = await supabase
     .from('manychat_contatos')
@@ -190,6 +198,18 @@ export async function updateContactStage(
     .single()
 
   if (error) throw error
+
+  if (currentContact && currentContact.current_stage !== stage) {
+    const { data: userData } = await supabase.auth.getUser()
+    await supabase.from('mc_kanban_history').insert({
+      manychat_id: currentContact.manychat_id,
+      contato_id: id,
+      previous_stage: currentContact.current_stage,
+      new_stage: stage,
+      changed_by: userData?.user?.id || null,
+    })
+  }
+
   return data
 }
 
