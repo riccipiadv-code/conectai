@@ -61,7 +61,7 @@ export default function Layout() {
 
   return (
     <SidebarProvider>
-      <Sidebar className="border-r border-slate-200/60 dark:border-zinc-800">
+      <Sidebar className="border-r border-slate-200/60 dark:border-zinc-800 z-50 shrink-0">
         <SidebarHeader className="border-b border-slate-200/60 dark:border-zinc-800 px-6 py-5">
           <div className="flex items-center gap-3 font-bold text-xl tracking-tight text-slate-900 dark:text-slate-100">
             <div className="h-9 w-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/20">
@@ -188,8 +188,8 @@ export default function Layout() {
         </SidebarFooter>
       </Sidebar>
 
-      <SidebarInset className="bg-slate-50/50 dark:bg-zinc-950">
-        <header className="flex h-16 items-center gap-4 border-b border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 shadow-[0_1px_2px_0_rgba(0,0,0,0.02)] sticky top-0 z-10">
+      <SidebarInset className="bg-slate-50/50 dark:bg-zinc-950 min-w-0">
+        <header className="flex h-16 shrink-0 items-center gap-4 border-b border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 shadow-[0_1px_2px_0_rgba(0,0,0,0.02)] sticky top-0 z-10">
           <SidebarTrigger className="text-slate-500 hover:text-slate-900" />
           <div className="flex-1">
             <h1 className="font-semibold text-lg tracking-tight text-slate-800 dark:text-slate-100">
@@ -209,14 +209,14 @@ export default function Layout() {
             </h1>
           </div>
         </header>
-        <main className="flex-1 overflow-auto flex flex-col">
+        <main className="flex-1 overflow-hidden flex flex-col min-w-0">
           <div
             className={
               location.pathname === '/'
-                ? 'w-full flex-1 flex flex-col'
+                ? 'w-full flex-1 flex flex-col min-w-0 h-full overflow-hidden'
                 : location.pathname === '/contatos' || location.pathname === '/dashboard'
-                  ? 'w-full mx-auto p-6 md:p-8'
-                  : 'max-w-7xl mx-auto p-6 md:p-8'
+                  ? 'w-full mx-auto p-6 md:p-8 overflow-y-auto h-full'
+                  : 'max-w-7xl mx-auto p-6 md:p-8 overflow-y-auto h-full'
             }
           >
             <Outlet />

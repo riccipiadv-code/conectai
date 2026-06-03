@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { startOfDay, endOfDay, addDays } from 'date-fns'
+import { OFFICIAL_STAGES } from '@/constants/stages'
 
 export interface ContactsFilters {
   stages?: string[]
@@ -186,6 +187,14 @@ export async function getContacts(
 
 export async function updateContact(id: string, updates: any, previousStage?: string) {
   const payload = { ...updates }
+
+  if (payload.current_stage) {
+    const isValid = OFFICIAL_STAGES.some((s) => s.id === payload.current_stage)
+    if (!isValid) {
+      throw new Error(`Estágio inválido: ${payload.current_stage}`)
+    }
+  }
+
   if (previousStage && payload.current_stage && previousStage !== payload.current_stage) {
     payload.last_stage_change_at = new Date().toISOString()
   }
@@ -207,6 +216,11 @@ export async function updateContactStage(
   cancelReasonId?: string,
   cancelObservation?: string,
 ) {
+  const isValid = OFFICIAL_STAGES.some((s) => s.id === stage)
+  if (!isValid) {
+    throw new Error(`Estágio inválido: ${stage}`)
+  }
+
   const { data: currentContact } = await supabase
     .from('manychat_contatos')
     .select('manychat_id, current_stage')

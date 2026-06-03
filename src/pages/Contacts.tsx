@@ -66,18 +66,7 @@ import {
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
 import { useToast } from '@/hooks/use-toast'
-
-const STAGES = [
-  { id: 'nivel_1_novo', label: 'Nível 1 - Novo' },
-  { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
-  { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
-  { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
-  { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
-  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
-  { id: 'cancelado', label: 'Cancelado' },
-]
-
-const DEFAULT_STAGES = ['nivel_1_novo', 'reuniao_consulta_agendada', 'enviado_orcamento_ag_retorno']
+import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 
 export default function Contacts() {
   const [data, setData] = useState<any[]>([])
@@ -350,7 +339,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Estágios {filters.stages.length} selecionados
+                    Estágios ({filters.stages?.length || 0})
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -367,7 +356,7 @@ export default function Contacts() {
                       onClick={() =>
                         updateFilter(
                           'stages',
-                          STAGES.map((s) => s.id),
+                          OFFICIAL_STAGES.map((s) => s.id),
                         )
                       }
                     >
@@ -391,18 +380,19 @@ export default function Contacts() {
                     </Button>
                   </div>
                   <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
-                    {STAGES.map((stage) => (
+                    {OFFICIAL_STAGES.map((stage) => (
                       <div key={stage.id} className="flex items-center space-x-3 px-1">
                         <Checkbox
                           id={`stage-${stage.id}`}
-                          checked={filters.stages.includes(stage.id)}
+                          checked={filters.stages?.includes(stage.id)}
                           onCheckedChange={(checked) => {
+                            const currentStages = filters.stages || []
                             if (checked) {
-                              updateFilter('stages', [...filters.stages, stage.id])
+                              updateFilter('stages', [...currentStages, stage.id])
                             } else {
                               updateFilter(
                                 'stages',
-                                filters.stages.filter((id) => id !== stage.id),
+                                currentStages.filter((id) => id !== stage.id),
                               )
                             }
                           }}
@@ -582,7 +572,7 @@ export default function Contacts() {
                   const phone = formatPhone(c.whatsapp_phone || c.telefone)
                   const initials = contactName.substring(0, 2).toUpperCase()
 
-                  const foundStage = STAGES.find((s) => s.id === c.current_stage)
+                  const foundStage = OFFICIAL_STAGES.find((s) => s.id === c.current_stage)
                   let stageLabel = foundStage ? foundStage.label : c.current_stage || '-'
                   if (!foundStage && stageLabel !== '-') {
                     stageLabel = stageLabel

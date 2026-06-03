@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { DashboardFilters as FiltersType } from '@/services/dashboard'
+import { OFFICIAL_STAGES } from '@/constants/stages'
 
 interface Props {
   filters: FiltersType
@@ -146,9 +147,11 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os Estágios</SelectItem>
-            <SelectItem value="nivel_1_novo">Novo</SelectItem>
-            <SelectItem value="orcamento_aprovado">Aprovado</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
+            {OFFICIAL_STAGES.map((stage) => (
+              <SelectItem key={stage.id} value={stage.id}>
+                {stage.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

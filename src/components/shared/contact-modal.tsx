@@ -31,6 +31,7 @@ import {
   getResponsaveis,
   Responsavel,
 } from '@/services/contacts'
+import { OFFICIAL_STAGES } from '@/constants/stages'
 
 export interface ContactModalProps {
   contact: Contact | null
@@ -137,16 +138,16 @@ export function ContactModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[800px]">
+      <DialogContent className="sm:max-w-3xl w-full">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-6 py-4 max-h-[75vh] overflow-y-auto px-1">
-          {/* Section 1: Dados do Contato */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b pb-2">
-              Dados do Contato
+        <div className="flex flex-col gap-6 py-4 max-h-[75vh] overflow-y-auto px-1 custom-scrollbar">
+          {/* SEÇÃO 1: DADOS DO CONTATO */}
+          <section className="space-y-4">
+            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b border-slate-200 dark:border-zinc-800 pb-2">
+              1. DADOS DO CONTATO
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -183,12 +184,12 @@ export function ContactModal({
                 />
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 2: Atendimento */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b pb-2">
-              Atendimento
+          {/* SEÇÃO 2: ATENDIMENTO */}
+          <section className="space-y-4">
+            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b border-slate-200 dark:border-zinc-800 pb-2">
+              2. ATENDIMENTO
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -263,7 +264,7 @@ export function ContactModal({
                   disabled={isView}
                 />
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 md:col-span-2 lg:col-span-1">
                 <Label>Data Entrada</Label>
                 <Input
                   value={
@@ -272,16 +273,17 @@ export function ContactModal({
                       : ''
                   }
                   disabled
+                  className="bg-slate-50 dark:bg-zinc-900"
                   placeholder={mode === 'create' ? 'Gerada automaticamente' : ''}
                 />
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 3: Comercial */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b pb-2">
-              Comercial
+          {/* SEÇÃO 3: COMERCIAL */}
+          <section className="space-y-4">
+            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b border-slate-200 dark:border-zinc-800 pb-2">
+              3. COMERCIAL
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="grid gap-2">
@@ -307,15 +309,16 @@ export function ContactModal({
                   value={formatCurrency(formData.valor)}
                   onChange={handleValorChange}
                   disabled={isView}
+                  placeholder="R$ 0,00"
                 />
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 4: Acompanhamento */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b pb-2">
-              Acompanhamento
+          {/* SEÇÃO 4: ACOMPANHAMENTO */}
+          <section className="space-y-4">
+            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b border-slate-200 dark:border-zinc-800 pb-2">
+              4. ACOMPANHAMENTO
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="grid gap-2">
@@ -331,12 +334,12 @@ export function ContactModal({
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="nivel_1_novo">Novo</SelectItem>
-                    <SelectItem value="nivel_2_em_atendimento">Em Atendimento</SelectItem>
-                    <SelectItem value="nivel_3_apresentacao">Apresentação</SelectItem>
-                    <SelectItem value="nivel_4_negociacao">Negociação</SelectItem>
-                    <SelectItem value="nivel_5_fechado">Fechado</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    {OFFICIAL_STAGES.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        {stage.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -352,9 +355,11 @@ export function ContactModal({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhum</SelectItem>
-                    <SelectItem value="green">Verde</SelectItem>
-                    <SelectItem value="yellow">Amarelo</SelectItem>
-                    <SelectItem value="red">Vermelho</SelectItem>
+                    <SelectItem value="green">No Prazo</SelectItem>
+                    <SelectItem value="yellow">Atenção</SelectItem>
+                    <SelectItem value="red">Atrasado</SelectItem>
+                    <SelectItem value="paused">Pausado</SelectItem>
+                    <SelectItem value="done">Finalizado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -393,49 +398,51 @@ export function ContactModal({
                 </Popover>
               </div>
             </div>
-          </div>
+          </section>
 
-          {/* Section 5: Solicitação */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b pb-2">
-              Solicitação
+          {/* SEÇÃO 5: SOLICITAÇÃO */}
+          <section className="space-y-4">
+            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b border-slate-200 dark:border-zinc-800 pb-2">
+              5. SOLICITAÇÃO
             </h4>
             <div className="grid gap-2">
               <Label>Resumo da Solicitação</Label>
               <Textarea
-                className="min-h-[100px]"
+                className="min-h-[100px] w-full"
                 value={formData.lead_resumo || ''}
                 onChange={(e) => handleChange('lead_resumo', e.target.value)}
                 disabled={isView}
+                placeholder="Detalhes da solicitação..."
               />
             </div>
-          </div>
+          </section>
 
-          {/* Section 6: Observações */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b pb-2">
-              Observações
+          {/* SEÇÃO 6: OBSERVAÇÕES */}
+          <section className="space-y-4">
+            <h4 className="text-sm font-semibold tracking-tight text-foreground border-b border-slate-200 dark:border-zinc-800 pb-2">
+              6. OBSERVAÇÕES
             </h4>
             <div className="grid gap-2">
               <Label>Observações Internas</Label>
               <Textarea
-                className="min-h-[100px]"
+                className="min-h-[100px] w-full"
                 value={formData.observacoes || ''}
                 onChange={(e) => handleChange('observacoes', e.target.value)}
                 disabled={isView}
+                placeholder="Anotações internas sobre o atendimento..."
               />
             </div>
-          </div>
+          </section>
 
-          {/* Section 7: Cancelamento */}
+          {/* SEÇÃO 7: CANCELAMENTO (Condicional) */}
           {isCancelado && (
-            <div className="space-y-4 p-4 border rounded-md bg-red-50/50 dark:bg-red-950/20">
-              <h4 className="text-sm font-semibold tracking-tight text-red-600 dark:text-red-400 border-b border-red-200 dark:border-red-900 pb-2">
-                Cancelamento
+            <section className="space-y-4 p-4 border rounded-lg bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50">
+              <h4 className="text-sm font-semibold tracking-tight text-rose-600 dark:text-rose-400 border-b border-rose-200 dark:border-rose-900/50 pb-2">
+                7. CANCELAMENTO
               </h4>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2">
-                  <Label className="text-red-600 dark:text-red-400">Motivo do Cancelamento</Label>
+                  <Label className="text-rose-600 dark:text-rose-400">Motivo do Cancelamento</Label>
                   <Select
                     disabled={isView}
                     value={formData.cancel_reason_id || 'none'}
@@ -443,7 +450,7 @@ export function ContactModal({
                       handleChange('cancel_reason_id', val === 'none' ? null : val)
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="border-rose-200 dark:border-rose-900">
                       <SelectValue placeholder="Selecione o motivo..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -457,19 +464,19 @@ export function ContactModal({
                   </Select>
                 </div>
                 <div className="grid gap-2 md:col-span-2">
-                  <Label className="text-red-600 dark:text-red-400">
+                  <Label className="text-rose-600 dark:text-rose-400">
                     Observações de Cancelamento
                   </Label>
                   <Textarea
-                    className="min-h-[80px]"
+                    className="min-h-[80px] border-rose-200 dark:border-rose-900"
                     value={formData.cancel_obs || ''}
                     onChange={(e) => handleChange('cancel_obs', e.target.value)}
                     disabled={isView}
-                    placeholder="Detalhes..."
+                    placeholder="Detalhes e justificativas do cancelamento..."
                   />
                 </div>
               </div>
-            </div>
+            </section>
           )}
         </div>
 
