@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { startOfDay, endOfDay, addDays } from 'date-fns'
 
 export interface ContactsFilters {
-  stage: string
+  stages: string[]
   responsavel_id: string
   servico_id: string
   depto_id: string
@@ -116,9 +116,14 @@ export async function getContacts(
       profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
     `)
     .is('deleted_at', null)
-    .limit(300)
+    .limit(1000)
 
-  if (filters.stage && filters.stage !== 'all') query = query.eq('current_stage', filters.stage)
+  if (filters.stages && filters.stages.length > 0) {
+    query = query.in('current_stage', filters.stages)
+  } else {
+    query = query.in('current_stage', ['__none__'])
+  }
+
   if (filters.responsavel_id && filters.responsavel_id !== 'all')
     query = query.eq('responsavel_id', filters.responsavel_id)
   if (filters.servico_id && filters.servico_id !== 'all')

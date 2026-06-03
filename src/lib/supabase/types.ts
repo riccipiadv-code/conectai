@@ -731,6 +731,13 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
+            foreignKeyName: 'manychat_contatos_responsible_user_id_profiles_fkey'
+            columns: ['responsible_user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'manychat_contatos_servico_id_fkey'
             columns: ['servico_id']
             isOneToOne: false
@@ -2114,6 +2121,7 @@ export const Constants = {
 //   PRIMARY KEY manychat_contatos_pkey: PRIMARY KEY (id)
 //   FOREIGN KEY manychat_contatos_responsavel_id_fkey: FOREIGN KEY (responsavel_id) REFERENCES legaldesk_usuarios(id)
 //   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
+//   FOREIGN KEY manychat_contatos_responsible_user_id_profiles_fkey: FOREIGN KEY (responsible_user_id) REFERENCES profiles(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
 //   UNIQUE unique_telefone: UNIQUE (telefone)
 // Table: manychat_deptos

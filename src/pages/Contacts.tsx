@@ -26,6 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -65,6 +67,18 @@ import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
 import { useToast } from '@/hooks/use-toast'
 
+const STAGES = [
+  { id: 'nivel_1_novo', label: 'Nível 1 - Novo' },
+  { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
+  { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
+  { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
+  { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
+  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
+  { id: 'cancelado', label: 'Cancelado' },
+]
+
+const DEFAULT_STAGES = STAGES.filter((s) => s.id !== 'cancelado').map((s) => s.id)
+
 export default function Contacts() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -77,7 +91,7 @@ export default function Contacts() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const [filters, setFilters] = useState<ContactsFilters>({
-    stage: 'all',
+    stages: DEFAULT_STAGES,
     responsavel_id: 'all',
     servico_id: 'all',
     depto_id: 'all',
@@ -133,7 +147,7 @@ export default function Contacts() {
     }))
   }
 
-  const updateFilter = (key: keyof ContactsFilters, value: string) => {
+  const updateFilter = (key: keyof ContactsFilters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -330,17 +344,80 @@ export default function Contacts() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Estágio</Label>
-              <Select value={filters.stage} onValueChange={(v) => updateFilter('stage', v)}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="nivel_1_novo">Novo</SelectItem>
-                  <SelectItem value="orcamento_aprovado">Aprovado</SelectItem>
-                  <SelectItem value="cancelado">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+                  >
+                    Estágios {filters.stages.length} selecionados
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="start">
+                  <div className="p-3 border-b border-slate-100 dark:border-zinc-800">
+                    <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
+                      Estágios
+                    </h4>
+                  </div>
+                  <div className="flex gap-2 p-2 bg-slate-50 dark:bg-zinc-900/50 border-b border-slate-100 dark:border-zinc-800">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
+                      onClick={() =>
+                        updateFilter(
+                          'stages',
+                          STAGES.map((s) => s.id),
+                        )
+                      }
+                    >
+                      Selecionar todos
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
+                      onClick={() => updateFilter('stages', DEFAULT_STAGES)}
+                    >
+                      Padrão
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
+                      onClick={() => updateFilter('stages', [])}
+                    >
+                      Limpar
+                    </Button>
+                  </div>
+                  <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
+                    {STAGES.map((stage) => (
+                      <div key={stage.id} className="flex items-center space-x-3 px-1">
+                        <Checkbox
+                          id={`stage-${stage.id}`}
+                          checked={filters.stages.includes(stage.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              updateFilter('stages', [...filters.stages, stage.id])
+                            } else {
+                              updateFilter(
+                                'stages',
+                                filters.stages.filter((id) => id !== stage.id),
+                              )
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`stage-${stage.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none text-slate-700 dark:text-slate-300"
+                        >
+                          {stage.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-1.5">
@@ -505,14 +582,13 @@ export default function Contacts() {
                   const phone = formatPhone(c.whatsapp_phone || c.telefone)
                   const initials = contactName.substring(0, 2).toUpperCase()
 
-                  let stageLabel = c.current_stage || '-'
-                  if (stageLabel === 'nivel_1_novo') stageLabel = 'Novo'
-                  else if (stageLabel === 'orcamento_aprovado') stageLabel = 'Aprovado'
-                  else if (stageLabel === 'cancelado') stageLabel = 'Cancelado'
-                  else
+                  const foundStage = STAGES.find((s) => s.id === c.current_stage)
+                  let stageLabel = foundStage ? foundStage.label : c.current_stage || '-'
+                  if (!foundStage && stageLabel !== '-') {
                     stageLabel = stageLabel
                       .replace(/_/g, ' ')
                       .replace(/\b\w/g, (l: any) => l.toUpperCase())
+                  }
 
                   return (
                     <TableRow
