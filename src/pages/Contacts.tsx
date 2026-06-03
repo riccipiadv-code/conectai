@@ -77,7 +77,7 @@ const STAGES = [
   { id: 'cancelado', label: 'Cancelado' },
 ]
 
-const DEFAULT_STAGES = STAGES.filter((s) => s.id !== 'cancelado').map((s) => s.id)
+const DEFAULT_STAGES = ['nivel_1_novo', 'reuniao_consulta_agendada', 'enviado_orcamento_ag_retorno']
 
 export default function Contacts() {
   const [data, setData] = useState<any[]>([])
