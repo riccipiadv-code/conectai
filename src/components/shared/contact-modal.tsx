@@ -17,7 +17,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Contact, Servico, Depto, CancelReason, Responsavel } from '@/services/contacts'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { CalendarIcon } from 'lucide-react'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { cn } from '@/lib/utils'
+import {
+  Contact,
+  Servico,
+  Depto,
+  CancelReason,
+  getResponsaveis,
+  Responsavel,
+} from '@/services/contacts'
 
 export interface ContactModalProps {
   contact: Contact | null
@@ -28,7 +41,6 @@ export interface ContactModalProps {
   servicos: Servico[]
   deptos: Depto[]
   cancelReasons: CancelReason[]
-  responsaveis: Responsavel[]
 }
 
 export function ContactModal({
@@ -40,10 +52,14 @@ export function ContactModal({
   servicos = [],
   deptos = [],
   cancelReasons = [],
-  responsaveis = [],
 }: ContactModalProps) {
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [loading, setLoading] = useState(false)
+  const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
+
+  useEffect(() => {
+    getResponsaveis().then(setResponsaveis).catch(console.error)
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
@@ -51,15 +67,23 @@ export function ContactModal({
         setFormData({ ...contact })
       } else {
         setFormData({
+          origem: 'Whatsapp',
+          current_stage: 'nivel_1_novo',
+          sla_status: 'green',
           nome: '',
-          responsavel_id: '',
-          servico_id: '',
+          responsavel_id: null,
+          servico_id: null,
           depto_id: null,
-          data_follow_up: '',
-          cancel_reason_id: '',
-          cancel_obs: '',
+          data_follow_up: null,
+          cancel_reason_id: null,
+          cancel_obs: null,
           valor: null,
-          orcamento: '',
+          orcamento: null,
+          lead_empresa_pf: '',
+          lead_email: '',
+          telefone: '',
+          lead_resumo: '',
+          observacoes: '',
         })
       }
     }
@@ -69,10 +93,33 @@ export function ContactModal({
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
+  const formatCurrency = (value: number | string | null | undefined) => {
+    if (value === null || value === undefined) return ''
+    const num = typeof value === 'string' ? Number(value) : value
+    if (isNaN(num)) return ''
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num)
+  }
+
+  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    const numbers = value.replace(/\D/g, '')
+    if (!numbers) {
+      handleChange('valor', null)
+      return
+    }
+    const numericValue = parseInt(numbers, 10) / 100
+    handleChange('valor', numericValue)
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
     try {
-      await onSave(formData, mode === 'create' ? undefined : contact?.id, contact?.current_stage)
+      const payload = { ...formData }
+      if (payload.current_stage !== 'cancelado') {
+        payload.cancel_reason_id = null
+        payload.cancel_obs = null
+      }
+      await onSave(payload, mode === 'create' ? undefined : contact?.id, contact?.current_stage)
     } finally {
       setLoading(false)
     }
@@ -81,17 +128,43 @@ export function ContactModal({
   const isView = mode === 'view'
   const isCancelado = formData.current_stage === 'cancelado'
 
+  const title =
+    mode === 'create'
+      ? 'Criar Novo Contato'
+      : mode === 'edit'
+        ? 'Atualizar Contato'
+        : 'Visualizar Contato'
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px]">
         <DialogHeader>
-          <DialogTitle>
-            {mode === 'view' ? 'Visualizar' : mode === 'edit' ? 'Editar' : 'Novo'} Contato
-          </DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 py-4 max-h-[75vh] overflow-y-auto px-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Origem</Label>
+              <Input
+                value={formData.origem || ''}
+                onChange={(e) => handleChange('origem', e.target.value)}
+                disabled={isView}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Data Entrada</Label>
+              <Input
+                value={
+                  formData.created_at
+                    ? format(new Date(formData.created_at), 'dd/MM/yyyy HH:mm')
+                    : ''
+                }
+                disabled
+                placeholder={mode === 'create' ? 'Gerada automaticamente' : ''}
+              />
+            </div>
+
             <div className="grid gap-2">
               <Label>Nome do Contato</Label>
               <Input
@@ -100,6 +173,33 @@ export function ContactModal({
                 disabled={isView}
               />
             </div>
+            <div className="grid gap-2">
+              <Label>Empresa / PF</Label>
+              <Input
+                value={formData.lead_empresa_pf || ''}
+                onChange={(e) => handleChange('lead_empresa_pf', e.target.value)}
+                disabled={isView}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>E-mail</Label>
+              <Input
+                type="email"
+                value={formData.lead_email || ''}
+                onChange={(e) => handleChange('lead_email', e.target.value)}
+                disabled={isView}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Telefone</Label>
+              <Input
+                value={formData.telefone || formData.whatsapp_phone || ''}
+                onChange={(e) => handleChange('telefone', e.target.value)}
+                disabled={isView}
+              />
+            </div>
+
             <div className="grid gap-2">
               <Label>Responsável</Label>
               <Select
@@ -120,11 +220,8 @@ export function ContactModal({
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label>Serviço</Label>
+              <Label>Serviço Selecionado</Label>
               <Select
                 disabled={isView}
                 value={formData.servico_id || 'none'}
@@ -166,36 +263,126 @@ export function ContactModal({
                 </SelectContent>
               </Select>
             </div>
+            <div className="grid gap-2">
+              <Label>Orçamento</Label>
+              <Select
+                disabled={isView}
+                value={formData.orcamento || 'none'}
+                onValueChange={(val) => handleChange('orcamento', val === 'none' ? null : val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  <SelectItem value="Tabela">Tabela</SelectItem>
+                  <SelectItem value="Personalizado">Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Valor</Label>
+              <Input
+                value={formatCurrency(formData.valor)}
+                onChange={handleValorChange}
+                disabled={isView}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Data Follow Up</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    disabled={isView}
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !formData.data_follow_up && 'text-muted-foreground',
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.data_follow_up ? (
+                      format(new Date(formData.data_follow_up), 'PPP', { locale: ptBR })
+                    ) : (
+                      <span>Selecione uma data</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={
+                      formData.data_follow_up ? new Date(formData.data_follow_up) : undefined
+                    }
+                    onSelect={(date) =>
+                      handleChange('data_follow_up', date ? date.toISOString() : null)
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Estágio</Label>
+              <Select
+                disabled={isView}
+                value={formData.current_stage || 'none'}
+                onValueChange={(val) => handleChange('current_stage', val === 'none' ? null : val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nivel_1_novo">Novo</SelectItem>
+                  <SelectItem value="nivel_2_em_atendimento">Em Atendimento</SelectItem>
+                  <SelectItem value="nivel_3_apresentacao">Apresentação</SelectItem>
+                  <SelectItem value="nivel_4_negociacao">Negociação</SelectItem>
+                  <SelectItem value="nivel_5_fechado">Fechado</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>SLA</Label>
+              <Select
+                disabled={isView}
+                value={formData.sla_status || 'none'}
+                onValueChange={(val) => handleChange('sla_status', val === 'none' ? null : val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  <SelectItem value="green">Verde</SelectItem>
+                  <SelectItem value="yellow">Amarelo</SelectItem>
+                  <SelectItem value="red">Vermelho</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="grid gap-2">
-              <Label>Data de Follow-up</Label>
-              <Input
-                type="date"
-                value={formData.data_follow_up ? formData.data_follow_up.split('T')[0] : ''}
-                onChange={(e) => {
-                  const date = e.target.value ? new Date(e.target.value).toISOString() : null
-                  handleChange('data_follow_up', date)
-                }}
-                disabled={isView}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Valor / Orçamento</Label>
-              <Input
-                type="number"
-                value={formData.valor || ''}
-                onChange={(e) =>
-                  handleChange('valor', e.target.value ? Number(e.target.value) : null)
-                }
-                disabled={isView}
-              />
-            </div>
+          <div className="grid gap-2">
+            <Label>Resumo da Solicitação</Label>
+            <Textarea
+              value={formData.lead_resumo || ''}
+              onChange={(e) => handleChange('lead_resumo', e.target.value)}
+              disabled={isView}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Observações</Label>
+            <Textarea
+              value={formData.observacoes || ''}
+              onChange={(e) => handleChange('observacoes', e.target.value)}
+              disabled={isView}
+            />
           </div>
 
           {isCancelado && (
-            <div className="grid gap-4 p-4 border rounded-md bg-red-50/50 dark:bg-red-950/20">
+            <div className="grid gap-4 p-4 border rounded-md bg-red-50/50 dark:bg-red-950/20 md:grid-cols-2">
               <div className="grid gap-2">
                 <Label className="text-red-600 dark:text-red-400">Motivo do Cancelamento</Label>
                 <Select
@@ -218,7 +405,7 @@ export function ContactModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid gap-2">
+              <div className="grid gap-2 md:col-span-2">
                 <Label className="text-red-600 dark:text-red-400">
                   Observações de Cancelamento
                 </Label>
@@ -239,7 +426,7 @@ export function ContactModal({
           </Button>
           {!isView && (
             <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? 'Salvando...' : 'Salvar'}
+              {loading ? 'Salvando...' : mode === 'create' ? 'Criar Contato' : 'Salvar Alterações'}
             </Button>
           )}
         </DialogFooter>
