@@ -37,10 +37,10 @@ export function ContactModal({
   isOpen,
   onClose,
   onSave,
-  servicos,
-  deptos,
-  cancelReasons,
-  responsaveis,
+  servicos = [],
+  deptos = [],
+  cancelReasons = [],
+  responsaveis = [],
 }: ContactModalProps) {
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [loading, setLoading] = useState(false)
@@ -112,7 +112,7 @@ export function ContactModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {responsaveis.map((r) => (
+                  {responsaveis?.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
                       {r.nome}
                     </SelectItem>
@@ -135,7 +135,7 @@ export function ContactModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {servicos.map((s) => (
+                  {servicos?.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.descricao}
                     </SelectItem>
@@ -158,7 +158,7 @@ export function ContactModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {deptos.map((d) => (
+                  {deptos?.map((d) => (
                     <SelectItem key={d.id} value={String(d.id)}>
                       {d.nome}
                     </SelectItem>
@@ -210,7 +210,7 @@ export function ContactModal({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Nenhum</SelectItem>
-                    {cancelReasons.map((r) => (
+                    {cancelReasons?.map((r) => (
                       <SelectItem key={r.id} value={r.id}>
                         {r.motivo}
                       </SelectItem>
