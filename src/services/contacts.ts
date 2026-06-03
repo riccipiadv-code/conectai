@@ -62,13 +62,51 @@ export interface Responsavel {
   nome: string
 }
 
+export function sanitizeContactPayload(payload: Partial<Contact>) {
+  const allowedFields = [
+    'manychat_id',
+    'nome',
+    'lead_nome',
+    'telefone',
+    'whatsapp_phone',
+    'lead_email',
+    'lead_empresa_pf',
+    'lead_servico',
+    'lead_resumo',
+    'servico_id',
+    'depto_id',
+    'responsavel_id',
+    'origem',
+    'orcamento',
+    'valor',
+    'observacoes',
+    'current_stage',
+    'sla_status',
+    'data_follow_up',
+    'cancel_reason_id',
+    'cancel_obs',
+    'last_stage_change_at',
+  ]
+
+  const sanitized: Partial<Contact> = {}
+
+  for (const key of allowedFields) {
+    if (key in payload) {
+      sanitized[key] = payload[key]
+    }
+  }
+
+  return sanitized
+}
+
 export async function createContact(payload: Partial<Contact>) {
-  if (!payload.manychat_id) {
-    payload.manychat_id = 'manual_' + new Date().getTime()
+  const sanitized = sanitizeContactPayload(payload)
+  if (!sanitized.manychat_id) {
+    sanitized.manychat_id = 'manual_' + new Date().getTime()
   }
   const { data, error } = await supabase
     .from('manychat_contatos')
-    .insert([payload])
+    .insert([sanitized])
     .select()
     .single()
   if (error) throw error
@@ -110,6 +148,11 @@ export async function getContacts(
     .from('manychat_contatos')
     .select(`
       *,
+      origem,
+      servico_id,
+      depto_id,
+      responsavel_id,
+      cancel_reason_id,
       manychat_servicos(descricao),
       manychat_deptos(nome),
       legaldesk_usuarios(nome),
@@ -182,18 +225,20 @@ export async function getContacts(
 }
 
 export async function updateContact(id: string, updates: any, previousStage?: string) {
-  const payload = { ...updates }
+  const rawPayload = { ...updates }
 
-  if (payload.current_stage) {
-    const isValid = OFFICIAL_STAGES.some((s) => s.id === payload.current_stage)
+  if (rawPayload.current_stage) {
+    const isValid = OFFICIAL_STAGES.some((s) => s.id === rawPayload.current_stage)
     if (!isValid) {
-      throw new Error(`Estágio inválido: ${payload.current_stage}`)
+      throw new Error(`Estágio inválido: ${rawPayload.current_stage}`)
     }
   }
 
-  if (previousStage && payload.current_stage && previousStage !== payload.current_stage) {
-    payload.last_stage_change_at = new Date().toISOString()
+  if (previousStage && rawPayload.current_stage && previousStage !== rawPayload.current_stage) {
+    rawPayload.last_stage_change_at = new Date().toISOString()
   }
+
+  const payload = sanitizeContactPayload(rawPayload)
 
   const { data, error } = await supabase
     .from('manychat_contatos')

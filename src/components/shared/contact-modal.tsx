@@ -70,6 +70,7 @@ export function ContactModal({
           nome: contact.nome || contact.lead_nome || contact.first_name || '',
           lead_nome: contact.lead_nome || contact.nome || contact.first_name || '',
           telefone: contact.telefone || contact.whatsapp_phone || '',
+          origem: contact.origem || '',
         })
       } else {
         setFormData({
@@ -127,9 +128,13 @@ export function ContactModal({
       }
       if (payload.responsavel_id === '') payload.responsavel_id = null
       if (payload.origem === '') payload.origem = null
+      if (payload.origem === 'none') payload.origem = null
       if (payload.orcamento === '') payload.orcamento = null
+      if (payload.orcamento === 'none') payload.orcamento = null
       if (payload.servico_id === '') payload.servico_id = null
+      if (payload.servico_id === 'none') payload.servico_id = null
       if ((payload.depto_id as any) === '') payload.depto_id = null
+      if ((payload.depto_id as any) === 'none') payload.depto_id = null
       await onSave(payload, mode === 'create' ? undefined : contact?.id, contact?.current_stage)
     } finally {
       setLoading(false)
@@ -268,11 +273,26 @@ export function ContactModal({
               </div>
               <div className="grid gap-2">
                 <Label>Origem</Label>
-                <Input
-                  value={formData.origem || ''}
-                  onChange={(e) => handleChange('origem', e.target.value)}
+                <Select
                   disabled={isView}
-                />
+                  value={formData.origem || 'none'}
+                  onValueChange={(val) => handleChange('origem', val === 'none' ? null : val)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum</SelectItem>
+                    <SelectItem value="Whatsapp">Whatsapp</SelectItem>
+                    <SelectItem value="E-mail">E-mail</SelectItem>
+                    <SelectItem value="Site">Site</SelectItem>
+                    <SelectItem value="Manual">Manual</SelectItem>
+                    <SelectItem value="Agente">Agente</SelectItem>
+                    <SelectItem value="Cliente">Cliente</SelectItem>
+                    <SelectItem value="Indicação">Indicação</SelectItem>
+                    <SelectItem value="Telefone">Telefone</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2 md:col-span-2 lg:col-span-1">
                 <Label>Data Entrada</Label>
