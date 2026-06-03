@@ -3,10 +3,21 @@ import { useKanbanData } from '@/hooks/use-kanban-data'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { KanbanFilters } from '@/components/kanban/kanban-filters'
 import { ContactModal } from '@/components/shared/contact-modal'
-import { Contact } from '@/services/contacts'
+import { Contact, updateContact, createContact } from '@/services/contacts'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Index() {
-  const { contacts, servicos, deptos, loading, moveContact } = useKanbanData()
+  const {
+    contacts,
+    servicos,
+    deptos,
+    cancelReasons,
+    responsaveis,
+    loading,
+    moveContact,
+    setContacts,
+  } = useKanbanData()
+  const { toast } = useToast()
 
   const [search, setSearch] = useState('')
   const [deptoId, setDeptoId] = useState('all')
@@ -14,7 +25,7 @@ export default function Index() {
   const [slaStatus, setSlaStatus] = useState('all')
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalMode, setModalMode] = useState<'view' | 'edit'>('view')
+  const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view')
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
 
   const handleView = (contact: Contact) => {
@@ -27,6 +38,27 @@ export default function Index() {
     setSelectedContact(contact)
     setModalMode('edit')
     setModalOpen(true)
+  }
+
+  const handleSaveContact = async (payload: Partial<Contact>, id?: string, prevStage?: string) => {
+    try {
+      if (id) {
+        const updated = await updateContact(id, payload, prevStage)
+        setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)))
+        toast({ title: 'Sucesso', description: 'Contato atualizado.' })
+      } else {
+        const created = await createContact(payload)
+        setContacts((prev) => [created, ...prev])
+        toast({ title: 'Sucesso', description: 'Contato criado.' })
+      }
+      setModalOpen(false)
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao salvar.',
+        variant: 'destructive',
+      })
+    }
   }
 
   const filteredContacts = useMemo(() => {
@@ -81,10 +113,15 @@ export default function Index() {
       </div>
 
       <ContactModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
         contact={selectedContact}
         mode={modalMode}
+        onSave={handleSaveContact}
+        servicos={servicos}
+        deptos={deptos}
+        cancelReasons={cancelReasons}
+        responsaveis={responsaveis}
       />
     </div>
   )

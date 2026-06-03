@@ -2,13 +2,16 @@ import { supabase } from '@/lib/supabase/client'
 import { startOfDay, endOfDay, addDays } from 'date-fns'
 
 export interface ContactsFilters {
-  stages: string[]
-  responsavel_id: string
-  servico_id: string
-  depto_id: string
-  sla: string
-  follow_up: string
-  origem: string
+  stages?: string[]
+  responsavel_id?: string
+  servico_id?: string
+  depto_id?: string | number
+  sla?: string
+  follow_up?: string
+  origem?: string
+  search?: string
+  limit?: number
+  offset?: number
 }
 
 export interface Contact {
@@ -118,10 +121,25 @@ export async function getContacts(
     .is('deleted_at', null)
     .limit(1000)
 
-  if (filters.stages && filters.stages.length > 0) {
-    query = query.in('current_stage', filters.stages)
-  } else {
-    query = query.in('current_stage', ['__none__'])
+  if (filters.stages !== undefined) {
+    if (filters.stages.length === 0) {
+      query = query.in('current_stage', ['__EMPTY__'])
+    } else {
+      if (filters.stages.includes('nivel_1_novo')) {
+        query = query.or(
+          `current_stage.in.(${filters.stages.map((s) => `"${s}"`).join(',')}),current_stage.is.null,current_stage.eq.""`,
+        )
+      } else {
+        query = query.in('current_stage', filters.stages)
+      }
+    }
+  }
+
+  if (filters.search) {
+    const s = `%${filters.search}%`
+    query = query.or(
+      `nome.ilike."${s}",lead_nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}"`,
+    )
   }
 
   if (filters.responsavel_id && filters.responsavel_id !== 'all')
@@ -150,6 +168,10 @@ export async function getContacts(
       query = query.is('data_follow_up', null)
     }
   }
+
+  if (filters.limit) query = query.limit(filters.limit)
+  if (filters.offset)
+    query = query.range(filters.offset, filters.offset + (filters.limit || 1000) - 1)
 
   if (sort && sort.column) {
     query = query.order(sort.column, { ascending: sort.ascending, nullsFirst: false })
@@ -192,8 +214,14 @@ export async function updateContactStage(
     .single()
 
   const updates: any = { current_stage: stage, last_stage_change_at: new Date().toISOString() }
-  if (cancelReasonId) updates.cancel_reason_id = cancelReasonId
-  if (cancelObservation) updates.cancel_obs = cancelObservation
+
+  if (stage !== 'cancelado') {
+    updates.cancel_reason_id = null
+    updates.cancel_obs = null
+  } else {
+    if (cancelReasonId !== undefined) updates.cancel_reason_id = cancelReasonId
+    if (cancelObservation !== undefined) updates.cancel_obs = cancelObservation
+  }
 
   const { data, error } = await supabase
     .from('manychat_contatos')

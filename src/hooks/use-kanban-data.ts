@@ -4,11 +4,13 @@ import {
   getServicos,
   getDeptos,
   getCancelReasons,
+  getResponsaveis,
   updateContactStage,
   Contact,
   Servico,
   Depto,
   CancelReason,
+  Responsavel,
 } from '@/services/contacts'
 import { useToast } from '@/hooks/use-toast'
 
@@ -17,6 +19,7 @@ export function useKanbanData() {
   const [servicos, setServicos] = useState<Servico[]>([])
   const [deptos, setDeptos] = useState<Depto[]>([])
   const [cancelReasons, setCancelReasons] = useState<CancelReason[]>([])
+  const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
@@ -28,16 +31,18 @@ export function useKanbanData() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [c, s, d, r] = await Promise.all([
+      const [c, s, d, r, resp] = await Promise.all([
         getContacts({ limit: 1000 }),
         getServicos(),
         getDeptos(),
         getCancelReasons(),
+        getResponsaveis(),
       ])
       setContacts(c)
       setServicos(s)
       setDeptos(d)
       setCancelReasons(r)
+      setResponsaveis(resp)
     } catch (error) {
       console.error(error)
       toast({ title: 'Erro', description: 'Falha ao carregar dados', variant: 'destructive' })
@@ -113,5 +118,14 @@ export function useKanbanData() {
     [toast],
   )
 
-  return { contacts, servicos, deptos, cancelReasons, loading, moveContact, setContacts }
+  return {
+    contacts,
+    servicos,
+    deptos,
+    cancelReasons,
+    responsaveis,
+    loading,
+    moveContact,
+    setContacts,
+  }
 }
