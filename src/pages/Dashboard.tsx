@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getDashboardData, DashboardFilters as FiltersType } from '@/services/dashboard'
-import { getResponsaveis, getServicos, getDeptos } from '@/services/contacts'
+import { getResponsaveis, getServicos, getDeptos, getOrigens } from '@/services/contacts'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
 import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
@@ -12,13 +12,13 @@ import { exportDashboardExcel } from '@/services/export-dashboard'
 export default function Dashboard() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [] })
+  const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [], origens: [] })
 
   const [filters, setFilters] = useState<FiltersType>({
     period: 'current_month',
     dateFrom: null,
     dateTo: null,
-    origem: '',
+    origem_id: '',
     servico_id: '',
     depto_id: '',
     responsavel_id: '',
@@ -28,8 +28,8 @@ export default function Dashboard() {
   })
 
   useEffect(() => {
-    Promise.all([getResponsaveis(), getServicos(), getDeptos()]).then(([r, s, d]: any) =>
-      setMeta({ responsaveis: r, servicos: s, deptos: d }),
+    Promise.all([getResponsaveis(), getServicos(), getDeptos(), getOrigens()]).then(
+      ([r, s, d, o]: any) => setMeta({ responsaveis: r, servicos: s, deptos: d, origens: o }),
     )
   }, [])
 

@@ -60,18 +60,19 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold uppercase text-slate-500">Origem</Label>
         <Select
-          value={filters.origem || 'all'}
-          onValueChange={(v) => update('origem', v === 'all' ? '' : v)}
+          value={filters.origem_id || 'all'}
+          onValueChange={(v) => update('origem_id', v === 'all' ? '' : v)}
         >
           <SelectTrigger className="h-9">
             <SelectValue placeholder="Todas as Origens" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as Origens</SelectItem>
-            <SelectItem value="Whatsapp">Whatsapp</SelectItem>
-            <SelectItem value="Agente">Agente</SelectItem>
-            <SelectItem value="E-mail">E-mail</SelectItem>
-            <SelectItem value="Indicação">Indicação</SelectItem>
+            {meta.origens?.map((o: any) => (
+              <SelectItem key={o.id} value={String(o.id)}>
+                {o.nome}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

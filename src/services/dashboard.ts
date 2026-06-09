@@ -5,7 +5,7 @@ export interface DashboardFilters {
   period: string
   dateFrom: Date | null
   dateTo: Date | null
-  origem: string
+  origem_id: string
   servico_id: string
   depto_id: string
   responsavel_id: string
@@ -23,8 +23,9 @@ export async function getDashboardData(filters: DashboardFilters) {
     let query = supabase
       .from('manychat_contatos')
       .select(`
-        id, created_at, origem, current_stage, valor, data_follow_up, sla_status, 
+        id, created_at, origem, origem_id, current_stage, valor, data_follow_up, sla_status, 
         orcamento, servico_id, depto_id, responsavel_id, cancel_reason_id, lead_nome, nome,
+        manychat_origens(nome),
         manychat_servicos(descricao),
         manychat_cancel_reasons(motivo),
         legaldesk_usuarios(nome)
@@ -48,7 +49,8 @@ export async function getDashboardData(filters: DashboardFilters) {
         .lte('created_at', filters.dateTo.toISOString())
     }
 
-    if (filters.origem) query = query.eq('origem', filters.origem)
+    if (filters.origem_id && filters.origem_id !== 'all')
+      query = query.eq('origem_id', filters.origem_id)
     if (filters.servico_id) query = query.eq('servico_id', filters.servico_id)
     if (filters.depto_id) query = query.eq('depto_id', filters.depto_id)
     if (filters.responsavel_id) query = query.eq('responsavel_id', filters.responsavel_id)

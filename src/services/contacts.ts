@@ -9,7 +9,7 @@ export interface ContactsFilters {
   depto_id?: string | number
   sla?: string
   follow_up?: string
-  origem?: string
+  origem_id?: string | number
   search?: string
   limit?: number
   offset?: number
@@ -33,6 +33,8 @@ export interface Contact {
   cancel_reason_id?: string | null
   cancel_obs?: string | null
   origem?: string | null
+  origem_id?: number | null
+  manychat_origens?: { nome: string } | null
   responsavel_id?: string | null
   orcamento?: string | null
   valor?: number | null
@@ -62,6 +64,11 @@ export interface Responsavel {
   nome: string
 }
 
+export interface Origem {
+  id: number
+  nome: string
+}
+
 export function sanitizeContactPayload(payload: Partial<Contact>) {
   const allowedFields = [
     'manychat_id',
@@ -76,7 +83,7 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
     'servico_id',
     'depto_id',
     'responsavel_id',
-    'origem',
+    'origem_id',
     'orcamento',
     'valor',
     'observacoes',
@@ -140,6 +147,15 @@ export async function getDeptos() {
   return data || []
 }
 
+export async function getOrigens() {
+  const { data } = await supabase
+    .from('manychat_origens')
+    .select('id, nome')
+    .eq('ativo', true)
+    .order('ordem', { ascending: true })
+  return data || []
+}
+
 export async function getContacts(
   filters: ContactsFilters,
   sort?: { column: string; ascending: boolean },
@@ -149,10 +165,12 @@ export async function getContacts(
     .select(`
       *,
       origem,
+      origem_id,
       servico_id,
       depto_id,
       responsavel_id,
       cancel_reason_id,
+      manychat_origens(nome),
       manychat_servicos(descricao),
       manychat_deptos(nome),
       legaldesk_usuarios(nome),
@@ -187,7 +205,8 @@ export async function getContacts(
   if (filters.servico_id && filters.servico_id !== 'all')
     query = query.eq('servico_id', filters.servico_id)
   if (filters.depto_id && filters.depto_id !== 'all') query = query.eq('depto_id', filters.depto_id)
-  if (filters.origem && filters.origem !== 'all') query = query.eq('origem', filters.origem)
+  if (filters.origem_id && filters.origem_id !== 'all')
+    query = query.eq('origem_id', filters.origem_id)
 
   if (filters.sla && filters.sla !== 'all') {
     query = query.eq('sla_status', filters.sla)

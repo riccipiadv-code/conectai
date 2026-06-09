@@ -46,7 +46,7 @@ export function exportDashboardExcel(data: any[]) {
 
   const originMap = new Map()
   data.forEach((c) => {
-    const o = c.origem || 'Não informada'
+    const o = c.manychat_origens?.nome || c.origem || 'Não informada'
     if (!originMap.has(o)) originMap.set(o, { requested: 0, approved: 0, cancelled: 0 })
     const item = originMap.get(o)
     item.requested++
@@ -121,7 +121,7 @@ export function exportDashboardExcel(data: any[]) {
       ...data.map((c) => [
         format(parseISO(c.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }),
         c.lead_nome || c.nome || '',
-        c.origem || '',
+        c.manychat_origens?.nome || c.origem || '',
         c.current_stage || '',
         c.valor || 0,
         c.sla_status || '',

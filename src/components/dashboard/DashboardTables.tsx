@@ -28,7 +28,7 @@ export function DashboardTables({ data }: { data: any[] }) {
   const originData = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
-      const o = c.origem || 'Não informada'
+      const o = c.manychat_origens?.nome || c.origem || 'Não informada'
       if (!map.has(o)) map.set(o, { origin: o, requested: 0, approved: 0, cancelled: 0 })
       const item = map.get(o)
       item.requested++

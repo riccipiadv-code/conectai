@@ -30,6 +30,7 @@ import {
   CancelReason,
   getResponsaveis,
   Responsavel,
+  Origem,
 } from '@/services/contacts'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 
@@ -42,6 +43,7 @@ export interface ContactModalProps {
   servicos: Servico[]
   deptos: Depto[]
   cancelReasons: CancelReason[]
+  origens: Origem[]
 }
 
 export function ContactModal({
@@ -53,6 +55,7 @@ export function ContactModal({
   servicos = [],
   deptos = [],
   cancelReasons = [],
+  origens = [],
 }: ContactModalProps) {
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [loading, setLoading] = useState(false)
@@ -70,11 +73,11 @@ export function ContactModal({
           nome: contact.nome || contact.lead_nome || contact.first_name || '',
           lead_nome: contact.lead_nome || contact.nome || contact.first_name || '',
           telefone: contact.telefone || contact.whatsapp_phone || '',
-          origem: contact.origem || '',
         })
       } else {
+        const whatsappOrigem = origens?.find((o) => o.nome === 'Whatsapp')
         setFormData({
-          origem: 'Whatsapp',
+          origem_id: whatsappOrigem ? whatsappOrigem.id : null,
           current_stage: 'nivel_1_novo',
           sla_status: 'green',
           nome: '',
@@ -127,8 +130,9 @@ export function ContactModal({
         payload.cancel_obs = null
       }
       if (payload.responsavel_id === '') payload.responsavel_id = null
-      if (payload.origem === '') payload.origem = null
-      if (payload.origem === 'none') payload.origem = null
+      if ((payload.origem_id as any) === '') payload.origem_id = null
+      if ((payload.origem_id as any) === 'none') payload.origem_id = null
+      if (payload.origem_id != null) payload.origem_id = Number(payload.origem_id)
       if (payload.orcamento === '') payload.orcamento = null
       if (payload.orcamento === 'none') payload.orcamento = null
       if (payload.servico_id === '') payload.servico_id = null
@@ -165,22 +169,21 @@ export function ContactModal({
               <Label>Origem</Label>
               <Select
                 disabled={isView}
-                value={formData.origem || 'none'}
-                onValueChange={(val) => handleChange('origem', val === 'none' ? null : val)}
+                value={formData.origem_id != null ? String(formData.origem_id) : 'none'}
+                onValueChange={(val) =>
+                  handleChange('origem_id', val === 'none' ? null : Number(val))
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  <SelectItem value="Whatsapp">Whatsapp</SelectItem>
-                  <SelectItem value="E-mail">E-mail</SelectItem>
-                  <SelectItem value="Site">Site</SelectItem>
-                  <SelectItem value="Manual">Manual</SelectItem>
-                  <SelectItem value="Agente">Agente</SelectItem>
-                  <SelectItem value="Cliente">Cliente</SelectItem>
-                  <SelectItem value="Indicação">Indicação</SelectItem>
-                  <SelectItem value="Telefone">Telefone</SelectItem>
+                  {origens?.map((o) => (
+                    <SelectItem key={o.id} value={String(o.id)}>
+                      {o.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -5,6 +5,7 @@ import {
   getServicos,
   getDeptos,
   getCancelReasons,
+  getOrigens,
   updateContact,
   createContact,
   deleteContact,
@@ -76,6 +77,7 @@ export default function Contacts() {
     servicos: [],
     deptos: [],
     cancelReasons: [],
+    origens: [],
   })
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -86,7 +88,7 @@ export default function Contacts() {
     depto_id: 'all',
     sla: 'all',
     follow_up: 'all',
-    origem: 'all',
+    origem_id: 'all',
   })
 
   const [sort, setSort] = useState<{ column: string; ascending: boolean }>({
@@ -105,11 +107,15 @@ export default function Contacts() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   useEffect(() => {
-    Promise.all([getResponsaveis(), getServicos(), getDeptos(), getCancelReasons()]).then(
-      ([r, s, d, c]: any) => {
-        setMeta({ responsaveis: r, servicos: s, deptos: d, cancelReasons: c })
-      },
-    )
+    Promise.all([
+      getResponsaveis(),
+      getServicos(),
+      getDeptos(),
+      getCancelReasons(),
+      getOrigens(),
+    ]).then(([r, s, d, c, o]: any) => {
+      setMeta({ responsaveis: r, servicos: s, deptos: d, cancelReasons: c, origens: o })
+    })
   }, [])
 
   const fetchData = useCallback(() => {
@@ -502,18 +508,20 @@ export default function Contacts() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Origem</Label>
-              <Select value={filters.origem} onValueChange={(v) => updateFilter('origem', v)}>
+              <Select
+                value={String(filters.origem_id)}
+                onValueChange={(v) => updateFilter('origem_id', v)}
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  <SelectItem value="Agente">Agente</SelectItem>
-                  <SelectItem value="Cliente">Cliente</SelectItem>
-                  <SelectItem value="E-mail">E-mail</SelectItem>
-                  <SelectItem value="Indicação">Indicação</SelectItem>
-                  <SelectItem value="Whatsapp">Whatsapp</SelectItem>
-                  <SelectItem value="Telefone">Telefone</SelectItem>
+                  {meta.origens?.map((o: any) => (
+                    <SelectItem key={o.id} value={String(o.id)}>
+                      {o.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -722,6 +730,7 @@ export default function Contacts() {
         servicos={meta.servicos}
         deptos={meta.deptos}
         cancelReasons={meta.cancelReasons}
+        origens={meta.origens}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

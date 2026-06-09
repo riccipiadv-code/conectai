@@ -40,7 +40,7 @@ export function DashboardCharts({ data }: { data: any[] }) {
   const originData = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
-      const o = c.origem || 'Não informada'
+      const o = c.manychat_origens?.nome || c.origem || 'Não informada'
       map.set(o, (map.get(o) || 0) + 1)
     })
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }))

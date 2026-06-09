@@ -585,6 +585,7 @@ export type Database = {
           observacoes: string | null
           orcamento: string | null
           origem: string | null
+          origem_id: number | null
           payload_bruto: Json | null
           porte_empresa: string | null
           responsavel_id: string | null
@@ -639,6 +640,7 @@ export type Database = {
           observacoes?: string | null
           orcamento?: string | null
           origem?: string | null
+          origem_id?: number | null
           payload_bruto?: Json | null
           porte_empresa?: string | null
           responsavel_id?: string | null
@@ -693,6 +695,7 @@ export type Database = {
           observacoes?: string | null
           orcamento?: string | null
           origem?: string | null
+          origem_id?: number | null
           payload_bruto?: Json | null
           porte_empresa?: string | null
           responsavel_id?: string | null
@@ -709,6 +712,13 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'fk_manychat_contatos_origem'
+            columns: ['origem_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_origens'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'manychat_contatos_cancel_reason_id_fkey'
             columns: ['cancel_reason_id']
@@ -764,6 +774,30 @@ export type Database = {
           created_at?: string
           id?: number
           nome?: string
+        }
+        Relationships: []
+      }
+      manychat_origens: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: number
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: number
+          nome: string
+          ordem: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: number
+          nome?: string
+          ordem?: number
         }
         Relationships: []
       }
@@ -1881,10 +1915,17 @@ export const Constants = {
 //   observacoes: text (nullable)
 //   data_follow_up: timestamp with time zone (nullable)
 //   controle: bigint (nullable, default: nextval('manychat_contatos_controle_seq'::regclass))
+//   origem_id: bigint (nullable)
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)
 //   ativo: boolean (not null, default: true)
+//   created_at: timestamp with time zone (not null, default: now())
+// Table: manychat_origens
+//   id: bigint (not null)
+//   nome: text (not null)
+//   ativo: boolean (not null, default: true)
+//   ordem: integer (not null)
 //   created_at: timestamp with time zone (not null, default: now())
 // Table: manychat_servicos
 //   id: uuid (not null, default: gen_random_uuid())
@@ -2110,6 +2151,7 @@ export const Constants = {
 //   FOREIGN KEY manychat_contact_attributes_manychat_id_fkey: FOREIGN KEY (manychat_id) REFERENCES manychat_contatos(manychat_id) ON DELETE CASCADE
 //   PRIMARY KEY manychat_contact_attributes_pkey: PRIMARY KEY (manychat_id, attribute_key)
 // Table: manychat_contatos
+//   FOREIGN KEY fk_manychat_contatos_origem: FOREIGN KEY (origem_id) REFERENCES manychat_origens(id)
 //   FOREIGN KEY manychat_contatos_cancel_reason_id_fkey: FOREIGN KEY (cancel_reason_id) REFERENCES manychat_cancel_reasons(id) ON DELETE SET NULL
 //   UNIQUE manychat_contatos_controle_unique: UNIQUE (controle)
 //   FOREIGN KEY manychat_contatos_deleted_by_fkey: FOREIGN KEY (deleted_by) REFERENCES auth.users(id) ON DELETE SET NULL
@@ -2123,10 +2165,12 @@ export const Constants = {
 //   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_responsible_user_id_profiles_fkey: FOREIGN KEY (responsible_user_id) REFERENCES profiles(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
-//   UNIQUE unique_telefone: UNIQUE (telefone)
 // Table: manychat_deptos
 //   UNIQUE manychat_deptos_nome_key: UNIQUE (nome)
 //   PRIMARY KEY manychat_deptos_pkey: PRIMARY KEY (id)
+// Table: manychat_origens
+//   UNIQUE manychat_origens_nome_key: UNIQUE (nome)
+//   PRIMARY KEY manychat_origens_pkey: PRIMARY KEY (id)
 // Table: manychat_servicos
 //   UNIQUE manychat_servicos_codigo_key: UNIQUE (codigo)
 //   FOREIGN KEY manychat_servicos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id)
@@ -2381,6 +2425,7 @@ export const Constants = {
 //   - anexos
 //   - departamentos
 //   - email_secrets
+//   - manychat_origens
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()
@@ -2575,9 +2620,10 @@ export const Constants = {
 //   CREATE INDEX idx_manychat_contatos_status ON public.manychat_contatos USING btree (last_update_status)
 //   CREATE UNIQUE INDEX manychat_contatos_controle_unique ON public.manychat_contatos USING btree (controle)
 //   CREATE UNIQUE INDEX manychat_contatos_manychat_id_key ON public.manychat_contatos USING btree (manychat_id)
-//   CREATE UNIQUE INDEX unique_telefone ON public.manychat_contatos USING btree (telefone)
 // Table: manychat_deptos
 //   CREATE UNIQUE INDEX manychat_deptos_nome_key ON public.manychat_deptos USING btree (nome)
+// Table: manychat_origens
+//   CREATE UNIQUE INDEX manychat_origens_nome_key ON public.manychat_origens USING btree (nome)
 // Table: manychat_servicos
 //   CREATE UNIQUE INDEX manychat_servicos_codigo_key ON public.manychat_servicos USING btree (codigo)
 //   CREATE UNIQUE INDEX unique_manychat_servicos_codigo ON public.manychat_servicos USING btree (codigo)
