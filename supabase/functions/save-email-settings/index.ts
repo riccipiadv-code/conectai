@@ -87,16 +87,14 @@ Deno.serve(async (req: Request) => {
     }
 
     if (secret) {
-      const { error: secretError } = await supabase
-        .from('email_secrets')
-        .upsert(
-          {
-            setting_id: savedSetting.id,
-            secret_value: secret,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'setting_id' },
-        )
+      const { error: secretError } = await supabase.from('email_secrets').upsert(
+        {
+          setting_id: savedSetting.id,
+          secret_value: secret,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'setting_id' },
+      )
       if (secretError) throw secretError
 
       await supabase
