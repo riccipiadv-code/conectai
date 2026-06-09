@@ -137,7 +137,7 @@ export async function getResponsaveis() {
 export async function getServicos() {
   const { data } = await supabase
     .from('manychat_servicos')
-    .select('id, descricao')
+    .select('id, descricao, depto_id')
     .order('descricao')
   return data || []
 }

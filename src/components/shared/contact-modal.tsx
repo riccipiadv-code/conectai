@@ -266,7 +266,19 @@ export function ContactModal({
               <Select
                 disabled={isView}
                 value={formData.servico_id || 'none'}
-                onValueChange={(val) => handleChange('servico_id', val === 'none' ? null : val)}
+                onValueChange={(val) => {
+                  const newServicoId = val === 'none' ? null : val
+                  setFormData((prev) => {
+                    const next = { ...prev, servico_id: newServicoId }
+                    if (newServicoId) {
+                      const selectedService = servicos?.find((s) => s.id === newServicoId)
+                      if (selectedService && selectedService.depto_id != null) {
+                        next.depto_id = selectedService.depto_id
+                      }
+                    }
+                    return next
+                  })
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />

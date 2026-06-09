@@ -2315,6 +2315,9 @@ export const Constants = {
 // Table: manychat_deptos
 //   Policy "authenticated_select_manychat_deptos" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
+// Table: manychat_origens
+//   Policy "authenticated_select_origens" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: manychat_servicos
 //   Policy "authenticated_select_manychat_servicos" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -2425,7 +2428,6 @@ export const Constants = {
 //   - anexos
 //   - departamentos
 //   - email_secrets
-//   - manychat_origens
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()
