@@ -10,6 +10,8 @@ export const OFFICIAL_STAGES = [
 
 export const DEFAULT_STAGES = [
   'nivel_1_novo',
+  'nivel_2_especialista',
+  'nivel_3_especial',
   'reuniao_consulta_agendada',
   'enviado_orcamento_ag_retorno',
 ]
