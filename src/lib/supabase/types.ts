@@ -2386,6 +2386,13 @@ export const Constants = {
 //   Policy "authenticated_update_manychat_contatos" (UPDATE, PERMISSIVE) roles={authenticated}
 //     USING: true
 //     WITH CHECK: true
+// Table: manychat_contatos_subservicos
+//   Policy "authenticated_delete_manychat_contatos_subservicos" (DELETE, PERMISSIVE) roles={authenticated}
+//     USING: true
+//   Policy "authenticated_insert_manychat_contatos_subservicos" (INSERT, PERMISSIVE) roles={authenticated}
+//     WITH CHECK: true
+//   Policy "authenticated_select_manychat_contatos_subservicos" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
 // Table: manychat_deptos
 //   Policy "authenticated_select_manychat_deptos" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
@@ -2394,6 +2401,9 @@ export const Constants = {
 //     USING: true
 // Table: manychat_servicos
 //   Policy "authenticated_select_manychat_servicos" (SELECT, PERMISSIVE) roles={authenticated}
+//     USING: true
+// Table: manychat_subservicos
+//   Policy "authenticated_select_manychat_subservicos" (SELECT, PERMISSIVE) roles={authenticated}
 //     USING: true
 // Table: manychat_sync_control
 //   Policy "anon_select_manychat_sync_control" (SELECT, PERMISSIVE) roles={anon}
@@ -2502,8 +2512,6 @@ export const Constants = {
 //   - anexos
 //   - departamentos
 //   - email_secrets
-//   - manychat_contatos_subservicos
-//   - manychat_subservicos
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()

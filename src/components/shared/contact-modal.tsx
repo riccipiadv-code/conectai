@@ -365,9 +365,9 @@ export function ContactModal({
             </div>
           </div>
 
-          {/* Subserviços */}
+          {/* Serviços Contratados */}
           <div className="grid grid-cols-1 gap-2">
-            <Label>Subserviços</Label>
+            <Label>Serviços Contratados</Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800">
               {subservicos?.length > 0 ? (
                 subservicos.map((sub) => (
@@ -398,7 +398,7 @@ export function ContactModal({
                 ))
               ) : (
                 <div className="text-sm text-muted-foreground col-span-full">
-                  Nenhum subserviço disponível.
+                  Nenhum serviço contratado disponível.
                 </div>
               )}
             </div>
