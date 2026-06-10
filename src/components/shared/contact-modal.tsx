@@ -31,7 +31,10 @@ import {
   getResponsaveis,
   Responsavel,
   Origem,
+  Subservico,
+  getContatoSubservicos,
 } from '@/services/contacts'
+import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 
 export interface ContactModalProps {
@@ -39,11 +42,17 @@ export interface ContactModalProps {
   mode: 'view' | 'edit' | 'create'
   isOpen: boolean
   onClose: () => void
-  onSave: (payload: Partial<Contact>, id?: string, prevStage?: string) => Promise<void>
+  onSave: (
+    payload: Partial<Contact>,
+    id?: string,
+    prevStage?: string,
+    subservicoIds?: number[],
+  ) => Promise<void>
   servicos: Servico[]
   deptos: Depto[]
   cancelReasons: CancelReason[]
   origens: Origem[]
+  subservicos: Subservico[]
 }
 
 export function ContactModal({
@@ -56,8 +65,10 @@ export function ContactModal({
   deptos = [],
   cancelReasons = [],
   origens = [],
+  subservicos = [],
 }: ContactModalProps) {
   const [formData, setFormData] = useState<Partial<Contact>>({})
+  const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
 
@@ -74,7 +85,13 @@ export function ContactModal({
           lead_nome: contact.lead_nome || contact.nome || contact.first_name || '',
           telefone: contact.telefone || contact.whatsapp_phone || '',
         })
+        getContatoSubservicos(contact.id)
+          .then((ids) => {
+            setSelectedSubservicos(ids)
+          })
+          .catch(console.error)
       } else {
+        setSelectedSubservicos([])
         const whatsappOrigem = origens?.find((o) => o.nome === 'Whatsapp')
         setFormData({
           origem_id: whatsappOrigem ? whatsappOrigem.id : null,
@@ -139,7 +156,12 @@ export function ContactModal({
       if (payload.servico_id === 'none') payload.servico_id = null
       if ((payload.depto_id as any) === '') payload.depto_id = null
       if ((payload.depto_id as any) === 'none') payload.depto_id = null
-      await onSave(payload, mode === 'create' ? undefined : contact?.id, contact?.current_stage)
+      await onSave(
+        payload,
+        mode === 'create' ? undefined : contact?.id,
+        contact?.current_stage,
+        selectedSubservicos,
+      )
     } finally {
       setLoading(false)
     }
@@ -343,8 +365,48 @@ export function ContactModal({
             </div>
           </div>
 
+          {/* Subserviços */}
+          <div className="grid grid-cols-1 gap-2">
+            <Label>Subserviços</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800">
+              {subservicos?.length > 0 ? (
+                subservicos.map((sub) => (
+                  <div key={sub.id} className="flex items-start space-x-3">
+                    <Checkbox
+                      id={`sub-${sub.id}`}
+                      disabled={isView}
+                      checked={selectedSubservicos.includes(sub.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedSubservicos((prev) => [...prev, sub.id])
+                        } else {
+                          setSelectedSubservicos((prev) => prev.filter((id) => id !== sub.id))
+                        }
+                      }}
+                      className="mt-0.5"
+                    />
+                    <Label
+                      htmlFor={`sub-${sub.id}`}
+                      className={cn(
+                        'text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-700 dark:text-slate-300',
+                        isView && 'cursor-default',
+                      )}
+                    >
+                      {sub.nome}
+                    </Label>
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-muted-foreground col-span-full">
+                  Nenhum subserviço disponível.
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Row 4: Resumo da Solicitação, Observações */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {' '}
             <div className="grid gap-2">
               <Label>Resumo da Solicitação</Label>
               <Textarea

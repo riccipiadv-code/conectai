@@ -69,6 +69,12 @@ export interface Origem {
   nome: string
 }
 
+export interface Subservico {
+  id: number
+  nome: string
+  ordem: number
+}
+
 export function sanitizeContactPayload(payload: Partial<Contact>) {
   const allowedFields = [
     'manychat_id',
@@ -154,6 +160,42 @@ export async function getOrigens() {
     .eq('ativo', true)
     .order('ordem', { ascending: true })
   return data || []
+}
+
+export async function getSubservicos() {
+  const { data, error } = await supabase
+    .from('manychat_subservicos')
+    .select('id, nome, ordem')
+    .eq('ativo', true)
+    .order('ordem', { ascending: true })
+  if (error) throw error
+  return data || []
+}
+
+export async function getContatoSubservicos(contatoId: string) {
+  const { data, error } = await supabase
+    .from('manychat_contatos_subservicos')
+    .select('subservico_id')
+    .eq('contato_id', contatoId)
+  if (error) throw error
+  return data?.map((d: any) => d.subservico_id) || []
+}
+
+export async function saveContatoSubservicos(contatoId: string, subservicoIds: number[]) {
+  const { error: delError } = await supabase
+    .from('manychat_contatos_subservicos')
+    .delete()
+    .eq('contato_id', contatoId)
+  if (delError) throw delError
+
+  if (subservicoIds && subservicoIds.length > 0) {
+    const inserts = subservicoIds.map((id) => ({
+      contato_id: contatoId,
+      subservico_id: id,
+    }))
+    const { error: insError } = await supabase.from('manychat_contatos_subservicos').insert(inserts)
+    if (insError) throw insError
+  }
 }
 
 export async function getContacts(

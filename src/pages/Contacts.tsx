@@ -6,6 +6,8 @@ import {
   getDeptos,
   getCancelReasons,
   getOrigens,
+  getSubservicos,
+  saveContatoSubservicos,
   updateContact,
   createContact,
   deleteContact,
@@ -72,12 +74,20 @@ import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 export default function Contacts() {
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [meta, setMeta] = useState({
+  const [meta, setMeta] = useState<{
+    responsaveis: any[]
+    servicos: any[]
+    deptos: any[]
+    cancelReasons: any[]
+    origens: any[]
+    subservicos: any[]
+  }>({
     responsaveis: [],
     servicos: [],
     deptos: [],
     cancelReasons: [],
     origens: [],
+    subservicos: [],
   })
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -113,8 +123,16 @@ export default function Contacts() {
       getDeptos(),
       getCancelReasons(),
       getOrigens(),
-    ]).then(([r, s, d, c, o]: any) => {
-      setMeta({ responsaveis: r, servicos: s, deptos: d, cancelReasons: c, origens: o })
+      getSubservicos(),
+    ]).then(([r, s, d, c, o, sub]: any) => {
+      setMeta({
+        responsaveis: r,
+        servicos: s,
+        deptos: d,
+        cancelReasons: c,
+        origens: o,
+        subservicos: sub,
+      })
     })
   }, [])
 
@@ -278,13 +296,24 @@ export default function Contacts() {
     setDeletingContact(null)
   }
 
-  const handleSaveModal = async (payload: any, id?: string, prevStage?: string) => {
+  const handleSaveModal = async (
+    payload: any,
+    id?: string,
+    prevStage?: string,
+    subservicoIds?: number[],
+  ) => {
     try {
       if (modalMode === 'create') {
-        await createContact(payload)
+        const newContact = await createContact(payload)
+        if (newContact?.id && subservicoIds) {
+          await saveContatoSubservicos(newContact.id, subservicoIds)
+        }
         toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
       } else if (modalMode === 'edit' && id) {
         await updateContact(id, payload, prevStage)
+        if (subservicoIds) {
+          await saveContatoSubservicos(id, subservicoIds)
+        }
         toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
       }
 
@@ -731,6 +760,7 @@ export default function Contacts() {
         deptos={meta.deptos}
         cancelReasons={meta.cancelReasons}
         origens={meta.origens}
+        subservicos={meta.subservicos}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

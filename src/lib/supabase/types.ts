@@ -756,6 +756,39 @@ export type Database = {
           },
         ]
       }
+      manychat_contatos_subservicos: {
+        Row: {
+          contato_id: string
+          created_at: string
+          subservico_id: number
+        }
+        Insert: {
+          contato_id: string
+          created_at?: string
+          subservico_id: number
+        }
+        Update: {
+          contato_id?: string
+          created_at?: string
+          subservico_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'fk_manychat_contatos_subservicos_contato'
+            columns: ['contato_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_contatos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'fk_manychat_contatos_subservicos_subservico'
+            columns: ['subservico_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_subservicos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       manychat_deptos: {
         Row: {
           ativo: boolean
@@ -838,6 +871,30 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      manychat_subservicos: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: number
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: number
+          nome: string
+          ordem: number
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: number
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
       }
       manychat_sync_control: {
         Row: {
@@ -1916,6 +1973,10 @@ export const Constants = {
 //   data_follow_up: timestamp with time zone (nullable)
 //   controle: bigint (nullable, default: nextval('manychat_contatos_controle_seq'::regclass))
 //   origem_id: bigint (nullable)
+// Table: manychat_contatos_subservicos
+//   contato_id: uuid (not null)
+//   subservico_id: bigint (not null)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: manychat_deptos
 //   id: integer (not null)
 //   nome: text (not null)
@@ -1935,6 +1996,12 @@ export const Constants = {
 //   created_at: timestamp with time zone (not null, default: now())
 //   ordem_fluxo: integer (nullable)
 //   depto_id: integer (nullable)
+// Table: manychat_subservicos
+//   id: bigint (not null)
+//   nome: text (not null)
+//   ativo: boolean (not null, default: true)
+//   ordem: integer (not null)
+//   created_at: timestamp with time zone (not null, default: now())
 // Table: manychat_sync_control
 //   id: uuid (not null, default: gen_random_uuid())
 //   sync_type: text (not null)
@@ -2165,6 +2232,10 @@ export const Constants = {
 //   FOREIGN KEY manychat_contatos_responsible_user_id_fkey: FOREIGN KEY (responsible_user_id) REFERENCES auth.users(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_responsible_user_id_profiles_fkey: FOREIGN KEY (responsible_user_id) REFERENCES profiles(id) ON DELETE SET NULL
 //   FOREIGN KEY manychat_contatos_servico_id_fkey: FOREIGN KEY (servico_id) REFERENCES manychat_servicos(id) ON DELETE SET NULL
+// Table: manychat_contatos_subservicos
+//   FOREIGN KEY fk_manychat_contatos_subservicos_contato: FOREIGN KEY (contato_id) REFERENCES manychat_contatos(id) ON DELETE CASCADE
+//   FOREIGN KEY fk_manychat_contatos_subservicos_subservico: FOREIGN KEY (subservico_id) REFERENCES manychat_subservicos(id) ON DELETE CASCADE
+//   PRIMARY KEY manychat_contatos_subservicos_pkey: PRIMARY KEY (contato_id, subservico_id)
 // Table: manychat_deptos
 //   UNIQUE manychat_deptos_nome_key: UNIQUE (nome)
 //   PRIMARY KEY manychat_deptos_pkey: PRIMARY KEY (id)
@@ -2176,6 +2247,9 @@ export const Constants = {
 //   FOREIGN KEY manychat_servicos_depto_id_fkey: FOREIGN KEY (depto_id) REFERENCES manychat_deptos(id)
 //   PRIMARY KEY manychat_servicos_pkey: PRIMARY KEY (id)
 //   UNIQUE unique_manychat_servicos_codigo: UNIQUE (codigo)
+// Table: manychat_subservicos
+//   UNIQUE manychat_subservicos_nome_key: UNIQUE (nome)
+//   PRIMARY KEY manychat_subservicos_pkey: PRIMARY KEY (id)
 // Table: manychat_sync_control
 //   PRIMARY KEY manychat_sync_control_pkey: PRIMARY KEY (id)
 // Table: mc_atendimento_custom_fields
@@ -2428,6 +2502,8 @@ export const Constants = {
 //   - anexos
 //   - departamentos
 //   - email_secrets
+//   - manychat_contatos_subservicos
+//   - manychat_subservicos
 
 // --- DATABASE FUNCTIONS ---
 // FUNCTION handle_new_user()
@@ -2629,6 +2705,8 @@ export const Constants = {
 // Table: manychat_servicos
 //   CREATE UNIQUE INDEX manychat_servicos_codigo_key ON public.manychat_servicos USING btree (codigo)
 //   CREATE UNIQUE INDEX unique_manychat_servicos_codigo ON public.manychat_servicos USING btree (codigo)
+// Table: manychat_subservicos
+//   CREATE UNIQUE INDEX manychat_subservicos_nome_key ON public.manychat_subservicos USING btree (nome)
 // Table: manychat_sync_control
 //   CREATE INDEX idx_manychat_sync_control_created_at ON public.manychat_sync_control USING btree (created_at)
 //   CREATE INDEX idx_manychat_sync_control_status ON public.manychat_sync_control USING btree (status)
