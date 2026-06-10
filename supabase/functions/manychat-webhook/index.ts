@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: existingContact } = await supabase
         .from('manychat_contatos')
-        .select('id, origem, responsavel_id')
+        .select('id, origem, origem_id, responsavel_id')
         .eq('manychat_id', String(subscriber_id))
         .maybeSingle()
 

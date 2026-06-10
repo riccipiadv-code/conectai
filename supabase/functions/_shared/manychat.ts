@@ -185,6 +185,29 @@ export function normalizeManyChatPayload(payload: any) {
 }
 
 let cachedAnaEdithId: string | null | undefined = undefined
+let cachedWhatsappOrigemId: number | null | undefined = undefined
+
+export async function getDefaultOrigemId(supabase: any): Promise<number | null> {
+  if (cachedWhatsappOrigemId !== undefined) {
+    return cachedWhatsappOrigemId
+  }
+
+  const { data: origem } = await supabase
+    .from('manychat_origens')
+    .select('id')
+    .eq('nome', 'Whatsapp')
+    .limit(1)
+    .maybeSingle()
+
+  if (origem) {
+    cachedWhatsappOrigemId = origem.id
+  } else {
+    console.warn('Default origin "Whatsapp" not found in manychat_origens')
+    cachedWhatsappOrigemId = null
+  }
+
+  return cachedWhatsappOrigemId
+}
 
 export async function getDefaultResponsavelId(supabase: any): Promise<string | null> {
   if (cachedAnaEdithId !== undefined) {
@@ -215,6 +238,15 @@ export async function enrichManyChatRecord(
 ) {
   if (!existingContact || !existingContact.origem) {
     record.origem = 'Whatsapp'
+  }
+
+  if (!existingContact || !existingContact.origem_id) {
+    if (record.origem === 'Whatsapp' || existingContact?.origem === 'Whatsapp') {
+      const origemId = await getDefaultOrigemId(supabase)
+      if (origemId) {
+        record.origem_id = origemId
+      }
+    }
   }
 
   if (!existingContact || !existingContact.responsavel_id) {
