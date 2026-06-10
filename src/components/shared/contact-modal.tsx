@@ -333,7 +333,7 @@ export function ContactModal({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Valor</Label>
+              <Label>Valor Faturado</Label>
               <Input
                 value={formatCurrency(formData.valor)}
                 onChange={handleValorChange}
