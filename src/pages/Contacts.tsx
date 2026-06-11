@@ -35,7 +35,6 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   AlertDialog,
@@ -341,7 +340,7 @@ export default function Contacts() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Atendimentos
+            Atendimentos ({filteredData.length})
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
             Gerencie os registros e acompanhe os follow-ups.
@@ -611,7 +610,6 @@ export default function Contacts() {
                     `${c.first_name || ''} ${c.last_name || ''}`.trim() ||
                     'Desconhecido'
                   const phone = formatPhone(c.whatsapp_phone || c.telefone)
-                  const initials = contactName.substring(0, 2).toUpperCase()
 
                   const foundStage = OFFICIAL_STAGES.find((s) => s.id === c.current_stage)
                   let stageLabel = foundStage ? foundStage.label : c.current_stage || '-'
@@ -628,10 +626,9 @@ export default function Contacts() {
                     >
                       <TableCell className="w-[220px] max-w-[220px] pl-6 align-top py-3">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarImage src={c.foto} />
-                            <AvatarFallback>{initials}</AvatarFallback>
-                          </Avatar>
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-slate-300">
+                            {c.controle || '-'}
+                          </div>
                           <div className="flex flex-col whitespace-normal break-words overflow-hidden">
                             <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">
                               {contactName}
