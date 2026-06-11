@@ -3,7 +3,6 @@ export const OFFICIAL_STAGES = [
   { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
   { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
   { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
-  { id: 'aguardando_documentos', label: 'Aguardando Documentos' },
   { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
   { id: 'cancelado', label: 'Cancelado' },

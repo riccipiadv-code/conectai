@@ -1,5 +1,5 @@
 export const DASHBOARD_STAGE_LABELS: Record<string, string> = {
-  nivel_1_novo: 'Novo Lead',
+  nivel_1_novo: 'Nível 1 - Novo',
   nivel_2_especialista: 'Em Atendimento',
   nivel_3_especial: 'Nível 3 - Especial',
   reuniao_consulta_agendada: 'Reunião Agendada',
