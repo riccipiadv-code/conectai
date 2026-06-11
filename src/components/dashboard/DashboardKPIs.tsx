@@ -25,13 +25,12 @@ export function DashboardKPIs({ data }: { data: any[] }) {
 
   const totalValue = data.reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
 
-  // Valor Faturado corresponds to total value of approved/billed
-  const billedValue = data
-    .filter((c) => c.current_stage === 'orcamento_aprovado' || c.current_stage === 'concluido')
-    .reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
+  // Valor Faturado now corresponds to total value of any contact with a value > 0
+  const billedContacts = data.filter((c) => Number(c.valor) > 0)
+  const billedValue = billedContacts.reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
 
-  const valueContacts = data.filter((c) => Number(c.valor) > 0).length
-  const ticketAvg = valueContacts > 0 ? totalValue / valueContacts : 0
+  const valueContacts = billedContacts.length
+  const ticketAvg = valueContacts > 0 ? billedValue / valueContacts : 0
 
   const pendingFollowUp = data.filter(
     (c) =>
