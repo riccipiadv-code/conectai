@@ -9,6 +9,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { DashboardFilters as FiltersType } from '@/services/dashboard'
 import { OFFICIAL_STAGES } from '@/constants/stages'
+import { Search } from 'lucide-react'
 
 interface Props {
   filters: FiltersType
@@ -21,6 +22,19 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5 mb-8 bg-white dark:bg-zinc-900 p-5 rounded-xl border border-slate-200/60 dark:border-zinc-800 shadow-sm">
+      <div className="space-y-1.5 md:col-span-4">
+        <Label className="text-xs font-semibold uppercase text-slate-500">Busca Global</Label>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Buscar por Nome, Telefone, Email, Empresa, ou Controle..."
+            value={filters.search}
+            onChange={(e) => update('search', e.target.value)}
+            className="pl-9 h-10 bg-slate-50 dark:bg-zinc-900/50"
+          />
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold uppercase text-slate-500">Período</Label>
         <Select value={filters.period} onValueChange={(v) => update('period', v)}>
@@ -171,6 +185,25 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
             <SelectItem value="green">No Prazo</SelectItem>
             <SelectItem value="yellow">Alerta</SelectItem>
             <SelectItem value="red">Atrasado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold uppercase text-slate-500">Follow-up</Label>
+        <Select
+          value={filters.follow_up || 'all'}
+          onValueChange={(v) => update('follow_up', v === 'all' ? '' : v)}
+        >
+          <SelectTrigger className="h-9">
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="overdue">Atrasado</SelectItem>
+            <SelectItem value="today">Hoje</SelectItem>
+            <SelectItem value="future">No Futuro</SelectItem>
+            <SelectItem value="none">Sem Follow-up</SelectItem>
           </SelectContent>
         </Select>
       </div>

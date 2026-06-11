@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
-import { startOfMonth, subMonths, startOfYear, endOfMonth } from 'date-fns'
+import { startOfMonth, subMonths, startOfYear, endOfMonth, startOfDay, endOfDay } from 'date-fns'
+import { OFFICIAL_STAGES } from '@/constants/stages'
 
 export interface DashboardFilters {
   period: string
@@ -12,6 +13,8 @@ export interface DashboardFilters {
   current_stage: string
   orcamento: string
   sla_status: string
+  follow_up: string
+  search: string
 }
 
 export async function getDashboardData(filters: DashboardFilters) {
@@ -24,9 +27,11 @@ export async function getDashboardData(filters: DashboardFilters) {
       .from('manychat_contatos')
       .select(`
         id, created_at, origem, origem_id, current_stage, valor, data_follow_up, sla_status, 
-        orcamento, servico_id, depto_id, responsavel_id, cancel_reason_id, lead_nome, nome,
+        orcamento, servico_id, depto_id, responsavel_id, cancel_reason_id, lead_nome, nome, first_name,
+        telefone, lead_email, lead_empresa_pf, porte_empresa, controle,
         manychat_origens(nome),
         manychat_servicos(descricao),
+        manychat_deptos(nome),
         manychat_cancel_reasons(motivo),
         legaldesk_usuarios(nome)
       `)
@@ -58,13 +63,46 @@ export async function getDashboardData(filters: DashboardFilters) {
     if (filters.orcamento) query = query.eq('orcamento', filters.orcamento)
     if (filters.sla_status) query = query.eq('sla_status', filters.sla_status)
 
+    if (filters.follow_up) {
+      const todayStart = startOfDay(new Date()).toISOString()
+      const todayEnd = endOfDay(new Date()).toISOString()
+
+      if (filters.follow_up === 'overdue') {
+        query = query.lt('data_follow_up', todayStart).not('data_follow_up', 'is', null)
+      } else if (filters.follow_up === 'today') {
+        query = query.gte('data_follow_up', todayStart).lte('data_follow_up', todayEnd)
+      } else if (filters.follow_up === 'future') {
+        query = query.gt('data_follow_up', todayEnd)
+      } else if (filters.follow_up === 'none') {
+        query = query.is('data_follow_up', null)
+      }
+    }
+
     query = query.range(from, from + limit - 1)
 
     const { data, error } = await query
     if (error) throw error
 
     if (!data || data.length === 0) break
-    allData.push(...data)
+
+    const mapped = data.map((c: any) => {
+      const stageObj = OFFICIAL_STAGES.find((s) => s.id === c.current_stage)
+      return {
+        ...c,
+        origem: c.manychat_origens?.nome || c.origem || 'Não informada',
+        data_entrada: c.created_at,
+        responsavel_nome: c.legaldesk_usuarios?.nome || 'Sem responsável',
+        lead_nome_exibicao: c.lead_nome || c.nome || c.first_name || 'Sem nome',
+        email: c.lead_email || '',
+        empresa_pf: c.lead_empresa_pf || '',
+        servico_selecionado: c.manychat_servicos?.descricao || 'Sem serviço',
+        departamento: c.manychat_deptos?.nome || 'Sem departamento',
+        current_stage_label: stageObj ? stageObj.label : c.current_stage,
+        cancel_reason: c.manychat_cancel_reasons?.motivo || c.cancel_reason || '',
+      }
+    })
+
+    allData.push(...mapped)
     if (data.length < limit) break
     from += limit
   }

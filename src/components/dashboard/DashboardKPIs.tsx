@@ -12,15 +12,22 @@ import {
 
 export function DashboardKPIs({ data }: { data: any[] }) {
   const total = data.length
-  const approved = data.filter((c) => c.current_stage === 'orcamento_aprovado').length
+  const withBudget = data.filter((c) => c.orcamento || Number(c.valor) > 0).length
+
+  // Consider 'orcamento_aprovado' and 'concluido' as approved
+  const approved = data.filter(
+    (c) => c.current_stage === 'orcamento_aprovado' || c.current_stage === 'concluido',
+  ).length
   const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
 
   const approvalRate = total > 0 ? (approved / total) * 100 : 0
   const declineRate = total > 0 ? (cancelled / total) * 100 : 0
 
   const totalValue = data.reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
-  const approvedValue = data
-    .filter((c) => c.current_stage === 'orcamento_aprovado')
+
+  // Valor Faturado corresponds to total value of approved/billed
+  const billedValue = data
+    .filter((c) => c.current_stage === 'orcamento_aprovado' || c.current_stage === 'concluido')
     .reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
 
   const valueContacts = data.filter((c) => Number(c.valor) > 0).length
@@ -40,7 +47,8 @@ export function DashboardKPIs({ data }: { data: any[] }) {
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
-      <KPICard title="Total Solicitações" value={total} icon={FileText} />
+      <KPICard title="Total Contatos" value={total} icon={FileText} />
+      <KPICard title="Com Orçamento" value={withBudget} icon={FileText} />
       <KPICard
         title="Aprovados"
         value={approved}
@@ -57,18 +65,12 @@ export function DashboardKPIs({ data }: { data: any[] }) {
       <KPICard title="Taxa Cancelamento" value={`${declineRate.toFixed(1)}%`} icon={TrendingDown} />
       <KPICard title="Valor Total (Todos)" value={formatCurrency(totalValue)} icon={DollarSign} />
       <KPICard
-        title="Valor Aprovado"
-        value={formatCurrency(approvedValue)}
+        title="Valor Faturado"
+        value={formatCurrency(billedValue)}
         icon={DollarSign}
         valueClass="text-green-600 dark:text-green-500"
       />
       <KPICard title="Ticket Médio" value={formatCurrency(ticketAvg)} icon={DollarSign} />
-      <KPICard
-        title="Follow-ups Pend."
-        value={pendingFollowUp}
-        icon={Clock}
-        valueClass={pendingFollowUp > 0 ? 'text-amber-600 dark:text-amber-500' : ''}
-      />
       <KPICard
         title="SLA Atraso/Alerta"
         value={overdueSla}

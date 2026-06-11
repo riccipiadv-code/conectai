@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getDashboardData, DashboardFilters as FiltersType } from '@/services/dashboard'
 import { getResponsaveis, getServicos, getDeptos, getOrigens } from '@/services/contacts'
 import { DashboardFilters } from '@/components/dashboard/DashboardFilters'
@@ -25,7 +25,22 @@ export default function Dashboard() {
     current_stage: '',
     orcamento: '',
     sla_status: '',
+    follow_up: '',
+    search: '',
   })
+
+  const filteredData = useMemo(() => {
+    if (!filters.search) return data
+    const s = filters.search.toLowerCase()
+    return data.filter(
+      (c: any) =>
+        c.lead_nome_exibicao?.toLowerCase().includes(s) ||
+        c.telefone?.toLowerCase().includes(s) ||
+        c.email?.toLowerCase().includes(s) ||
+        c.empresa_pf?.toLowerCase().includes(s) ||
+        String(c.controle) === s,
+    )
+  }, [data, filters.search])
 
   useEffect(() => {
     Promise.all([getResponsaveis(), getServicos(), getDeptos(), getOrigens()]).then(
@@ -55,7 +70,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Dashboard
+            Dashboard ({filteredData.length})
           </h2>
           <p className="text-muted-foreground text-sm mt-1">
             Análise de atendimentos, conversões e performance da equipe
@@ -63,7 +78,7 @@ export default function Dashboard() {
         </div>
         <Button
           onClick={handleExport}
-          disabled={loading || data.length === 0}
+          disabled={loading || filteredData.length === 0}
           className="shadow-sm"
         >
           <Download className="mr-2 h-4 w-4" /> Exportar Excel
@@ -79,7 +94,7 @@ export default function Dashboard() {
             Carregando dados do dashboard...
           </p>
         </div>
-      ) : data.length === 0 ? (
+      ) : filteredData.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-32 bg-white dark:bg-zinc-900 rounded-xl border border-dashed border-slate-300 dark:border-zinc-800">
           <div className="h-16 w-16 bg-slate-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4">
             <FileText className="h-8 w-8 text-slate-400" />
@@ -88,15 +103,15 @@ export default function Dashboard() {
             Nenhum dado encontrado
           </h3>
           <p className="text-muted-foreground mt-1 text-center max-w-sm">
-            Não existem solicitações correspondentes aos filtros selecionados. Tente ajustar o
-            período ou outras opções.
+            Não existem contatos correspondentes aos filtros selecionados. Tente ajustar a busca ou
+            as opções.
           </p>
         </div>
       ) : (
         <div className="animate-fade-in-up">
-          <DashboardKPIs data={data} />
-          <DashboardCharts data={data} />
-          <DashboardTables data={data} />
+          <DashboardKPIs data={filteredData} />
+          <DashboardCharts data={filteredData} />
+          <DashboardTables data={filteredData} />
         </div>
       )}
     </div>
