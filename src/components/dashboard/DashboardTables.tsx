@@ -8,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { getStageLabel } from '@/constants/stages'
 
 export function DashboardTables({ data }: { data: any[] }) {
   const isApproved = (stage: string) => stage === 'orcamento_aprovado' || stage === 'concluido'
@@ -27,7 +28,10 @@ export function DashboardTables({ data }: { data: any[] }) {
     return Array.from(map.values()).sort((a: any, b: any) => b.requested - a.requested)
   }
 
-  const responsaveis = useMemo(() => aggregateBy('responsavel_nome', 'Responsável'), [data])
+  const responsaveis = useMemo(
+    () => aggregateBy('responsavel_nome', 'Responsável').filter((r: any) => r.valor > 0),
+    [data],
+  )
   const servicos = useMemo(() => aggregateBy('servico_selecionado', 'Serviço'), [data])
   const departamentos = useMemo(() => aggregateBy('departamento', 'Departamento'), [data])
   const origens = useMemo(() => aggregateBy('origem', 'Origem'), [data])
@@ -35,7 +39,7 @@ export function DashboardTables({ data }: { data: any[] }) {
   const estagios = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
-      const k = c.current_stage_label || c.current_stage || 'Não informado'
+      const k = getStageLabel(c.current_stage)
       if (!map.has(k)) map.set(k, { name: k, count: 0 })
       map.get(k).count++
     })

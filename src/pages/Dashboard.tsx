@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [], origens: [] })
 
   const [filters, setFilters] = useState<FiltersType>({
-    period: 'current_month',
+    period: 'current_year',
     dateFrom: null,
     dateTo: null,
     origem_id: '',

@@ -22,6 +22,7 @@ import {
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { getStageLabel } from '@/constants/stages'
 
 export function DashboardCharts({ data }: { data: any[] }) {
   const monthlyData = useMemo(() => {
@@ -49,7 +50,7 @@ export function DashboardCharts({ data }: { data: any[] }) {
   const funnelData = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
-      const stage = c.current_stage || 'Sem Estágio'
+      const stage = getStageLabel(c.current_stage)
       map.set(stage, (map.get(stage) || 0) + 1)
     })
     return Array.from(map.entries())
