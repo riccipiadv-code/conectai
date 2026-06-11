@@ -8,10 +8,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getDashboardStageLabel } from './utils'
+import { getDashboardStageLabel, DASHBOARD_ALLOWED_STAGES } from './utils'
 
 export function DashboardTables({ data }: { data: any[] }) {
-  const isApproved = (stage: string) => stage === 'orcamento_aprovado' || stage === 'concluido'
+  const isApproved = (stage: string) => stage === 'orcamento_aprovado'
   const isCancelled = (stage: string) => stage === 'cancelado'
 
   const aggregateBy = (key: string, label: string) => {
@@ -39,6 +39,7 @@ export function DashboardTables({ data }: { data: any[] }) {
   const estagios = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
+      if (!c.current_stage || !DASHBOARD_ALLOWED_STAGES.includes(c.current_stage)) return
       const k = getDashboardStageLabel(c.current_stage)
       if (!map.has(k)) map.set(k, { name: k, count: 0 })
       map.get(k).count++

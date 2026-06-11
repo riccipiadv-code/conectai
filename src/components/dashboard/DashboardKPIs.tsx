@@ -14,10 +14,7 @@ export function DashboardKPIs({ data }: { data: any[] }) {
   const total = data.length
   const withBudget = data.filter((c) => c.orcamento || Number(c.valor) > 0).length
 
-  // Consider 'orcamento_aprovado' and 'concluido' as approved
-  const approved = data.filter(
-    (c) => c.current_stage === 'orcamento_aprovado' || c.current_stage === 'concluido',
-  ).length
+  const approved = data.filter((c) => c.current_stage === 'orcamento_aprovado').length
   const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
 
   const approvalRate = total > 0 ? (approved / total) * 100 : 0

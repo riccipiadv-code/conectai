@@ -22,7 +22,7 @@ import {
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { getDashboardStageLabel } from './utils'
+import { getDashboardStageLabel, DASHBOARD_ALLOWED_STAGES } from './utils'
 
 export function DashboardCharts({ data }: { data: any[] }) {
   const monthlyData = useMemo(() => {
@@ -48,16 +48,6 @@ export function DashboardCharts({ data }: { data: any[] }) {
   }, [data])
 
   const funnelData = useMemo(() => {
-    const DASHBOARD_ALLOWED_STAGES = [
-      'cancelado',
-      'enviado_orcamento_ag_retorno',
-      'orcamento_aprovado',
-      'nivel_1_novo',
-      'reuniao_consulta_agendada',
-      'nivel_2_especialista',
-      'nivel_3_especial',
-    ]
-
     const map = new Map()
     data.forEach((c) => {
       if (!c.current_stage || !DASHBOARD_ALLOWED_STAGES.includes(c.current_stage)) return

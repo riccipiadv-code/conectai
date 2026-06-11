@@ -1,6 +1,7 @@
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { exportToExcel } from '@/lib/excel'
+import { getDashboardStageLabel } from '@/components/dashboard/utils'
 
 export function exportDashboardExcel(data: any[]) {
   const total = data.length
@@ -122,7 +123,7 @@ export function exportDashboardExcel(data: any[]) {
         format(parseISO(c.created_at), 'dd/MM/yyyy HH:mm', { locale: ptBR }),
         c.lead_nome || c.nome || '',
         c.manychat_origens?.nome || c.origem || '',
-        c.current_stage || '',
+        getDashboardStageLabel(c.current_stage),
         c.valor || 0,
         c.sla_status || '',
         c.manychat_cancel_reasons?.motivo || '',

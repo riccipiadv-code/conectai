@@ -626,7 +626,7 @@ export default function Contacts() {
                     >
                       <TableCell className="w-[220px] max-w-[220px] pl-6 align-top py-3">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-slate-300">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-slate-300">
                             {c.controle || '-'}
                           </div>
                           <div className="flex flex-col whitespace-normal break-words overflow-hidden">
