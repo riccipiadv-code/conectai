@@ -111,6 +111,7 @@ export function ContactModal({
           telefone: '',
           lead_resumo: '',
           observacoes: '',
+          created_at: new Date().toISOString(),
         })
       }
     }
@@ -156,6 +157,7 @@ export function ContactModal({
       if (payload.servico_id === 'none') payload.servico_id = null
       if ((payload.depto_id as any) === '') payload.depto_id = null
       if ((payload.depto_id as any) === 'none') payload.depto_id = null
+      if (!payload.created_at) delete payload.created_at
       await onSave(
         payload,
         mode === 'create' ? undefined : contact?.id,
@@ -212,14 +214,18 @@ export function ContactModal({
             <div className="grid gap-2">
               <Label>Data Entrada</Label>
               <Input
+                type="datetime-local"
                 value={
                   formData.created_at
-                    ? format(new Date(formData.created_at), 'dd/MM/yyyy HH:mm')
+                    ? format(new Date(formData.created_at), "yyyy-MM-dd'T'HH:mm")
                     : ''
                 }
-                disabled
-                className="bg-slate-50 dark:bg-zinc-900"
-                placeholder={mode === 'create' ? 'Gerada automaticamente' : ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  handleChange('created_at', val ? new Date(val).toISOString() : null)
+                }}
+                disabled={isView}
+                className={cn(isView && 'bg-slate-50 dark:bg-zinc-900')}
               />
             </div>
             <div className="grid gap-2">

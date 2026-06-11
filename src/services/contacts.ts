@@ -99,6 +99,7 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
     'cancel_reason_id',
     'cancel_obs',
     'last_stage_change_at',
+    'created_at',
   ]
 
   const sanitized: Partial<Contact> = {}
