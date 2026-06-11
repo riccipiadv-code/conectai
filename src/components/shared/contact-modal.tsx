@@ -81,7 +81,6 @@ export function ContactModal({
       if (contact && mode !== 'create') {
         setFormData({
           ...contact,
-          nome: contact.nome || contact.lead_nome || contact.first_name || '',
           lead_nome: contact.lead_nome || contact.nome || contact.first_name || '',
           telefone: contact.telefone || contact.whatsapp_phone || '',
         })
@@ -97,7 +96,7 @@ export function ContactModal({
           origem_id: whatsappOrigem ? whatsappOrigem.id : null,
           current_stage: 'nivel_1_novo',
           sla_status: 'green',
-          nome: '',
+          lead_nome: '',
           responsavel_id: null,
           servico_id: null,
           depto_id: null,
@@ -255,8 +254,8 @@ export function ContactModal({
             <div className="grid gap-2">
               <Label>Nome do Contato</Label>
               <Input
-                value={formData.nome || formData.lead_nome || formData.first_name || ''}
-                onChange={(e) => handleChange('nome', e.target.value)}
+                value={formData.lead_nome || ''}
+                onChange={(e) => handleChange('lead_nome', e.target.value)}
                 disabled={isView}
               />
             </div>

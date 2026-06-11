@@ -168,6 +168,7 @@ export default function Contacts() {
     if (!searchTerm) return true
     const term = searchTerm.toLowerCase()
     return (
+      c.lead_nome?.toLowerCase().includes(term) ||
       c.nome?.toLowerCase().includes(term) ||
       c.first_name?.toLowerCase().includes(term) ||
       c.whatsapp_phone?.toLowerCase().includes(term) ||
@@ -605,7 +606,10 @@ export default function Contacts() {
                   const isOverdue = fupDate && isBefore(startOfDay(fupDate), startOfDay(new Date()))
 
                   const contactName =
-                    c.nome || `${c.first_name || ''} ${c.last_name || ''}`.trim() || 'Desconhecido'
+                    c.lead_nome ||
+                    c.nome ||
+                    `${c.first_name || ''} ${c.last_name || ''}`.trim() ||
+                    'Desconhecido'
                   const phone = formatPhone(c.whatsapp_phone || c.telefone)
                   const initials = contactName.substring(0, 2).toUpperCase()
 
@@ -770,7 +774,7 @@ export default function Contacts() {
             <AlertDialogDescription>
               Tem certeza que deseja excluir o contato{' '}
               <span className="font-semibold text-slate-900 dark:text-slate-100">
-                {deletingContact?.nome || deletingContact?.first_name}
+                {deletingContact?.lead_nome || deletingContact?.nome || deletingContact?.first_name}
               </span>
               ? Esta ação não poderá ser desfeita.
             </AlertDialogDescription>

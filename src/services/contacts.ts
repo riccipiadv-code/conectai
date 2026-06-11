@@ -239,7 +239,7 @@ export async function getContacts(
   if (filters.search) {
     const s = `%${filters.search}%`
     query = query.or(
-      `nome.ilike."${s}",lead_nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}"`,
+      `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}"`,
     )
   }
 
