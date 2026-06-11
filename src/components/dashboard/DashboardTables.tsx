@@ -8,7 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getStageLabel } from '@/constants/stages'
+import { getDashboardStageLabel } from './utils'
 
 export function DashboardTables({ data }: { data: any[] }) {
   const isApproved = (stage: string) => stage === 'orcamento_aprovado' || stage === 'concluido'
@@ -39,7 +39,7 @@ export function DashboardTables({ data }: { data: any[] }) {
   const estagios = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
-      const k = getStageLabel(c.current_stage)
+      const k = getDashboardStageLabel(c.current_stage)
       if (!map.has(k)) map.set(k, { name: k, count: 0 })
       map.get(k).count++
     })
