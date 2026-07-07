@@ -2,11 +2,18 @@ import { supabase } from '@/lib/supabase/client'
 import { startOfMonth, subMonths, startOfYear, endOfMonth, startOfDay, endOfDay } from 'date-fns'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 
+export const DEFAULT_ORIGIN_NAMES = ['Whatsapp', 'E-mail', 'Telefone']
+
+export function isDefaultOriginName(nome: string): boolean {
+  const lower = nome.toLowerCase()
+  return DEFAULT_ORIGIN_NAMES.some((name) => lower.includes(name.toLowerCase()))
+}
+
 export interface DashboardFilters {
   period: string
   dateFrom: Date | null
   dateTo: Date | null
-  origem_id: string
+  origens: number[]
   servico_id: string
   depto_id: string
   responsavel_id: string
@@ -54,8 +61,8 @@ export async function getDashboardData(filters: DashboardFilters) {
         .lte('created_at', filters.dateTo.toISOString())
     }
 
-    if (filters.origem_id && filters.origem_id !== 'all')
-      query = query.eq('origem_id', filters.origem_id)
+    if (filters.origens && filters.origens.length > 0)
+      query = query.in('origem_id', filters.origens)
     if (filters.servico_id) query = query.eq('servico_id', filters.servico_id)
     if (filters.depto_id) query = query.eq('depto_id', filters.depto_id)
     if (filters.responsavel_id) query = query.eq('responsavel_id', filters.responsavel_id)

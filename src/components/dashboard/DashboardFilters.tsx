@@ -7,7 +7,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { DashboardFilters as FiltersType } from '@/services/dashboard'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Checkbox } from '@/components/ui/checkbox'
+import { DashboardFilters as FiltersType, DEFAULT_ORIGIN_NAMES } from '@/services/dashboard'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 import { Search } from 'lucide-react'
 import { getDashboardStageLabel } from './utils'
@@ -74,22 +77,84 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
 
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold uppercase text-slate-500">Origem</Label>
-        <Select
-          value={filters.origem_id || 'all'}
-          onValueChange={(v) => update('origem_id', v === 'all' ? '' : v)}
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="Todas as Origens" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as Origens</SelectItem>
-            {meta.origens?.map((o: any) => (
-              <SelectItem key={o.id} value={String(o.id)}>
-                {o.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+            >
+              Origens ({filters.origens?.length || 0})
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0" align="start">
+            <div className="p-3 border-b border-slate-100 dark:border-zinc-800">
+              <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Origens</h4>
+            </div>
+            <div className="flex gap-2 p-2 bg-slate-50 dark:bg-zinc-900/50 border-b border-slate-100 dark:border-zinc-800">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
+                onClick={() => update('origens', meta.origens?.map((o: any) => o.id) || [])}
+              >
+                Selecionar todos
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
+                onClick={() => update('origens', [])}
+              >
+                Limpar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
+                onClick={() => {
+                  const defaults =
+                    meta.origens
+                      ?.filter((o: any) =>
+                        DEFAULT_ORIGIN_NAMES.some((name) =>
+                          o.nome?.toLowerCase().includes(name.toLowerCase()),
+                        ),
+                      )
+                      .map((o: any) => o.id) || []
+                  update('origens', defaults)
+                }}
+              >
+                Padrão
+              </Button>
+            </div>
+            <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
+              {meta.origens?.map((o: any) => (
+                <div key={o.id} className="flex items-center space-x-3 px-1">
+                  <Checkbox
+                    id={`origem-${o.id}`}
+                    checked={filters.origens?.includes(o.id)}
+                    onCheckedChange={(checked) => {
+                      const current = filters.origens || []
+                      if (checked) {
+                        update('origens', [...current, o.id])
+                      } else {
+                        update(
+                          'origens',
+                          current.filter((id: number) => id !== o.id),
+                        )
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor={`origem-${o.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none text-slate-700 dark:text-slate-300"
+                  >
+                    {o.nome}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="space-y-1.5">
