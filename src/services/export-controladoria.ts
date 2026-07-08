@@ -15,6 +15,7 @@ const B: ExcelCellStyle = { fontFamily: FT, fontSize: SZ, border: true, borderCo
 const HDR: ExcelCellStyle = { ...B, bold: true, bgColor: WH, alignment: 'center' }
 const TXT: ExcelCellStyle = { ...B, bgColor: WH, alignment: 'left' }
 const NUM: ExcelCellStyle = { ...B, bgColor: WH, alignment: 'right' }
+const NUMC: ExcelCellStyle = { ...B, bgColor: WH, alignment: 'center' }
 const CTR: ExcelCellStyle = { ...B, bgColor: WH, alignment: 'center' }
 const TL: ExcelCellStyle = { ...B, bold: true, bgColor: GR, alignment: 'left' }
 const TR: ExcelCellStyle = { ...B, bold: true, bgColor: GR, alignment: 'right' }
@@ -52,11 +53,12 @@ function sc(
 }
 
 const txt = (v: string | number | null): ExcelCell => sc(v ?? '', TXT)
-const num = (v: number): ExcelCell => sc(v, NUM, 'n')
+const num = (v: number): ExcelCell => sc(v, NUMC, 'n')
 const ctr = (v: string | number | null): ExcelCell => sc(v ?? '', CTR)
 const mon = (v: number): ExcelCell => sc(v, NUM, 'n', CUR)
 const dat = (s: string): ExcelCell => sc(parseISO(s), CTR, 'd', DT_F)
 const pct = (r: number): ExcelCell => sc(r, TC, 'n', PCT_F)
+const pctData = (r: number): ExcelCell => sc(r, NUMC, 'n', PCT_F)
 const pad16 = (r: CellValue[]): CellValue[] => {
   const c = [...r]
   while (c.length < 16) c.push(sc('', SEP))
@@ -83,9 +85,9 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
   const rows: CellValue[][] = []
 
   for (let i = 0; i < maxR; i++) {
-    const r1 = b1[i] || Array.from({ length: 5 }, () => sc('', TXT))
-    const r2 = b2[i] || Array.from({ length: 5 }, () => sc('', TXT))
-    const r3 = b3[i] || Array.from({ length: 4 }, () => sc('', TXT))
+    const r1 = b1[i] || Array.from({ length: 5 }, () => sc('', SEP))
+    const r2 = b2[i] || Array.from({ length: 5 }, () => sc('', SEP))
+    const r3 = b3[i] || Array.from({ length: 4 }, () => sc('', SEP))
     rows.push([...r1, sc('', SEP), ...r2, sc('', SEP), ...r3])
   }
   while (rows.length < 11) {
@@ -145,17 +147,17 @@ function resumoMes(data: any[]): CellValue[][] {
     })
   rows.push([
     sc('Total Geral', TL),
-    sc(gMC, TR, 'n'),
-    sc(gER, TR, 'n'),
-    sc(gTel, TR, 'n'),
-    sc(gT, TR, 'n'),
+    sc(gMC, TC, 'n'),
+    sc(gER, TC, 'n'),
+    sc(gTel, TC, 'n'),
+    sc(gT, TC, 'n'),
   ])
   rows.push([
     sc('Participação %', TL),
     gT ? pct(gMC / gT) : pct(0),
     gT ? pct(gER / gT) : pct(0),
     gT ? pct(gTel / gT) : pct(0),
-    sc('', TR),
+    sc('', TC),
   ])
   return rows
 }
@@ -193,17 +195,17 @@ function convOrigem(data: any[]): CellValue[][] {
   })
   rows.push([
     sc('Total Geral', TL),
-    sc(cA, TR, 'n'),
-    sc(cN, TR, 'n'),
-    sc(cP, TR, 'n'),
-    sc(cT, TR, 'n'),
+    sc(cA, TC, 'n'),
+    sc(cN, TC, 'n'),
+    sc(cP, TC, 'n'),
+    sc(cT, TC, 'n'),
   ])
   rows.push([
     sc('Participação %', TL),
     cT ? pct(cA / cT) : pct(0),
     cT ? pct(cN / cT) : pct(0),
     cT ? pct(cP / cT) : pct(0),
-    sc('', TR),
+    sc('', TC),
   ])
   return rows
 }
@@ -225,12 +227,12 @@ function convArea(data: any[]): CellValue[][] {
   Array.from(am.entries()).forEach(([a, v]) => {
     tS += v.sol
     tF += v.fech
-    rows.push([txt(a), num(v.sol), num(v.fech), v.sol ? pct(v.fech / v.sol) : pct(0)])
+    rows.push([txt(a), num(v.sol), num(v.fech), v.sol ? pctData(v.fech / v.sol) : pctData(0)])
   })
   rows.push([
     sc('Total', TL),
-    sc(tS, TR, 'n'),
-    sc(tF, TR, 'n'),
+    sc(tS, TC, 'n'),
+    sc(tF, TC, 'n'),
     tS ? sc(tF / tS, TC, 'n', PCT_F) : sc(0, TC, 'n', PCT_F),
   ])
   return rows
@@ -239,7 +241,7 @@ function convArea(data: any[]): CellValue[][] {
 function detalheFechados(data: any[], rows: CellValue[][]) {
   rows.push(
     pad16([
-      sc('', LHDR),
+      sc('Sequencial', LHDR),
       sc('Origem', LHDR),
       sc('Data', LHDR),
       sc('Contato', LHDR),
