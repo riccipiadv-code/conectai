@@ -1,9 +1,17 @@
 import * as XLSX from 'xlsx'
 
+export interface ExcelCellStyle {
+  bold?: boolean
+  bgColor?: string
+  fontSize?: number
+  alignment?: 'left' | 'center' | 'right'
+}
+
 export interface ExcelCell {
   value: string | number | Date | boolean | null
   fmt?: string
   type?: 's' | 'n' | 'd' | 'b'
+  style?: ExcelCellStyle
 }
 
 export type CellValue = ExcelCell | string | number | Date | boolean | null
@@ -45,6 +53,21 @@ function normalizeCell(cell: CellValue): any {
           : 's')
   const result: any = { t: inferredType, v: ec.value }
   if (ec.fmt) result.z = ec.fmt
+  if (ec.style) {
+    const s: any = {}
+    if (ec.style.bold || ec.style.fontSize) {
+      s.font = {}
+      if (ec.style.bold) s.font.bold = true
+      if (ec.style.fontSize) s.font.sz = ec.style.fontSize
+    }
+    if (ec.style.bgColor) {
+      s.fill = { patternType: 'solid', fgColor: { rgb: ec.style.bgColor } }
+    }
+    if (ec.style.alignment) {
+      s.alignment = { horizontal: ec.style.alignment }
+    }
+    if (Object.keys(s).length > 0) result.s = s
+  }
   return result
 }
 
@@ -80,5 +103,5 @@ export function exportToExcel(sheets: ExcelSheet[], filename: string) {
     XLSX.utils.book_append_sheet(wb, ws, cleanName)
   })
 
-  XLSX.writeFile(wb, filename, { cellDates: true, bookType: 'xlsx' })
+  XLSX.writeFile(wb, filename, { cellDates: true, bookType: 'xlsx', cellStyles: true })
 }

@@ -1,6 +1,7 @@
 import { format, parseISO } from 'date-fns'
 import { exportToExcel, type ExcelCell, type CellValue, type ExcelSheet } from '@/lib/excel'
 import { getDashboardStageLabel } from '@/components/dashboard/utils'
+import { buildControladoriaSheet } from '@/services/export-controladoria'
 
 const CURRENCY_FMT = '"R$" #,##0.00'
 const PERCENT_FMT = '0.00%'
@@ -157,8 +158,19 @@ export function exportDashboardExcel(data: any[]) {
     ],
   }
 
+  const controladoriaSheet = buildControladoriaSheet(data)
+
   exportToExcel(
-    [resumoSheet, monthSheet, originSheet, serviceSheet, agentSheet, cancelSheet, baseSheet],
+    [
+      controladoriaSheet,
+      resumoSheet,
+      monthSheet,
+      originSheet,
+      serviceSheet,
+      agentSheet,
+      cancelSheet,
+      baseSheet,
+    ],
     `dashboard-manyskip-${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
   )
 }
