@@ -22,6 +22,26 @@ const TR: ExcelCellStyle = { ...B, bold: true, bgColor: GR, alignment: 'right' }
 const TC: ExcelCellStyle = { ...B, bold: true, bgColor: GR, alignment: 'center' }
 const LHDR: ExcelCellStyle = { ...B, bold: true, bgColor: YL, alignment: 'center' }
 const SEP: ExcelCellStyle = { fontFamily: FT, fontSize: SZ, bgColor: WH }
+const TOT_LBL: ExcelCellStyle = {
+  fontFamily: FT,
+  fontSize: SZ,
+  bold: true,
+  bgColor: WH,
+  alignment: 'center',
+  borderTop: true,
+  borderBottom: true,
+  borderColor: BL,
+}
+const TOT_VAL: ExcelCellStyle = {
+  fontFamily: FT,
+  fontSize: SZ,
+  bold: true,
+  bgColor: WH,
+  alignment: 'right',
+  borderTop: true,
+  borderBottom: true,
+  borderColor: BL,
+}
 
 const APR = 'orcamento_aprovado',
   CAN = 'cancelado'
@@ -90,16 +110,15 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
     const r3 = b3[i] || Array.from({ length: 4 }, () => sc('', SEP))
     rows.push([...r1, sc('', SEP), ...r2, sc('', SEP), ...r3])
   }
-  while (rows.length < 11) {
-    rows.push(Array.from({ length: 16 }, () => sc('', SEP)))
-  }
+  rows.push(Array.from({ length: 16 }, () => sc('', SEP)))
 
   detalheFechados(data, rows)
 
-  const rh = rows.map((_, i) => (i === 0 ? 30 : i === 11 ? 24 : 16))
+  const detailHeaderRow = maxR + 1
+  const rh = rows.map((_, i) => (i === 0 ? 30 : i === detailHeaderRow ? 24 : 16))
   return {
     name: 'Controladoria',
-    colWidths: [9, 10, 12, 33, 19, 12, 12, 19, 49, 10, 10, 7, 11, 14, 10, 8],
+    colWidths: [9, 10, 12, 33, 22, 12, 18, 16, 18, 12, 10, 4, 18, 14, 10, 8],
     data: rows,
     rowHeights: rh,
     merges: [],
@@ -249,7 +268,7 @@ function detalheFechados(data: any[], rows: CellValue[][]) {
       sc('Porte Empresa', LHDR),
       sc('Nº Cliente', LHDR),
       sc('Valor Faturado', LHDR),
-      sc('Resp', LHDR),
+      sc('Responsável', LHDR),
       sc('Depto.', LHDR),
     ]),
   )
@@ -277,16 +296,16 @@ function detalheFechados(data: any[], rows: CellValue[][]) {
 
   rows.push(
     pad16([
-      sc('', TL),
-      sc('', TL),
-      sc('', TL),
-      sc('Total', TL),
-      sc('', TL),
-      sc('', TL),
-      sc('', TL),
-      sc(tv, TR, 'n', CUR),
-      sc('', TL),
-      sc('', TL),
+      sc('', SEP),
+      sc('', SEP),
+      sc('', SEP),
+      sc('', SEP),
+      sc('', SEP),
+      sc('', SEP),
+      sc('Total', TOT_LBL),
+      sc(tv, TOT_VAL, 'n', CUR),
+      sc('', SEP),
+      sc('', SEP),
     ]),
   )
 }

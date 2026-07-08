@@ -8,6 +8,10 @@ export interface ExcelCellStyle {
   alignment?: 'left' | 'center' | 'right'
   border?: boolean
   borderColor?: string
+  borderTop?: boolean
+  borderBottom?: boolean
+  borderLeft?: boolean
+  borderRight?: boolean
 }
 
 export interface ExcelCell {
@@ -72,10 +76,20 @@ function normalizeCell(cell: CellValue): any {
     if (ec.style.alignment) {
       s.alignment = { horizontal: ec.style.alignment }
     }
-    if (ec.style.border) {
+    const hasAnyBorder =
+      ec.style.border ||
+      ec.style.borderTop ||
+      ec.style.borderBottom ||
+      ec.style.borderLeft ||
+      ec.style.borderRight
+    if (hasAnyBorder) {
       const bColor = ec.style.borderColor || '000000'
-      const border = { style: 'thin' as const, color: { rgb: bColor } }
-      s.border = { top: border, bottom: border, left: border, right: border }
+      const thin = { style: 'thin' as const, color: { rgb: bColor } }
+      s.border = {}
+      if (ec.style.border || ec.style.borderTop) s.border.top = thin
+      if (ec.style.border || ec.style.borderBottom) s.border.bottom = thin
+      if (ec.style.border || ec.style.borderLeft) s.border.left = thin
+      if (ec.style.border || ec.style.borderRight) s.border.right = thin
     }
     if (Object.keys(s).length > 0) result.s = s
   }
