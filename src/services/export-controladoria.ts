@@ -4,21 +4,50 @@ import type { ExcelCell, ExcelCellStyle, CellValue, ExcelSheet } from '@/lib/exc
 const CURRENCY_FMT = '"R$" #,##0.00'
 const PERCENT_FMT = '0.00%'
 const DATE_FMT = 'dd/mm/yyyy'
+const BORDER_COLOR = '8EAADB'
 
-const HEADER_STYLE: ExcelCellStyle = { bold: true, bgColor: '4472C4', alignment: 'center' }
-const TOTAL_STYLE: ExcelCellStyle = { bold: true, bgColor: 'D9E2F3' }
+const HEADER_STYLE: ExcelCellStyle = {
+  bold: true,
+  bgColor: '4472C4',
+  alignment: 'center',
+  border: true,
+  borderColor: BORDER_COLOR,
+}
 const TITLE_STYLE: ExcelCellStyle = {
   bold: true,
   bgColor: '1F4E79',
   alignment: 'center',
   fontSize: 14,
 }
-const SECTION_STYLE: ExcelCellStyle = { bold: true, bgColor: '8EAADB' }
-const PCT_STYLE: ExcelCellStyle = { bold: true }
+const SECTION_STYLE: ExcelCellStyle = {
+  bold: true,
+  bgColor: '8EAADB',
+  alignment: 'center',
+  border: true,
+  borderColor: BORDER_COLOR,
+}
+const TOTAL_BASE: ExcelCellStyle = {
+  bold: true,
+  bgColor: 'D9E2F3',
+  border: true,
+  borderColor: BORDER_COLOR,
+}
+const TOTAL_LEFT: ExcelCellStyle = { ...TOTAL_BASE, alignment: 'left' }
+const TOTAL_RIGHT: ExcelCellStyle = { ...TOTAL_BASE, alignment: 'right' }
+const TOTAL_CENTER: ExcelCellStyle = { ...TOTAL_BASE, alignment: 'center' }
+const TEXT_LEFT: ExcelCellStyle = { alignment: 'left', border: true, borderColor: BORDER_COLOR }
+const NUM_RIGHT: ExcelCellStyle = { alignment: 'right', border: true, borderColor: BORDER_COLOR }
+const CENTER: ExcelCellStyle = { alignment: 'center', border: true, borderColor: BORDER_COLOR }
+const PCT_CENTER: ExcelCellStyle = {
+  bold: true,
+  alignment: 'center',
+  border: true,
+  borderColor: BORDER_COLOR,
+}
+const EMPTY_BD: ExcelCellStyle = { border: true, borderColor: BORDER_COLOR }
 
 const STAGE_APROVADO = 'orcamento_aprovado'
 const STAGE_CANCELADO = 'cancelado'
-
 const MONTH_NAMES_BR = [
   'Janeiro',
   'Fevereiro',
@@ -34,11 +63,6 @@ const MONTH_NAMES_BR = [
   'Dezembro',
 ]
 
-function formatMonthBR(key: string): string {
-  const [mm, yyyy] = key.split('/')
-  return `${MONTH_NAMES_BR[Number(mm) - 1]}/${yyyy}`
-}
-
 function sc(
   value: string | number | Date | null,
   style: ExcelCellStyle,
@@ -51,6 +75,21 @@ function sc(
   return cell
 }
 
+const eb = (): ExcelCell => sc('', EMPTY_BD)
+const txt = (v: string | number | null): ExcelCell => sc(v ?? '', TEXT_LEFT)
+const num = (v: number): ExcelCell => sc(v, NUM_RIGHT, 'n')
+const ctr = (v: string | number | null): ExcelCell => sc(v ?? '', CENTER)
+const mon = (v: number): ExcelCell => sc(v, NUM_RIGHT, 'n', CURRENCY_FMT)
+const dat = (s: string): ExcelCell => sc(parseISO(s), CENTER, 'd', DATE_FMT)
+const pct = (r: number): ExcelCell => sc(r, PCT_CENTER, 'n', PERCENT_FMT)
+const secRow = (title: string, w: number): ExcelCell[] =>
+  Array.from({ length: w }, (_, i) => sc(i === 0 ? title : '', SECTION_STYLE))
+
+function formatMonthBR(key: string): string {
+  const [mm, yyyy] = key.split('/')
+  return `${MONTH_NAMES_BR[Number(mm) - 1]}/${yyyy}`
+}
+
 function categorizeOrigin(originName: string): string {
   const lower = (originName || '').toLowerCase().replace(/[-\s]/g, '')
   if (lower.includes('whatsapp') || lower.includes('manychat')) return 'ManyChat'
@@ -59,72 +98,52 @@ function categorizeOrigin(originName: string): string {
   return 'ManyChat'
 }
 
-function pctCell(ratio: number): ExcelCell {
-  return sc(ratio, PCT_STYLE, 'n', PERCENT_FMT)
-}
-
 function padBlock(block: CellValue[][], width: number): CellValue[][] {
   return block.map((row) => {
     const padded = [...row]
-    while (padded.length < width) padded.push('')
+    while (padded.length < width) padded.push(eb())
     return padded
   })
 }
 
 export function buildControladoriaSheet(data: any[]): ExcelSheet {
-  const block1 = buildResumoMesOrigem(data)
-  const block2 = buildConversaoOrigem(data)
-  const block3 = buildConversaoArea(data)
-
-  const W1 = 5,
-    W2 = 5,
-    W3 = 4
-  const b1 = padBlock(block1, W1)
-  const b2 = padBlock(block2, W2)
-  const b3 = padBlock(block3, W3)
+  const b1 = padBlock(buildResumoMesOrigem(data), 5)
+  const b2 = padBlock(buildConversaoOrigem(data), 5)
+  const b3 = padBlock(buildConversaoArea(data), 4)
   const maxRows = Math.max(b1.length, b2.length, b3.length)
 
   const rows: CellValue[][] = []
-  rows.push([
-    sc('CONTROLADORIA', TITLE_STYLE),
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-    '',
-  ])
-  rows.push([])
+  rows.push(Array.from({ length: 16 }, (_, i) => sc(i === 0 ? 'CONTROLADORIA' : '', TITLE_STYLE)))
 
   for (let i = 0; i < maxRows; i++) {
-    const r1 = b1[i] || Array(W1).fill('')
-    const r2 = b2[i] || Array(W2).fill('')
-    const r3 = b3[i] || Array(W3).fill('')
+    const r1 = b1[i] || Array.from({ length: 5 }, () => eb())
+    const r2 = b2[i] || Array.from({ length: 5 }, () => eb())
+    const r3 = b3[i] || Array.from({ length: 4 }, () => eb())
     rows.push([...r1, '', ...r2, '', ...r3])
   }
 
   rows.push([])
   buildDetalheFechados(data, rows)
 
+  const rowHeights = rows.map((_, i) => (i === 0 ? 30 : i === 1 || i === 2 ? 22 : 20))
+
   return {
     name: 'Controladoria',
-    colWidths: [8, 18, 14, 22, 18, 14, 12, 16, 30, 22, 22, 3, 22, 18, 10, 8],
+    colWidths: [8, 14, 12, 24, 22, 12, 10, 14, 24, 22, 10, 3, 22, 14, 10, 8],
     data: rows,
+    rowHeights,
+    merges: [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 15 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+      { s: { r: 1, c: 6 }, e: { r: 1, c: 10 } },
+      { s: { r: 1, c: 12 }, e: { r: 1, c: 15 } },
+    ],
   }
 }
 
 function buildResumoMesOrigem(data: any[]): CellValue[][] {
   const rows: CellValue[][] = []
-  rows.push([sc('RESUMO POR MÊS E ORIGEM', SECTION_STYLE), '', '', '', ''])
+  rows.push(secRow('RESUMO POR MÊS E ORIGEM', 5))
   rows.push([
     sc('Mês', HEADER_STYLE),
     sc('ManyChat', HEADER_STYLE),
@@ -161,27 +180,30 @@ function buildResumoMesOrigem(data: any[]): CellValue[][] {
       gER += v.er
       gTel += v.tel
       gTotal += v.total
-      rows.push([formatMonthBR(m), v.mc, v.er, v.tel, v.total])
+      rows.push([txt(formatMonthBR(m)), num(v.mc), num(v.er), num(v.tel), num(v.total)])
     })
+
   rows.push([
-    sc('Total Geral', TOTAL_STYLE),
-    sc(gMC, TOTAL_STYLE, 'n'),
-    sc(gER, TOTAL_STYLE, 'n'),
-    sc(gTel, TOTAL_STYLE, 'n'),
-    sc(gTotal, TOTAL_STYLE, 'n'),
+    sc('Total Geral', TOTAL_LEFT),
+    sc(gMC, TOTAL_RIGHT, 'n'),
+    sc(gER, TOTAL_RIGHT, 'n'),
+    sc(gTel, TOTAL_RIGHT, 'n'),
+    sc(gTotal, TOTAL_RIGHT, 'n'),
   ])
-  rows.push([])
-  rows.push([sc('Participação por Origem', SECTION_STYLE), '', '', '', ''])
-  rows.push([sc('ManyChat', PCT_STYLE), gTotal ? pctCell(gMC / gTotal) : pctCell(0), '', '', ''])
-  rows.push([sc('Email Ricci', PCT_STYLE), gTotal ? pctCell(gER / gTotal) : pctCell(0), '', '', ''])
-  rows.push([sc('Telefone', PCT_STYLE), gTotal ? pctCell(gTel / gTotal) : pctCell(0), '', '', ''])
+  rows.push([
+    sc('Participação %', TOTAL_LEFT),
+    gTotal ? pct(gMC / gTotal) : pct(0),
+    gTotal ? pct(gER / gTotal) : pct(0),
+    gTotal ? pct(gTel / gTotal) : pct(0),
+    eb(),
+  ])
 
   return rows
 }
 
 function buildConversaoOrigem(data: any[]): CellValue[][] {
   const rows: CellValue[][] = []
-  rows.push([sc('CONVERSÃO POR ORIGEM', SECTION_STYLE), '', '', '', ''])
+  rows.push(secRow('CONVERSÃO POR ORIGEM', 5))
   rows.push([
     sc('Origem', HEADER_STYLE),
     sc('Autorizado', HEADER_STYLE),
@@ -213,36 +235,22 @@ function buildConversaoOrigem(data: any[]): CellValue[][] {
     cNotAuth += v.notAuth
     cPend += v.pend
     cTotal += v.total
-    rows.push([o, v.auth, v.notAuth, v.pend, v.total])
+    rows.push([txt(o), num(v.auth), num(v.notAuth), num(v.pend), num(v.total)])
   })
+
   rows.push([
-    sc('Total Geral', TOTAL_STYLE),
-    sc(cAuth, TOTAL_STYLE, 'n'),
-    sc(cNotAuth, TOTAL_STYLE, 'n'),
-    sc(cPend, TOTAL_STYLE, 'n'),
-    sc(cTotal, TOTAL_STYLE, 'n'),
-  ])
-  rows.push([])
-  rows.push([
-    sc('% Autorizado', PCT_STYLE),
-    cTotal ? pctCell(cAuth / cTotal) : pctCell(0),
-    '',
-    '',
-    '',
+    sc('Total Geral', TOTAL_LEFT),
+    sc(cAuth, TOTAL_RIGHT, 'n'),
+    sc(cNotAuth, TOTAL_RIGHT, 'n'),
+    sc(cPend, TOTAL_RIGHT, 'n'),
+    sc(cTotal, TOTAL_RIGHT, 'n'),
   ])
   rows.push([
-    sc('% Não Autorizado', PCT_STYLE),
-    cTotal ? pctCell(cNotAuth / cTotal) : pctCell(0),
-    '',
-    '',
-    '',
-  ])
-  rows.push([
-    sc('% Pendente', PCT_STYLE),
-    cTotal ? pctCell(cPend / cTotal) : pctCell(0),
-    '',
-    '',
-    '',
+    sc('Participação %', TOTAL_LEFT),
+    cTotal ? pct(cAuth / cTotal) : pct(0),
+    cTotal ? pct(cNotAuth / cTotal) : pct(0),
+    cTotal ? pct(cPend / cTotal) : pct(0),
+    eb(),
   ])
 
   return rows
@@ -250,10 +258,10 @@ function buildConversaoOrigem(data: any[]): CellValue[][] {
 
 function buildConversaoArea(data: any[]): CellValue[][] {
   const rows: CellValue[][] = []
-  rows.push([sc('CONVERSÃO POR ÁREA', SECTION_STYLE), '', '', ''])
+  rows.push(secRow('CONVERSÃO POR ÁREA', 4))
   rows.push([
     sc('Área', HEADER_STYLE),
-    sc('Orçamentos Solicitados', HEADER_STYLE),
+    sc('Solicitados', HEADER_STYLE),
     sc('Fechado', HEADER_STYLE),
     sc('%', HEADER_STYLE),
   ])
@@ -272,13 +280,14 @@ function buildConversaoArea(data: any[]): CellValue[][] {
   Array.from(areaMap.entries()).forEach(([a, v]) => {
     tSol += v.sol
     tFech += v.fech
-    rows.push([a, v.sol, v.fech, v.sol ? pctCell(v.fech / v.sol) : pctCell(0)])
+    rows.push([txt(a), num(v.sol), num(v.fech), v.sol ? pct(v.fech / v.sol) : pct(0)])
   })
+
   rows.push([
-    sc('Total', TOTAL_STYLE),
-    sc(tSol, TOTAL_STYLE, 'n'),
-    sc(tFech, TOTAL_STYLE, 'n'),
-    tSol ? sc(tFech / tSol, TOTAL_STYLE, 'n', PERCENT_FMT) : sc(0, TOTAL_STYLE, 'n', PERCENT_FMT),
+    sc('Total', TOTAL_LEFT),
+    sc(tSol, TOTAL_RIGHT, 'n'),
+    sc(tFech, TOTAL_RIGHT, 'n'),
+    tSol ? sc(tFech / tSol, TOTAL_CENTER, 'n', PERCENT_FMT) : sc(0, TOTAL_CENTER, 'n', PERCENT_FMT),
   ])
 
   return rows
@@ -294,7 +303,6 @@ function buildDetalheFechados(data: any[], rows: CellValue[][]) {
     sc('Porte Empresa', HEADER_STYLE),
     sc('Nº Cliente', HEADER_STYLE),
     sc('Valor Faturado', HEADER_STYLE),
-    sc('Resumo', HEADER_STYLE),
     sc('Responsável', HEADER_STYLE),
     sc('Departamento', HEADER_STYLE),
   ])
@@ -305,30 +313,29 @@ function buildDetalheFechados(data: any[], rows: CellValue[][]) {
     const valor = Number(c.valor) || 0
     totalValor += valor
     rows.push([
-      i + 1,
-      c.manychat_origens?.nome || c.origem || '',
-      { value: parseISO(c.created_at), type: 'd', fmt: DATE_FMT },
-      c.lead_nome_exibicao || c.lead_nome || c.nome || '',
-      c.empresa_pf || c.lead_empresa_pf || '',
-      c.porte_empresa || '',
-      c.numero_cliente ?? '',
-      { value: valor, type: 'n', fmt: CURRENCY_FMT },
-      c.lead_resumo || '',
-      c.responsavel_nome || c.legaldesk_usuarios?.nome || '',
-      c.departamento || c.manychat_deptos?.nome || '',
+      ctr(i + 1),
+      txt(c.manychat_origens?.nome || c.origem || ''),
+      dat(c.created_at),
+      txt(c.lead_nome_exibicao || c.lead_nome || c.nome || ''),
+      txt(c.empresa_pf || c.lead_empresa_pf || ''),
+      txt(c.porte_empresa || ''),
+      ctr(c.numero_cliente ?? ''),
+      mon(valor),
+      txt(c.responsavel_nome || c.legaldesk_usuarios?.nome || ''),
+      txt(c.departamento || c.manychat_deptos?.nome || ''),
     ])
   })
+
   rows.push([
-    sc('', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
-    sc('Total', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
-    sc(totalValor, TOTAL_STYLE, 'n', CURRENCY_FMT),
-    sc('', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
-    sc('', TOTAL_STYLE),
+    sc('', TOTAL_BASE),
+    sc('', TOTAL_BASE),
+    sc('', TOTAL_BASE),
+    sc('Total', TOTAL_LEFT),
+    sc('', TOTAL_BASE),
+    sc('', TOTAL_BASE),
+    sc('', TOTAL_BASE),
+    sc(totalValor, TOTAL_RIGHT, 'n', CURRENCY_FMT),
+    sc('', TOTAL_BASE),
+    sc('', TOTAL_BASE),
   ])
 }

@@ -5,6 +5,8 @@ export interface ExcelCellStyle {
   bgColor?: string
   fontSize?: number
   alignment?: 'left' | 'center' | 'right'
+  border?: boolean
+  borderColor?: string
 }
 
 export interface ExcelCell {
@@ -20,6 +22,8 @@ export interface ExcelSheet {
   name: string
   data: CellValue[][]
   colWidths?: number[]
+  rowHeights?: number[]
+  merges?: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }>
 }
 
 function normalizeCell(cell: CellValue): any {
@@ -66,6 +70,11 @@ function normalizeCell(cell: CellValue): any {
     if (ec.style.alignment) {
       s.alignment = { horizontal: ec.style.alignment }
     }
+    if (ec.style.border) {
+      const bColor = ec.style.borderColor || '000000'
+      const border = { style: 'thin' as const, color: { rgb: bColor } }
+      s.border = { top: border, bottom: border, left: border, right: border }
+    }
     if (Object.keys(s).length > 0) result.s = s
   }
   return result
@@ -100,6 +109,12 @@ export function exportToExcel(sheets: ExcelSheet[], filename: string) {
   sheets.forEach((sheet) => {
     const cleanName = sheet.name.replace(/[\\/?*[\]]/g, '').substring(0, 31)
     const ws = buildWorksheet(sheet.data, sheet.colWidths)
+    if (sheet.rowHeights) {
+      ws['!rows'] = sheet.rowHeights.map((h) => ({ hpt: h }))
+    }
+    if (sheet.merges) {
+      ws['!merges'] = sheet.merges
+    }
     XLSX.utils.book_append_sheet(wb, ws, cleanName)
   })
 
