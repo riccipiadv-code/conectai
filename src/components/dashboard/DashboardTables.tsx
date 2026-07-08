@@ -8,10 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getDashboardStageLabel, DASHBOARD_ALLOWED_STAGES } from './utils'
+import { getDashboardStageLabel, DASHBOARD_ALLOWED_STAGES, isFechado } from './utils'
 
 export function DashboardTables({ data }: { data: any[] }) {
-  const isApproved = (stage: string) => stage === 'orcamento_aprovado'
   const isCancelled = (stage: string) => stage === 'cancelado'
 
   const aggregateBy = (key: string, label: string) => {
@@ -21,7 +20,7 @@ export function DashboardTables({ data }: { data: any[] }) {
       if (!map.has(k)) map.set(k, { name: k, requested: 0, approved: 0, cancelled: 0, valor: 0 })
       const item = map.get(k)
       item.requested++
-      if (isApproved(c.current_stage)) item.approved++
+      if (isFechado(c)) item.approved++
       if (isCancelled(c.current_stage)) item.cancelled++
       item.valor += Number(c.valor) || 0
     })

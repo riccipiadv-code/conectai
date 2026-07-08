@@ -9,12 +9,13 @@ import {
   AlertTriangle,
   TrendingDown,
 } from 'lucide-react'
+import { isFechado } from './utils'
 
 export function DashboardKPIs({ data }: { data: any[] }) {
   const total = data.length
   const withBudget = data.filter((c) => c.orcamento || Number(c.valor) > 0).length
 
-  const approved = data.filter((c) => c.current_stage === 'orcamento_aprovado').length
+  const approved = data.filter((c) => isFechado(c)).length
   const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
 
   const approvalRate = total > 0 ? (approved / total) * 100 : 0

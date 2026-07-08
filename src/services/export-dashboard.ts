@@ -1,6 +1,6 @@
 import { format, parseISO } from 'date-fns'
 import { exportToExcel, type ExcelCell, type CellValue, type ExcelSheet } from '@/lib/excel'
-import { getDashboardStageLabel } from '@/components/dashboard/utils'
+import { getDashboardStageLabel, isFechado } from '@/components/dashboard/utils'
 import { buildControladoriaSheet } from '@/services/export-controladoria'
 
 const CURRENCY_FMT = '"R$" #,##0.00'
@@ -21,7 +21,7 @@ function dateCell(dateStr: string): ExcelCell {
 
 export function exportDashboardExcel(data: any[]) {
   const total = data.length
-  const approved = data.filter((c) => c.current_stage === 'orcamento_aprovado').length
+  const approved = data.filter((c) => isFechado(c)).length
   const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
   const approvalRate = total > 0 ? approved / total : 0
   const totalValue = data.reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
@@ -45,7 +45,7 @@ export function exportDashboardExcel(data: any[]) {
     if (!monthMap.has(m)) monthMap.set(m, { requested: 0, approved: 0, cancelled: 0 })
     const item = monthMap.get(m)!
     item.requested++
-    if (c.current_stage === 'orcamento_aprovado') item.approved++
+    if (isFechado(c)) item.approved++
     if (c.current_stage === 'cancelado') item.cancelled++
   })
   const monthSheet: ExcelSheet = {
@@ -69,7 +69,7 @@ export function exportDashboardExcel(data: any[]) {
     if (!originMap.has(o)) originMap.set(o, { requested: 0, approved: 0, cancelled: 0 })
     const item = originMap.get(o)!
     item.requested++
-    if (c.current_stage === 'orcamento_aprovado') item.approved++
+    if (isFechado(c)) item.approved++
     if (c.current_stage === 'cancelado') item.cancelled++
   })
   const originSheet: ExcelSheet = {
@@ -114,7 +114,7 @@ export function exportDashboardExcel(data: any[]) {
     if (!agentMap.has(a)) agentMap.set(a, { count: 0, approved: 0 })
     const item = agentMap.get(a)!
     item.count++
-    if (c.current_stage === 'orcamento_aprovado') item.approved++
+    if (isFechado(c)) item.approved++
   })
   const agentSheet: ExcelSheet = {
     name: 'Por responsável',

@@ -22,3 +22,7 @@ export const getDashboardStageLabel = (stageId: string | null | undefined): stri
   if (!stageId) return 'Sem Estágio'
   return DASHBOARD_STAGE_LABELS[stageId] || stageId
 }
+
+export const isFechado = (contact: any): boolean => {
+  return Number(contact?.valor) > 0
+}

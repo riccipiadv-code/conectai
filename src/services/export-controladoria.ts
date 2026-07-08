@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns'
 import type { ExcelCell, ExcelCellStyle, CellValue, ExcelSheet } from '@/lib/excel'
+import { isFechado } from '@/components/dashboard/utils'
 
 const BL = '000000',
   WH = 'FFFFFF',
@@ -43,8 +44,7 @@ const TOT_VAL: ExcelCellStyle = {
   borderColor: BL,
 }
 
-const APR = 'orcamento_aprovado',
-  CAN = 'cancelado'
+const CAN = 'cancelado'
 const MES = [
   'Janeiro',
   'Fevereiro',
@@ -196,7 +196,7 @@ function convOrigem(data: any[]): CellValue[][] {
     const o = c.manychat_origens?.nome || c.origem || 'Não informada'
     if (!om.has(o)) om.set(o, { auth: 0, na: 0, pend: 0, total: 0 })
     const it = om.get(o)!
-    if (c.current_stage === APR) it.auth++
+    if (isFechado(c)) it.auth++
     else if (c.current_stage === CAN) it.na++
     else it.pend++
     it.total++
@@ -239,7 +239,7 @@ function convArea(data: any[]): CellValue[][] {
     if (!am.has(a)) am.set(a, { sol: 0, fech: 0 })
     const it = am.get(a)!
     it.sol++
-    if (c.current_stage === APR) it.fech++
+    if (isFechado(c)) it.fech++
   })
   let tS = 0,
     tF = 0
