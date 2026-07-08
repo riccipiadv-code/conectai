@@ -240,9 +240,16 @@ export async function getContacts(
 
   if (filters.search) {
     const s = `%${filters.search}%`
-    query = query.or(
-      `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}"`,
-    )
+    const numericSearch = filters.search.replace(/[^0-9]/g, '')
+    if (numericSearch) {
+      query = query.or(
+        `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}",numero_cliente.eq.${numericSearch}`,
+      )
+    } else {
+      query = query.or(
+        `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}"`,
+      )
+    }
   }
 
   if (filters.responsavel_id && filters.responsavel_id !== 'all')

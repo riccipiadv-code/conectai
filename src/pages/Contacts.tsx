@@ -172,7 +172,8 @@ export default function Contacts() {
       c.first_name?.toLowerCase().includes(term) ||
       c.whatsapp_phone?.toLowerCase().includes(term) ||
       c.telefone?.toLowerCase().includes(term) ||
-      c.lead_empresa_pf?.toLowerCase().includes(term)
+      c.lead_empresa_pf?.toLowerCase().includes(term) ||
+      (c.numero_cliente != null && String(c.numero_cliente).includes(term))
     )
   })
 
