@@ -285,7 +285,7 @@ function detalheFechados(data: any[], rows: CellValue[][]) {
         dat(c.created_at),
         txt(c.lead_nome_exibicao || c.lead_nome || c.nome || ''),
         txt(c.empresa_pf || c.lead_empresa_pf || ''),
-        txt(c.porte_empresa || ''),
+        txt(c.manychat_portes_empresa?.nome || c.porte_empresa || ''),
         ctr(c.numero_cliente ?? ''),
         mon(v),
         txt(c.responsavel_nome || c.legaldesk_usuarios?.nome || ''),

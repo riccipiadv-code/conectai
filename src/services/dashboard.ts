@@ -40,6 +40,7 @@ export async function getDashboardData(filters: DashboardFilters) {
         manychat_servicos(descricao),
         manychat_deptos(nome),
         manychat_cancel_reasons(motivo),
+        manychat_portes_empresa(nome),
         legaldesk_usuarios(nome)
       `)
       .is('deleted_at', null)
