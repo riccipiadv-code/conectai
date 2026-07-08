@@ -186,8 +186,8 @@ export function ContactModal({
         </DialogHeader>
 
         <div className="flex flex-col space-y-4 py-4 max-h-[78vh] overflow-y-auto px-1 custom-scrollbar">
-          {/* Row 1: Origem, Data Entrada, Responsável */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Row 1: Origem, Nº Cliente, Data Entrada, Responsável */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="grid gap-2">
               <Label>Origem</Label>
               <Select
@@ -209,6 +209,19 @@ export function ContactModal({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Nº Cliente</Label>
+              <Input
+                type="number"
+                value={formData.numero_cliente != null ? String(formData.numero_cliente) : ''}
+                onChange={(e) => {
+                  const val = e.target.value
+                  handleChange('numero_cliente', val === '' ? null : Number(val))
+                }}
+                disabled={isView}
+                placeholder="Nº do cliente"
+              />
             </div>
             <div className="grid gap-2">
               <Label>Data Entrada</Label>

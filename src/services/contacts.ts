@@ -40,6 +40,7 @@ export interface Contact {
   valor?: number | null
   observacoes?: string
   data_follow_up?: string | null
+  numero_cliente?: number | null
   [key: string]: any
 }
 
@@ -100,6 +101,7 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
     'cancel_obs',
     'last_stage_change_at',
     'created_at',
+    'numero_cliente',
   ]
 
   const sanitized: Partial<Contact> = {}

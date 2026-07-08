@@ -582,6 +582,7 @@ export type Database = {
           manychat_live_chat_url: string | null
           messages_payload: Json | null
           nome: string | null
+          numero_cliente: number | null
           observacoes: string | null
           orcamento: string | null
           origem: string | null
@@ -637,6 +638,7 @@ export type Database = {
           manychat_live_chat_url?: string | null
           messages_payload?: Json | null
           nome?: string | null
+          numero_cliente?: number | null
           observacoes?: string | null
           orcamento?: string | null
           origem?: string | null
@@ -692,6 +694,7 @@ export type Database = {
           manychat_live_chat_url?: string | null
           messages_payload?: Json | null
           nome?: string | null
+          numero_cliente?: number | null
           observacoes?: string | null
           orcamento?: string | null
           origem?: string | null
