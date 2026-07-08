@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 export interface ExcelCellStyle {
   bold?: boolean
   bgColor?: string
+  fontFamily?: string
   fontSize?: number
   alignment?: 'left' | 'center' | 'right'
   border?: boolean
@@ -59,10 +60,11 @@ function normalizeCell(cell: CellValue): any {
   if (ec.fmt) result.z = ec.fmt
   if (ec.style) {
     const s: any = {}
-    if (ec.style.bold || ec.style.fontSize) {
+    if (ec.style.bold || ec.style.fontSize || ec.style.fontFamily) {
       s.font = {}
       if (ec.style.bold) s.font.bold = true
       if (ec.style.fontSize) s.font.sz = ec.style.fontSize
+      if (ec.style.fontFamily) s.font.name = ec.style.fontFamily
     }
     if (ec.style.bgColor) {
       s.fill = { patternType: 'solid', fgColor: { rgb: ec.style.bgColor } }
