@@ -3,7 +3,7 @@ import type { ExcelCell, ExcelCellStyle, CellValue, ExcelSheet } from '@/lib/exc
 
 const CURRENCY_FMT = '"R$" #,##0.00'
 const PERCENT_FMT = '0.00%'
-const DATE_TIME_FMT = 'dd/mm/yyyy hh:mm'
+const DATE_FMT = 'dd/mm/yyyy'
 
 const HEADER_STYLE: ExcelCellStyle = { bold: true, bgColor: '4472C4', alignment: 'center' }
 const TOTAL_STYLE: ExcelCellStyle = { bold: true, bgColor: 'D9E2F3' }
@@ -32,7 +32,7 @@ function sc(
 }
 
 function categorizeOrigin(originName: string): string {
-  const lower = (originName || '').toLowerCase()
+  const lower = (originName || '').toLowerCase().replace(/[-\s]/g, '')
   if (lower.includes('whatsapp') || lower.includes('manychat')) return 'ManyChat'
   if (lower.includes('email')) return 'Email Ricci'
   if (lower.includes('telefone') || lower.includes('phone')) return 'Telefone'
@@ -43,12 +43,67 @@ function pctCell(ratio: number): ExcelCell {
   return sc(ratio, PCT_STYLE, 'n', PERCENT_FMT)
 }
 
-export function buildControladoriaSheet(data: any[]): ExcelSheet {
-  const rows: CellValue[][] = []
+function padBlock(block: CellValue[][], width: number): CellValue[][] {
+  return block.map((row) => {
+    const padded = [...row]
+    while (padded.length < width) padded.push('')
+    return padded
+  })
+}
 
-  rows.push([sc('CONTROLADORIA', TITLE_STYLE), '', '', '', '', '', '', '', '', '', ''])
+export function buildControladoriaSheet(data: any[]): ExcelSheet {
+  const block1 = buildResumoMesOrigem(data)
+  const block2 = buildConversaoOrigem(data)
+  const block3 = buildConversaoArea(data)
+
+  const W1 = 5,
+    W2 = 5,
+    W3 = 4
+  const b1 = padBlock(block1, W1)
+  const b2 = padBlock(block2, W2)
+  const b3 = padBlock(block3, W3)
+  const maxRows = Math.max(b1.length, b2.length, b3.length)
+
+  const rows: CellValue[][] = []
+  rows.push([
+    sc('CONTROLADORIA', TITLE_STYLE),
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+    '',
+  ])
   rows.push([])
 
+  for (let i = 0; i < maxRows; i++) {
+    const r1 = b1[i] || Array(W1).fill('')
+    const r2 = b2[i] || Array(W2).fill('')
+    const r3 = b3[i] || Array(W3).fill('')
+    rows.push([...r1, '', ...r2, '', ...r3])
+  }
+
+  rows.push([])
+  buildDetalheFechados(data, rows)
+
+  return {
+    name: 'Controladoria',
+    colWidths: [8, 18, 14, 22, 18, 14, 12, 16, 30, 22, 22, 3, 22, 18, 10, 8],
+    data: rows,
+  }
+}
+
+function buildResumoMesOrigem(data: any[]): CellValue[][] {
+  const rows: CellValue[][] = []
   rows.push([sc('RESUMO POR MÊS E ORIGEM', SECTION_STYLE), '', '', '', ''])
   rows.push([
     sc('Mês', HEADER_STYLE),
@@ -96,8 +151,12 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
   rows.push([sc('ManyChat', PCT_STYLE), gTotal ? pctCell(gMC / gTotal) : pctCell(0), '', '', ''])
   rows.push([sc('Email Ricci', PCT_STYLE), gTotal ? pctCell(gER / gTotal) : pctCell(0), '', '', ''])
   rows.push([sc('Telefone', PCT_STYLE), gTotal ? pctCell(gTel / gTotal) : pctCell(0), '', '', ''])
-  rows.push([])
 
+  return rows
+}
+
+function buildConversaoOrigem(data: any[]): CellValue[][] {
+  const rows: CellValue[][] = []
   rows.push([sc('CONVERSÃO POR ORIGEM', SECTION_STYLE), '', '', '', ''])
   rows.push([
     sc('Origem', HEADER_STYLE),
@@ -161,8 +220,12 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
     '',
     '',
   ])
-  rows.push([])
 
+  return rows
+}
+
+function buildConversaoArea(data: any[]): CellValue[][] {
+  const rows: CellValue[][] = []
   rows.push([sc('CONVERSÃO POR ÁREA', SECTION_STYLE), '', '', ''])
   rows.push([
     sc('Área', HEADER_STYLE),
@@ -193,15 +256,17 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
     sc(tFech, TOTAL_STYLE, 'n'),
     tSol ? sc(tFech / tSol, TOTAL_STYLE, 'n', PERCENT_FMT) : sc(0, TOTAL_STYLE, 'n', PERCENT_FMT),
   ])
-  rows.push([])
 
-  rows.push([sc('RELAÇÃO DOS FECHADOS', SECTION_STYLE), '', '', '', '', '', '', '', '', '', ''])
+  return rows
+}
+
+function buildDetalheFechados(data: any[], rows: CellValue[][]) {
   rows.push([
-    sc('Seq', HEADER_STYLE),
+    sc('', HEADER_STYLE),
     sc('Origem', HEADER_STYLE),
     sc('Data', HEADER_STYLE),
     sc('Contato', HEADER_STYLE),
-    sc('Cliente', HEADER_STYLE),
+    sc('Empresa', HEADER_STYLE),
     sc('Porte Empresa', HEADER_STYLE),
     sc('Nº Cliente', HEADER_STYLE),
     sc('Valor Faturado', HEADER_STYLE),
@@ -210,15 +275,15 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
     sc('Departamento', HEADER_STYLE),
   ])
 
-  const closed = data.filter((c) => c.current_stage === STAGE_APROVADO)
+  const billed = data.filter((c) => Number(c.valor) > 0)
   let totalValor = 0
-  closed.forEach((c, i) => {
+  billed.forEach((c, i) => {
     const valor = Number(c.valor) || 0
     totalValor += valor
     rows.push([
       i + 1,
       c.manychat_origens?.nome || c.origem || '',
-      { value: parseISO(c.created_at), type: 'd', fmt: DATE_TIME_FMT },
+      { value: parseISO(c.created_at), type: 'd', fmt: DATE_FMT },
       c.lead_nome_exibicao || c.lead_nome || c.nome || '',
       c.empresa_pf || c.lead_empresa_pf || '',
       c.porte_empresa || '',
@@ -242,10 +307,4 @@ export function buildControladoriaSheet(data: any[]): ExcelSheet {
     sc('', TOTAL_STYLE),
     sc('', TOTAL_STYLE),
   ])
-
-  return {
-    name: 'Controladoria',
-    colWidths: [6, 22, 18, 24, 20, 14, 12, 18, 30, 22, 22],
-    data: rows,
-  }
 }
