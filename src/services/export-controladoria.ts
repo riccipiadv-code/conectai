@@ -19,6 +19,26 @@ const PCT_STYLE: ExcelCellStyle = { bold: true }
 const STAGE_APROVADO = 'orcamento_aprovado'
 const STAGE_CANCELADO = 'cancelado'
 
+const MONTH_NAMES_BR = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+]
+
+function formatMonthBR(key: string): string {
+  const [mm, yyyy] = key.split('/')
+  return `${MONTH_NAMES_BR[Number(mm) - 1]}/${yyyy}`
+}
+
 function sc(
   value: string | number | Date | null,
   style: ExcelCellStyle,
@@ -130,14 +150,18 @@ function buildResumoMesOrigem(data: any[]): CellValue[][] {
     gTel = 0,
     gTotal = 0
   Array.from(monthMap.keys())
-    .sort()
+    .sort((a, b) => {
+      const [ma, ya] = a.split('/')
+      const [mb, yb] = b.split('/')
+      return ya.localeCompare(yb) || ma.localeCompare(mb)
+    })
     .forEach((m) => {
       const v = monthMap.get(m)!
       gMC += v.mc
       gER += v.er
       gTel += v.tel
       gTotal += v.total
-      rows.push([m, v.mc, v.er, v.tel, v.total])
+      rows.push([formatMonthBR(m), v.mc, v.er, v.tel, v.total])
     })
   rows.push([
     sc('Total Geral', TOTAL_STYLE),
