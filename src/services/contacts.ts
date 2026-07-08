@@ -41,6 +41,8 @@ export interface Contact {
   observacoes?: string
   data_follow_up?: string | null
   numero_cliente?: number | null
+  porte_empresa_id?: number | null
+  porte_empresa?: string | null
   [key: string]: any
 }
 
@@ -68,6 +70,13 @@ export interface Responsavel {
 export interface Origem {
   id: number
   nome: string
+}
+
+export interface PorteEmpresa {
+  id: number
+  nome: string
+  ordem: number
+  ativo: boolean
 }
 
 export interface Subservico {
@@ -102,6 +111,8 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
     'last_stage_change_at',
     'created_at',
     'numero_cliente',
+    'porte_empresa_id',
+    'porte_empresa',
   ]
 
   const sanitized: Partial<Contact> = {}
@@ -162,6 +173,16 @@ export async function getOrigens() {
     .select('id, nome')
     .eq('ativo', true)
     .order('ordem', { ascending: true })
+  return data || []
+}
+
+export async function getPortesEmpresa() {
+  const { data, error } = await supabase
+    .from('manychat_portes_empresa')
+    .select('id, nome, ordem, ativo')
+    .eq('ativo', true)
+    .order('ordem', { ascending: true })
+  if (error) throw error
   return data || []
 }
 

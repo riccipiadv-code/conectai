@@ -33,6 +33,7 @@ import {
   Origem,
   Subservico,
   getContatoSubservicos,
+  PorteEmpresa,
 } from '@/services/contacts'
 import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
@@ -53,6 +54,7 @@ export interface ContactModalProps {
   cancelReasons: CancelReason[]
   origens: Origem[]
   subservicos: Subservico[]
+  portesEmpresa: PorteEmpresa[]
 }
 
 export function ContactModal({
@@ -66,6 +68,7 @@ export function ContactModal({
   cancelReasons = [],
   origens = [],
   subservicos = [],
+  portesEmpresa = [],
 }: ContactModalProps) {
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
@@ -105,6 +108,8 @@ export function ContactModal({
           cancel_obs: null,
           valor: null,
           orcamento: null,
+          porte_empresa_id: null,
+          porte_empresa: null,
           lead_empresa_pf: '',
           lead_email: '',
           telefone: '',
@@ -356,19 +361,33 @@ export function ContactModal({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Orçamento</Label>
+              <Label>Porte Empresa</Label>
               <Select
                 disabled={isView}
-                value={formData.orcamento || 'none'}
-                onValueChange={(val) => handleChange('orcamento', val === 'none' ? null : val)}
+                value={
+                  formData.porte_empresa_id != null ? String(formData.porte_empresa_id) : 'none'
+                }
+                onValueChange={(val) => {
+                  if (val === 'none') {
+                    handleChange('porte_empresa_id', null)
+                    handleChange('porte_empresa', null)
+                  } else {
+                    const selected = portesEmpresa?.find((p) => p.id === Number(val))
+                    handleChange('porte_empresa_id', Number(val))
+                    handleChange('porte_empresa', selected?.nome || null)
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  <SelectItem value="Tabela">Tabela</SelectItem>
-                  <SelectItem value="Personalizado">Personalizado</SelectItem>
+                  {portesEmpresa?.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

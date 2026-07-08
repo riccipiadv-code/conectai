@@ -589,6 +589,7 @@ export type Database = {
           origem_id: number | null
           payload_bruto: Json | null
           porte_empresa: string | null
+          porte_empresa_id: number | null
           responsavel_id: string | null
           responsible_user_id: string | null
           servico_id: string | null
@@ -645,6 +646,7 @@ export type Database = {
           origem_id?: number | null
           payload_bruto?: Json | null
           porte_empresa?: string | null
+          porte_empresa_id?: number | null
           responsavel_id?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
@@ -701,6 +703,7 @@ export type Database = {
           origem_id?: number | null
           payload_bruto?: Json | null
           porte_empresa?: string | null
+          porte_empresa_id?: number | null
           responsavel_id?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
@@ -720,6 +723,13 @@ export type Database = {
             columns: ['origem_id']
             isOneToOne: false
             referencedRelation: 'manychat_origens'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'fk_manychat_contatos_porte_empresa'
+            columns: ['porte_empresa_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_portes_empresa'
             referencedColumns: ['id']
           },
           {
@@ -830,6 +840,33 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          created_at?: string
+          id?: number
+          nome?: string
+          ordem?: number
+        }
+        Relationships: []
+      }
+      manychat_portes_empresa: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          id: number
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          id?: number
+          nome: string
+          ordem: number
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
           created_at?: string
           id?: number
           nome?: string

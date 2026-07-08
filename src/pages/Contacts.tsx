@@ -11,6 +11,7 @@ import {
   updateContact,
   createContact,
   deleteContact,
+  getPortesEmpresa,
   ContactsFilters,
 } from '@/services/contacts'
 import { Card, CardContent } from '@/components/ui/card'
@@ -80,6 +81,7 @@ export default function Contacts() {
     cancelReasons: any[]
     origens: any[]
     subservicos: any[]
+    portesEmpresa: any[]
   }>({
     responsaveis: [],
     servicos: [],
@@ -87,6 +89,7 @@ export default function Contacts() {
     cancelReasons: [],
     origens: [],
     subservicos: [],
+    portesEmpresa: [],
   })
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -123,7 +126,8 @@ export default function Contacts() {
       getCancelReasons(),
       getOrigens(),
       getSubservicos(),
-    ]).then(([r, s, d, c, o, sub]: any) => {
+      getPortesEmpresa(),
+    ]).then(([r, s, d, c, o, sub, pe]: any) => {
       setMeta({
         responsaveis: r,
         servicos: s,
@@ -131,6 +135,7 @@ export default function Contacts() {
         cancelReasons: c,
         origens: o,
         subservicos: sub,
+        portesEmpresa: pe,
       })
     })
   }, [])
@@ -763,6 +768,7 @@ export default function Contacts() {
         cancelReasons={meta.cancelReasons}
         origens={meta.origens}
         subservicos={meta.subservicos}
+        portesEmpresa={meta.portesEmpresa}
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
