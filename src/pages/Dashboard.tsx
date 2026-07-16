@@ -41,10 +41,18 @@ export default function Dashboard() {
     return data.filter(
       (c: any) =>
         c.lead_nome_exibicao?.toLowerCase().includes(s) ||
+        c.lead_nome?.toLowerCase().includes(s) ||
+        c.nome?.toLowerCase().includes(s) ||
+        c.first_name?.toLowerCase().includes(s) ||
         c.telefone?.toLowerCase().includes(s) ||
         c.email?.toLowerCase().includes(s) ||
         c.empresa_pf?.toLowerCase().includes(s) ||
-        String(c.controle) === s,
+        c.responsavel_nome?.toLowerCase().includes(s) ||
+        c.servico_selecionado?.toLowerCase().includes(s) ||
+        c.departamento?.toLowerCase().includes(s) ||
+        c.origem?.toLowerCase().includes(s) ||
+        String(c.controle || '').includes(s) ||
+        String(c.numero_cliente || '').includes(s),
     )
   }, [data, filters.search])
 
