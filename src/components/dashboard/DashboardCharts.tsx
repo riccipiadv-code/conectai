@@ -54,15 +54,19 @@ export function DashboardCharts({ data }: { data: DashboardContact[] }) {
   }, [data])
 
   const funnelData = useMemo(() => {
-    const map = new Map()
+    const map = new Map<string, number>()
+    DASHBOARD_ALLOWED_STAGES.forEach((stageId) => {
+      map.set(getDashboardStageLabel(stageId), 0)
+    })
     data.forEach((c) => {
       if (!c.current_stage || !DASHBOARD_ALLOWED_STAGES.includes(c.current_stage)) return
       const stage = getDashboardStageLabel(c.current_stage)
       map.set(stage, (map.get(stage) || 0) + 1)
     })
-    return Array.from(map.entries())
-      .map(([stage, count]) => ({ stage, count }))
-      .sort((a, b) => b.count - a.count)
+    return DASHBOARD_ALLOWED_STAGES.map((stageId) => ({
+      stage: getDashboardStageLabel(stageId),
+      count: map.get(getDashboardStageLabel(stageId)) || 0,
+    }))
   }, [data])
 
   const COLORS = [
@@ -133,18 +137,8 @@ export function DashboardCharts({ data }: { data: DashboardContact[] }) {
               <YAxis tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
               <ChartTooltip content={<ChartTooltipContent />} />
               <ChartLegend content={<ChartLegendContent />} />
-              <Bar
-                dataKey="approved"
-                stackId="a"
-                fill="var(--color-approved)"
-                radius={[0, 0, 4, 4]}
-              />
-              <Bar
-                dataKey="cancelled"
-                stackId="a"
-                fill="var(--color-cancelled)"
-                radius={[4, 4, 0, 0]}
-              />
+              <Bar dataKey="approved" fill="var(--color-approved)" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="cancelled" fill="var(--color-cancelled)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ChartContainer>
         </CardContent>
