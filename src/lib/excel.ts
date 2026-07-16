@@ -12,6 +12,7 @@ export interface ExcelCellStyle {
   borderBottom?: boolean
   borderLeft?: boolean
   borderRight?: boolean
+  wrapText?: boolean
 }
 
 export interface ExcelCell {
@@ -29,6 +30,7 @@ export interface ExcelSheet {
   colWidths?: number[]
   rowHeights?: number[]
   merges?: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }>
+  autofilter?: boolean
 }
 
 function normalizeCell(cell: CellValue): any {
@@ -73,8 +75,10 @@ function normalizeCell(cell: CellValue): any {
     if (ec.style.bgColor) {
       s.fill = { patternType: 'solid', fgColor: { rgb: ec.style.bgColor } }
     }
-    if (ec.style.alignment) {
-      s.alignment = { horizontal: ec.style.alignment }
+    if (ec.style.alignment || ec.style.wrapText) {
+      s.alignment = {}
+      if (ec.style.alignment) s.alignment.horizontal = ec.style.alignment
+      if (ec.style.wrapText) s.alignment.wrapText = true
     }
     const hasAnyBorder =
       ec.style.border ||
@@ -130,6 +134,9 @@ export function exportToExcel(sheets: ExcelSheet[], filename: string) {
     }
     if (sheet.merges) {
       ws['!merges'] = sheet.merges
+    }
+    if (sheet.autofilter) {
+      ws['!autofilter'] = { ref: ws['!ref'] }
     }
     XLSX.utils.book_append_sheet(wb, ws, cleanName)
   })

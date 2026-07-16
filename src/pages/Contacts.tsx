@@ -58,6 +58,7 @@ import {
   Edit,
   Trash2,
   FileText,
+  FileSpreadsheet,
   Loader2,
   Plus,
   CheckCircle2,
@@ -68,6 +69,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
+import { exportContactsExcel } from '@/services/export-contacts'
 import { useToast } from '@/hooks/use-toast'
 import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 
@@ -117,6 +119,8 @@ export default function Contacts() {
 
   const [deletingContact, setDeletingContact] = useState<any | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -270,6 +274,30 @@ export default function Contacts() {
     setIsModalOpen(true)
   }
 
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const result = await exportContactsExcel({
+        ...filters,
+        search: searchTerm || undefined,
+      })
+      if (!result.success) {
+        toast({ title: 'Aviso', description: result.message })
+      } else {
+        toast({ title: 'Sucesso', description: 'Arquivo exportado com sucesso.' })
+      }
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao exportar atendimentos.',
+        variant: 'destructive',
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleView = (c: any) => {
     setUpdatingContact(c)
     setModalMode('view')
@@ -353,6 +381,19 @@ export default function Contacts() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={exporting}>
+            {exporting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Exportando...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Exportar
+              </>
+            )}
+          </Button>
           <Button onClick={handleCreateNew}>
             <Plus className="mr-2 h-4 w-4" /> Criar Novo
           </Button>

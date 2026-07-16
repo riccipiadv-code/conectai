@@ -239,6 +239,7 @@ export async function getContacts(
       manychat_origens(nome),
       manychat_servicos(descricao),
       manychat_deptos(nome),
+      manychat_portes_empresa(nome),
       legaldesk_usuarios(nome),
       profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
     `)
@@ -314,6 +315,25 @@ export async function getContacts(
   const { data, error } = await query
   if (error) throw error
   return data || []
+}
+
+export async function getContactsForExport(filters: ContactsFilters) {
+  const allData: any[] = []
+  let offset = 0
+  const pageSize = 1000
+
+  while (true) {
+    const batchFilters: ContactsFilters = { ...filters, limit: pageSize, offset }
+    const batch = await getContacts(batchFilters, {
+      column: 'created_at',
+      ascending: true,
+    })
+    allData.push(...batch)
+    if (batch.length < pageSize) break
+    offset += pageSize
+  }
+
+  return allData
 }
 
 export async function updateContact(id: string, updates: any, previousStage?: string) {
