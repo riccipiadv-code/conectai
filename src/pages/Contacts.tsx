@@ -69,7 +69,14 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
-import { exportContactsExcel } from '@/services/export-contacts'
+import { exportVisibleContactsExcel, exportAllContactsExcel } from '@/services/export-contacts'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 
@@ -120,7 +127,8 @@ export default function Contacts() {
   const [deletingContact, setDeletingContact] = useState<any | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
-  const [exporting, setExporting] = useState(false)
+  const [exporting, setExporting] = useState<null | 'visible' | 'all'>(null)
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -274,13 +282,14 @@ export default function Contacts() {
     setIsModalOpen(true)
   }
 
-  const handleExport = async () => {
-    setExporting(true)
+  const handleExportClick = () => {
+    setIsExportDialogOpen(true)
+  }
+
+  const handleExportVisible = async () => {
+    setExporting('visible')
     try {
-      const result = await exportContactsExcel({
-        ...filters,
-        search: searchTerm || undefined,
-      })
+      const result = await exportVisibleContactsExcel(filteredData)
       if (!result.success) {
         toast({ title: 'Aviso', description: result.message })
       } else {
@@ -294,7 +303,30 @@ export default function Contacts() {
         variant: 'destructive',
       })
     } finally {
-      setExporting(false)
+      setExporting(null)
+      setIsExportDialogOpen(false)
+    }
+  }
+
+  const handleExportAll = async () => {
+    setExporting('all')
+    try {
+      const result = await exportAllContactsExcel()
+      if (!result.success) {
+        toast({ title: 'Aviso', description: result.message })
+      } else {
+        toast({ title: 'Sucesso', description: 'Arquivo exportado com sucesso.' })
+      }
+    } catch (error: any) {
+      console.error(error)
+      toast({
+        title: 'Erro',
+        description: error.message || 'Erro ao exportar atendimentos.',
+        variant: 'destructive',
+      })
+    } finally {
+      setExporting(null)
+      setIsExportDialogOpen(false)
     }
   }
 
@@ -381,8 +413,8 @@ export default function Contacts() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleExport} disabled={exporting}>
-            {exporting ? (
+          <Button variant="outline" onClick={handleExportClick} disabled={exporting !== null}>
+            {exporting !== null ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Exportando...
@@ -835,6 +867,61 @@ export default function Contacts() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={isExportDialogOpen}
+        onOpenChange={(open) => {
+          if (!exporting) setIsExportDialogOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exportar</DialogTitle>
+            <DialogDescription>
+              Escolha o tipo de exportação desejada. O arquivo será gerado em formato Excel (.xlsx).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 mt-2">
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={handleExportVisible}
+              disabled={exporting !== null}
+            >
+              {exporting === 'visible' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exportando...
+                </>
+              ) : (
+                'Apenas selecionados em tela'
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={handleExportAll}
+              disabled={exporting !== null}
+            >
+              {exporting === 'all' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Exportando...
+                </>
+              ) : (
+                'Todos os registros'
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setIsExportDialogOpen(false)}
+              disabled={exporting !== null}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

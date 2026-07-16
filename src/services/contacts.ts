@@ -336,6 +336,42 @@ export async function getContactsForExport(filters: ContactsFilters) {
   return allData
 }
 
+export async function getAllContactsForExport() {
+  const allData: any[] = []
+  let offset = 0
+  const pageSize = 1000
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('manychat_contatos')
+      .select(`
+        *,
+        origem,
+        origem_id,
+        servico_id,
+        depto_id,
+        responsavel_id,
+        cancel_reason_id,
+        manychat_origens(nome),
+        manychat_servicos(descricao),
+        manychat_deptos(nome),
+        manychat_portes_empresa(nome),
+        legaldesk_usuarios(nome),
+        profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
+      `)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true, nullsFirst: false })
+      .range(offset, offset + pageSize - 1)
+
+    if (error) throw error
+    allData.push(...(data || []))
+    if (!data || data.length < pageSize) break
+    offset += pageSize
+  }
+
+  return allData
+}
+
 export async function updateContact(id: string, updates: any, previousStage?: string) {
   const rawPayload = { ...updates }
 

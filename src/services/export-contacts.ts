@@ -7,11 +7,10 @@ import {
   type ExcelSheet,
   type ExcelCellStyle,
 } from '@/lib/excel'
-import { getContactsForExport, type ContactsFilters } from '@/services/contacts'
+import { getAllContactsForExport } from '@/services/contacts'
 import { supabase } from '@/lib/supabase/client'
 
 const CUR_FMT = '"R$" #,##0.00'
-const DT_FMT = 'dd/mm/yyyy hh:mm'
 const DATE_FMT = 'dd/mm/yyyy'
 
 const HDR: ExcelCellStyle = {
@@ -64,6 +63,15 @@ function safeStr(v: any): string {
   return String(v)
 }
 
+function sortData(data: any[]): any[] {
+  return [...data].sort((a, b) => {
+    if (!a.created_at && !b.created_at) return 0
+    if (!a.created_at) return 1
+    if (!b.created_at) return -1
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  })
+}
+
 async function fetchSubservicos(contactIds: string[]): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>()
   const batchSize = 200
@@ -84,22 +92,19 @@ async function fetchSubservicos(contactIds: string[]): Promise<Map<string, strin
   return result
 }
 
-export async function exportContactsExcel(
-  filters: ContactsFilters,
-): Promise<{ success: boolean; message?: string }> {
-  const data = await getContactsForExport(filters)
-
+async function generateExcel(data: any[]): Promise<{ success: boolean; message?: string }> {
   if (!data || data.length === 0) {
     return { success: false, message: 'Nenhum atendimento encontrado para exportação' }
   }
 
-  const contactIds = data.map((d: any) => d.id)
+  const sortedData = sortData(data)
+  const contactIds = sortedData.map((d: any) => d.id)
   const subservicoMap = await fetchSubservicos(contactIds)
 
   const rows: CellValue[][] = []
   rows.push(HEADERS.map((h) => sc(h, HDR)))
 
-  for (const c of data) {
+  for (const c of sortedData) {
     const contactName = safeStr(
       c.lead_nome ||
         c.nome ||
@@ -118,7 +123,7 @@ export async function exportContactsExcel(
     const valor = Number(c.valor) || 0
 
     const dataEntrada: ExcelCell = c.created_at
-      ? sc(parseISO(c.created_at), CTR, 'd', DT_FMT)
+      ? sc(parseISO(c.created_at), CTR, 'd', DATE_FMT)
       : sc('', CTR)
 
     const dataFollowUp: ExcelCell = c.data_follow_up
@@ -152,7 +157,7 @@ export async function exportContactsExcel(
     for (const row of rows.slice(1)) {
       const cell = row[i] as ExcelCell
       const val = cell?.value
-      const str = val instanceof Date ? format(val, 'dd/mm/yyyy hh:mm') : String(val ?? '')
+      const str = val instanceof Date ? format(val, 'dd/mm/yyyy') : String(val ?? '')
       maxLen = Math.max(maxLen, Math.min(str.length, 60))
     }
     return Math.max(maxLen + 2, 10)
@@ -169,4 +174,15 @@ export async function exportContactsExcel(
   exportToExcel([sheet], filename)
 
   return { success: true }
+}
+
+export async function exportVisibleContactsExcel(
+  data: any[],
+): Promise<{ success: boolean; message?: string }> {
+  return generateExcel(data)
+}
+
+export async function exportAllContactsExcel(): Promise<{ success: boolean; message?: string }> {
+  const data = await getAllContactsForExport()
+  return generateExcel(data)
 }
