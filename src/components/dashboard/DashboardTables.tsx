@@ -36,6 +36,11 @@ export function DashboardTables({ data }: { data: DashboardContact[] }) {
     return Array.from(map.values()).sort((a: any, b: any) => b.count - a.count)
   }, [data])
 
+  const totalEstagiosExibidos = useMemo(
+    () => estagios.reduce((acc: number, s: any) => acc + s.count, 0),
+    [estagios],
+  )
+
   const renderTable = (title: string, items: any[], colName: string) => (
     <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm col-span-1">
       <CardHeader>
@@ -105,7 +110,10 @@ export function DashboardTables({ data }: { data: DashboardContact[] }) {
                   <TableCell className="pl-6 font-medium">{d.name}</TableCell>
                   <TableCell className="text-right">{d.count}</TableCell>
                   <TableCell className="text-right pr-6 font-semibold">
-                    {data.length ? ((d.count / data.length) * 100).toFixed(1) : 0}%
+                    {totalEstagiosExibidos
+                      ? ((d.count / totalEstagiosExibidos) * 100).toFixed(1)
+                      : '0'}
+                    %
                   </TableCell>
                 </TableRow>
               ))}
