@@ -8,32 +8,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { getDashboardStageLabel, DASHBOARD_ALLOWED_STAGES, isFechado } from './utils'
+import {
+  getDashboardStageLabel,
+  DASHBOARD_ALLOWED_STAGES,
+  aggregateByKey,
+  formatCurrency,
+  type DashboardContact,
+} from './utils'
 
-export function DashboardTables({ data }: { data: any[] }) {
-  const isCancelled = (stage: string) => stage === 'cancelado'
-
-  const aggregateBy = (key: string, label: string) => {
-    const map = new Map()
-    data.forEach((c) => {
-      const k = c[key] || 'Não informado'
-      if (!map.has(k)) map.set(k, { name: k, requested: 0, approved: 0, cancelled: 0, valor: 0 })
-      const item = map.get(k)
-      item.requested++
-      if (isFechado(c)) item.approved++
-      if (isCancelled(c.current_stage)) item.cancelled++
-      item.valor += Number(c.valor) || 0
-    })
-    return Array.from(map.values()).sort((a: any, b: any) => b.requested - a.requested)
-  }
-
+export function DashboardTables({ data }: { data: DashboardContact[] }) {
   const responsaveis = useMemo(
-    () => aggregateBy('responsavel_nome', 'Responsável').filter((r: any) => r.valor > 0),
+    () => aggregateByKey(data, 'responsavel_nome').filter((r) => r.valor > 0),
     [data],
   )
-  const servicos = useMemo(() => aggregateBy('servico_selecionado', 'Serviço'), [data])
-  const departamentos = useMemo(() => aggregateBy('departamento', 'Departamento'), [data])
-  const origens = useMemo(() => aggregateBy('origem', 'Origem'), [data])
+  const servicos = useMemo(() => aggregateByKey(data, 'servico_selecionado'), [data])
+  const departamentos = useMemo(() => aggregateByKey(data, 'departamento'), [data])
+  const origens = useMemo(() => aggregateByKey(data, 'origem'), [data])
 
   const estagios = useMemo(() => {
     const map = new Map()
@@ -45,9 +35,6 @@ export function DashboardTables({ data }: { data: any[] }) {
     })
     return Array.from(map.values()).sort((a: any, b: any) => b.count - a.count)
   }, [data])
-
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
   const renderTable = (title: string, items: any[], colName: string) => (
     <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm col-span-1">

@@ -10,11 +10,12 @@ import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs'
 import { DashboardCharts } from '@/components/dashboard/DashboardCharts'
 import { DashboardTables } from '@/components/dashboard/DashboardTables'
 import { Button } from '@/components/ui/button'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Loader2, FileText } from 'lucide-react'
 import { exportDashboardExcel } from '@/services/export-dashboard'
+import { DashboardContact } from '@/components/dashboard/utils'
 
 export default function Dashboard() {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<DashboardContact[]>([])
   const [loading, setLoading] = useState(true)
   const [meta, setMeta] = useState({ responsaveis: [], servicos: [], deptos: [], origens: [] })
   const [metaLoaded, setMetaLoaded] = useState(false)
@@ -75,7 +76,7 @@ export default function Dashboard() {
   }, [filters, metaLoaded])
 
   const handleExport = () => {
-    exportDashboardExcel(data)
+    exportDashboardExcel(filteredData)
   }
 
   return (
@@ -130,5 +131,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
-import { FileText } from 'lucide-react'

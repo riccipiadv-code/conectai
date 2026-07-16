@@ -1,6 +1,11 @@
 import { format, parseISO } from 'date-fns'
 import { exportToExcel, type ExcelCell, type CellValue, type ExcelSheet } from '@/lib/excel'
-import { getDashboardStageLabel, isFechado } from '@/components/dashboard/utils'
+import {
+  getDashboardStageLabel,
+  isFechado,
+  isCancelado,
+  type DashboardContact,
+} from '@/components/dashboard/utils'
 import { buildControladoriaSheet } from '@/services/export-controladoria'
 
 const CURRENCY_FMT = '"R$" #,##0.00'
@@ -19,7 +24,7 @@ function dateCell(dateStr: string): ExcelCell {
   return { value: parseISO(dateStr), type: 'd', fmt: DATE_TIME_FMT }
 }
 
-export function exportDashboardExcel(data: any[]) {
+export function exportDashboardExcel(data: DashboardContact[]) {
   const total = data.length
   const approved = data.filter((c) => isFechado(c)).length
   const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
@@ -46,7 +51,7 @@ export function exportDashboardExcel(data: any[]) {
     const item = monthMap.get(m)!
     item.requested++
     if (isFechado(c)) item.approved++
-    if (c.current_stage === 'cancelado') item.cancelled++
+    if (isCancelado(c)) item.cancelled++
   })
   const monthSheet: ExcelSheet = {
     name: 'Por mês',
@@ -70,7 +75,7 @@ export function exportDashboardExcel(data: any[]) {
     const item = originMap.get(o)!
     item.requested++
     if (isFechado(c)) item.approved++
-    if (c.current_stage === 'cancelado') item.cancelled++
+    if (isCancelado(c)) item.cancelled++
   })
   const originSheet: ExcelSheet = {
     name: 'Por origem',

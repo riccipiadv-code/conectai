@@ -22,9 +22,15 @@ import {
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { getDashboardStageLabel, DASHBOARD_ALLOWED_STAGES, isFechado } from './utils'
+import {
+  getDashboardStageLabel,
+  DASHBOARD_ALLOWED_STAGES,
+  isFechado,
+  isCancelado,
+  type DashboardContact,
+} from './utils'
 
-export function DashboardCharts({ data }: { data: any[] }) {
+export function DashboardCharts({ data }: { data: DashboardContact[] }) {
   const monthlyData = useMemo(() => {
     const map = new Map()
     data.forEach((c) => {
@@ -33,7 +39,7 @@ export function DashboardCharts({ data }: { data: any[] }) {
       const item = map.get(month)
       item.requested++
       if (isFechado(c)) item.approved++
-      if (c.current_stage === 'cancelado') item.cancelled++
+      if (isCancelado(c)) item.cancelled++
     })
     return Array.from(map.values()).reverse()
   }, [data])

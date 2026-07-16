@@ -5,26 +5,24 @@ import {
   XCircle,
   Percent,
   DollarSign,
-  Clock,
   AlertTriangle,
   TrendingDown,
 } from 'lucide-react'
-import { isFechado } from './utils'
+import { isFechado, isCancelado, formatCurrency, type DashboardContact } from './utils'
 
-export function DashboardKPIs({ data }: { data: any[] }) {
+export function DashboardKPIs({ data }: { data: DashboardContact[] }) {
   const total = data.length
   const withBudget = data.filter((c) => c.orcamento || Number(c.valor) > 0).length
 
   const approved = data.filter((c) => isFechado(c)).length
-  const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
+  const cancelled = data.filter((c) => isCancelado(c)).length
 
   const approvalRate = total > 0 ? (approved / total) * 100 : 0
   const declineRate = total > 0 ? (cancelled / total) * 100 : 0
 
   const totalValue = data.reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
 
-  // Valor Faturado now corresponds to total value of any contact with a value > 0
-  const billedContacts = data.filter((c) => Number(c.valor) > 0)
+  const billedContacts = data.filter((c) => isFechado(c))
   const billedValue = billedContacts.reduce((acc, c) => acc + (Number(c.valor) || 0), 0)
 
   const valueContacts = billedContacts.length
@@ -38,9 +36,6 @@ export function DashboardKPIs({ data }: { data: any[] }) {
       c.current_stage !== 'cancelado',
   ).length
   const overdueSla = data.filter((c) => c.sla_status === 'red' || c.sla_status === 'yellow').length
-
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
