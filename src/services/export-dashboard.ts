@@ -24,7 +24,10 @@ function dateCell(dateStr: string): ExcelCell {
   return { value: parseISO(dateStr), type: 'd', fmt: DATE_TIME_FMT }
 }
 
-export function exportDashboardExcel(data: DashboardContact[]) {
+export function exportDashboardExcel(
+  data: DashboardContact[],
+  controladoriaData: DashboardContact[] = data,
+) {
   const total = data.length
   const approved = data.filter((c) => isFechado(c)).length
   const cancelled = data.filter((c) => c.current_stage === 'cancelado').length
@@ -163,7 +166,7 @@ export function exportDashboardExcel(data: DashboardContact[]) {
     ],
   }
 
-  const controladoriaSheet = buildControladoriaSheet(data)
+  const controladoriaSheet = buildControladoriaSheet(controladoriaData)
 
   exportToExcel(
     [

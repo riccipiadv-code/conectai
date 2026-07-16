@@ -84,7 +84,7 @@ export default function Dashboard() {
   }, [filters, metaLoaded])
 
   const handleExport = () => {
-    exportDashboardExcel(filteredData)
+    exportDashboardExcel(filteredData, data)
   }
 
   return (
