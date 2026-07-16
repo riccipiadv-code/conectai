@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { DashboardFilters as FiltersType, DEFAULT_ORIGIN_NAMES } from '@/services/dashboard'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 import { Search } from 'lucide-react'
+import { parse, startOfDay, endOfDay } from 'date-fns'
 import { getDashboardStageLabel } from './utils'
 
 interface Props {
@@ -61,7 +62,14 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
             <Input
               type="date"
               className="h-9"
-              onChange={(e) => update('dateFrom', e.target.value ? new Date(e.target.value) : null)}
+              onChange={(e) =>
+                update(
+                  'dateFrom',
+                  e.target.value
+                    ? startOfDay(parse(e.target.value, 'yyyy-MM-dd', new Date()))
+                    : null,
+                )
+              }
             />
           </div>
           <div className="space-y-1.5">
@@ -69,7 +77,12 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
             <Input
               type="date"
               className="h-9"
-              onChange={(e) => update('dateTo', e.target.value ? new Date(e.target.value) : null)}
+              onChange={(e) =>
+                update(
+                  'dateTo',
+                  e.target.value ? endOfDay(parse(e.target.value, 'yyyy-MM-dd', new Date())) : null,
+                )
+              }
             />
           </div>
         </>

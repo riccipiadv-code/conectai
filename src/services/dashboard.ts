@@ -57,9 +57,9 @@ export async function getDashboardData(filters: DashboardFilters) {
       const start = startOfYear(new Date())
       query = query.gte('created_at', start.toISOString())
     } else if (filters.period === 'custom' && filters.dateFrom && filters.dateTo) {
-      query = query
-        .gte('created_at', filters.dateFrom.toISOString())
-        .lte('created_at', filters.dateTo.toISOString())
+      const from = startOfDay(filters.dateFrom)
+      const to = endOfDay(filters.dateTo)
+      query = query.gte('created_at', from.toISOString()).lte('created_at', to.toISOString())
     }
 
     if (filters.origens && filters.origens.length > 0)
