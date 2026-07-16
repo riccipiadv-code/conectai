@@ -12,7 +12,7 @@ import { isFechado, isCancelado, formatCurrency, type DashboardContact } from '.
 
 export function DashboardKPIs({ data }: { data: DashboardContact[] }) {
   const total = data.length
-  const withBudget = data.filter((c) => c.orcamento || Number(c.valor) > 0).length
+  const withBudget = data.filter((c) => c.current_stage === 'enviado_orcamento_ag_retorno').length
 
   const approved = data.filter((c) => isFechado(c)).length
   const cancelled = data.filter((c) => isCancelado(c)).length
