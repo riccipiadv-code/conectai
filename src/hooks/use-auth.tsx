@@ -99,6 +99,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    if (!user || !profile || profile.ativo !== true) {
+      return
+    }
+
+    const channel = supabase
+      .channel(`profile-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        async (payload) => {
+          const updatedProfile = payload.new as { perfil?: string; ativo?: boolean }
+          if (updatedProfile && updatedProfile.ativo === false) {
+            await supabase.auth.signOut()
+            setUser(null)
+            setSession(null)
+            setProfile({
+              perfil: updatedProfile.perfil ?? '',
+              ativo: false,
+            })
+            window.location.href = '/login?reason=disabled'
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, profile?.ativo])
+
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
