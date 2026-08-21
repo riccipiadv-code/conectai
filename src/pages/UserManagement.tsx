@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/table'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -29,17 +28,36 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Search, Loader2, Save } from 'lucide-react'
+import {
+  Search,
+  Loader2,
+  UserCheck,
+  UserX,
+  UserCog,
+  Trash2,
+  ShieldAlert,
+  ShieldCheck,
+  AlertTriangle,
+} from 'lucide-react'
 
-type UserRow = {
+export type UserRow = {
   legaldesk_id: string
   nome: string
   sigla: string
   email: string
   ativo_ld: boolean
   profile_id?: string
-  perfil: string
+  perfil: string | null // null quando não tem profile
   ativo_sys: boolean
+  auth_user_exists: boolean
+}
+
+const PERFIL_LABELS: Record<string, string> = {
+  socio_gestor: 'Sócio Gestor',
+  gestor_area: 'Gestor de Área',
+  advogado: 'Advogado',
+  estagiario: 'Estagiário',
+  administrativo: 'Administrativo',
 }
 
 export default function UserManagement() {
@@ -47,77 +65,297 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
-  const [pendingChanges, setPendingChanges] = useState<
-    Record<string, { grant_access: boolean; perfil: string }>
-  >({})
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const { toast } = useToast()
+
+  // Diálogos modais
+  const [grantModalUser, setGrantModalUser] = useState<UserRow | null>(null)
+  const [grantPerfil, setGrantPerfil] = useState<string>('advogado')
+
+  const [reactivateModalUser, setReactivateModalUser] = useState<UserRow | null>(null)
+
+  const [revokeModalUser, setRevokeModalUser] = useState<UserRow | null>(null)
+
+  const [changePerfilUser, setChangePerfilUser] = useState<UserRow | null>(null)
+  const [newPerfil, setNewPerfil] = useState<string>('advogado')
+
+  const [deleteModalUser, setDeleteModalUser] = useState<UserRow | null>(null)
 
   const loadData = async () => {
     setLoading(true)
-    const [{ data: ldUsers }, { data: profs }] = await Promise.all([
-      supabase.from('legaldesk_usuarios').select('*').order('nome'),
-      supabase.from('profiles').select('*'),
-    ])
+    try {
+      const [{ data: ldUsers, error: ldErr }, { data: profs, error: profErr }] = await Promise.all([
+        supabase.from('legaldesk_usuarios').select('*').order('nome'),
+        supabase.from('profiles').select('*'),
+      ])
 
-    if (ldUsers) {
-      const rows = ldUsers.map((ld) => {
-        const prof = profs?.find((p) => p.legaldesk_usuario_id === ld.id || p.email === ld.email)
-        return {
-          legaldesk_id: ld.id,
-          nome: ld.nome,
-          sigla: ld.sigla || '',
-          email: ld.email || '',
-          ativo_ld: ld.ativo ?? false,
-          profile_id: prof?.id,
-          perfil: prof?.perfil || 'advogado',
-          ativo_sys: prof?.ativo ?? false,
-        }
+      if (ldErr) throw ldErr
+      if (profErr) throw profErr
+
+      if (ldUsers) {
+        const rows: UserRow[] = ldUsers.map((ld) => {
+          // Vínculo principal: legaldesk_usuario_id; Fallback: e-mail
+          const prof =
+            profs?.find((p) => p.legaldesk_usuario_id === ld.id) ||
+            (ld.email
+              ? profs?.find((p) => p.email?.toLowerCase() === ld.email?.toLowerCase())
+              : undefined)
+
+          if (prof) {
+            return {
+              legaldesk_id: ld.id,
+              nome: ld.nome,
+              sigla: ld.sigla || '',
+              email: ld.email || prof.email || '',
+              ativo_ld: ld.ativo ?? false,
+              profile_id: prof.id,
+              perfil: prof.perfil || null,
+              ativo_sys: prof.ativo ?? false,
+              auth_user_exists: true,
+            }
+          }
+
+          return {
+            legaldesk_id: ld.id,
+            nome: ld.nome,
+            sigla: ld.sigla || '',
+            email: ld.email || '',
+            ativo_ld: ld.ativo ?? false,
+            profile_id: undefined,
+            perfil: null,
+            ativo_sys: false,
+            auth_user_exists: false,
+          }
+        })
+
+        setUsers(rows)
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao carregar usuários',
+        description: err.message || 'Falha na comunicação com o banco.',
+        variant: 'destructive',
       })
-      setUsers(rows)
+    } finally {
+      setLoading(false)
     }
-    setPendingChanges({})
-    setLoading(false)
   }
 
   useEffect(() => {
     loadData()
   }, [])
 
-  const handleChange = (legaldesk_id: string, field: 'grant_access' | 'perfil', value: any) => {
-    const user = users.find((u) => u.legaldesk_id === legaldesk_id)
-    if (!user) return
-
-    setPendingChanges((prev) => {
-      const current = prev[legaldesk_id] || { grant_access: user.ativo_sys, perfil: user.perfil }
-      const updated = { ...current, [field]: value }
-      if (updated.grant_access === user.ativo_sys && updated.perfil === user.perfil) {
-        const next = { ...prev }
-        delete next[legaldesk_id]
-        return next
-      }
-      return { ...prev, [legaldesk_id]: updated }
-    })
+  // 1. Ativar Acesso (novo usuário sem profile)
+  const handleOpenGrantModal = (user: UserRow) => {
+    setGrantModalUser(user)
+    setGrantPerfil('advogado')
   }
 
-  const handleSave = async () => {
-    setSaving(true)
-    const actions = Object.entries(pendingChanges).map(([id, changes]) => {
-      const user = users.find((u) => u.legaldesk_id === id)!
-      return { legaldesk_id: id, email: user.email, name: user.nome, ...changes }
-    })
+  const handleConfirmGrant = async () => {
+    if (!grantModalUser) return
+    const user = grantModalUser
+    setActionLoadingId(user.legaldesk_id)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'grant_access',
+          legaldesk_id: user.legaldesk_id,
+          email: user.email,
+          name: user.nome,
+          perfil: grantPerfil,
+        },
+      })
 
-    const { error } = await supabase.functions.invoke('admin-user-access', { body: { actions } })
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao conceder acesso.')
+      }
 
-    if (error) {
-      toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' })
-    } else {
-      toast({ title: 'Sucesso', description: 'Permissões atualizadas com sucesso.' })
-      setShowConfirm(false)
-      loadData()
+      toast({
+        title: 'Acesso liberado!',
+        description: `O acesso para ${user.nome} como "${PERFIL_LABELS[grantPerfil] || grantPerfil}" foi configurado com sucesso.`,
+      })
+      setGrantModalUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao liberar acesso',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoadingId(null)
     }
-    setSaving(false)
+  }
+
+  // 2. Reativar Acesso (usuário com profile e ativo_sys=false)
+  const handleOpenReactivateModal = (user: UserRow) => {
+    setReactivateModalUser(user)
+  }
+
+  const handleConfirmReactivate = async () => {
+    if (!reactivateModalUser) return
+    const user = reactivateModalUser
+    setActionLoadingId(user.legaldesk_id)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'grant_access',
+          legaldesk_id: user.legaldesk_id,
+          email: user.email,
+          name: user.nome,
+          perfil: user.perfil || 'advogado',
+        },
+      })
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao reativar acesso.')
+      }
+
+      toast({
+        title: 'Acesso reativado!',
+        description: `O acesso de ${user.nome} foi reativado com sucesso.`,
+      })
+      setReactivateModalUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao reativar acesso',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // 3. Desativar Acesso (usuário com profile e ativo_sys=true)
+  const handleOpenRevokeModal = (user: UserRow) => {
+    setRevokeModalUser(user)
+  }
+
+  const handleConfirmRevoke = async () => {
+    if (!revokeModalUser) return
+    const user = revokeModalUser
+    setActionLoadingId(user.legaldesk_id)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'revoke_access',
+          legaldesk_id: user.legaldesk_id,
+          email: user.email,
+          name: user.nome,
+        },
+      })
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao revogar acesso.')
+      }
+
+      toast({
+        title: 'Acesso desativado',
+        description: `O acesso de ${user.nome} foi bloqueado.`,
+      })
+      setRevokeModalUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao desativar acesso',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // 4. Alterar Perfil
+  const handleOpenChangePerfilModal = (user: UserRow) => {
+    setChangePerfilUser(user)
+    setNewPerfil(user.perfil || 'advogado')
+  }
+
+  const handleConfirmChangePerfil = async () => {
+    if (!changePerfilUser) return
+    const user = changePerfilUser
+    setActionLoadingId(user.legaldesk_id)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'change_perfil',
+          legaldesk_id: user.legaldesk_id,
+          email: user.email,
+          name: user.nome,
+          perfil: newPerfil,
+        },
+      })
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao alterar perfil.')
+      }
+
+      toast({
+        title: 'Perfil alterado',
+        description: `O perfil de ${user.nome} foi atualizado para "${PERFIL_LABELS[newPerfil] || newPerfil}".`,
+      })
+      setChangePerfilUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao alterar perfil',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  // 5. Excluir Acesso
+  const handleOpenDeleteModal = (user: UserRow) => {
+    setDeleteModalUser(user)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModalUser) return
+    const user = deleteModalUser
+    setActionLoadingId(user.legaldesk_id)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'delete_access',
+          legaldesk_id: user.legaldesk_id,
+          email: user.email,
+          name: user.nome,
+        },
+      })
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao excluir acesso.')
+      }
+
+      if (data?.deleted === false && data?.deactivated) {
+        toast({
+          title: 'Acesso desativado (com dependências)',
+          description: `O usuário ${user.nome} possui registros vinculados no sistema. A conta de acesso foi desativada em vez de excluída fisicamente.`,
+        })
+      } else {
+        toast({
+          title: 'Acesso excluído',
+          description: `A conta de acesso ao Skip de ${user.nome} foi removida com sucesso. O registro no LegalDesk permanece intacto.`,
+        })
+      }
+
+      setDeleteModalUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao excluir acesso',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   const filteredUsers = useMemo(() => {
@@ -128,26 +366,12 @@ export default function UserManagement() {
         u.sigla.toLowerCase().includes(search.toLowerCase())
       if (!matchesSearch) return false
 
-      const currentAccess = pendingChanges[u.legaldesk_id]?.grant_access ?? u.ativo_sys
-      if (filter === 'with_access') return currentAccess
-      if (filter === 'without_access') return !currentAccess
+      if (filter === 'with_access') return u.auth_user_exists && u.ativo_sys
+      if (filter === 'without_access') return !u.auth_user_exists || !u.ativo_sys
       if (filter === 'active_ld') return u.ativo_ld
       return true
     })
-  }, [users, search, filter, pendingChanges])
-
-  const summary = useMemo(() => {
-    let granted = 0,
-      revoked = 0
-    Object.entries(pendingChanges).forEach(([id, changes]) => {
-      const u = users.find((u) => u.legaldesk_id === id)
-      if (u) {
-        if (changes.grant_access && !u.ativo_sys) granted++
-        if (!changes.grant_access && u.ativo_sys) revoked++
-      }
-    })
-    return { granted, revoked, total: Object.keys(pendingChanges).length }
-  }, [pendingChanges, users])
+  }, [users, search, filter])
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -163,24 +387,18 @@ export default function UserManagement() {
         </div>
         <Tabs value={filter} onValueChange={setFilter} className="w-full sm:w-auto">
           <TabsList className="w-full sm:w-auto overflow-x-auto">
-            <TabsTrigger value="all">Todos</TabsTrigger>
-            <TabsTrigger value="with_access">Com Acesso</TabsTrigger>
-            <TabsTrigger value="without_access">Sem Acesso</TabsTrigger>
-            <TabsTrigger value="active_ld">Ativos LD</TabsTrigger>
+            <TabsTrigger value="all">Todos ({users.length})</TabsTrigger>
+            <TabsTrigger value="with_access">
+              Com Acesso ({users.filter((u) => u.auth_user_exists && u.ativo_sys).length})
+            </TabsTrigger>
+            <TabsTrigger value="without_access">
+              Sem Acesso ({users.filter((u) => !u.auth_user_exists || !u.ativo_sys).length})
+            </TabsTrigger>
+            <TabsTrigger value="active_ld">
+              Ativos LD ({users.filter((u) => u.ativo_ld).length})
+            </TabsTrigger>
           </TabsList>
         </Tabs>
-        <Button
-          onClick={() => setShowConfirm(true)}
-          disabled={summary.total === 0}
-          className="w-full sm:w-auto gap-2"
-        >
-          <Save className="h-4 w-4" /> Salvar Alterações
-          {summary.total > 0 && (
-            <Badge variant="secondary" className="ml-1 px-1.5 min-w-5 h-5 rounded-full">
-              {summary.total}
-            </Badge>
-          )}
-        </Button>
       </div>
 
       <div className="border border-slate-200/60 dark:border-zinc-800 rounded-lg bg-white dark:bg-zinc-900 shadow-sm overflow-hidden">
@@ -192,31 +410,33 @@ export default function UserManagement() {
                 <TableHead>Sigla / E-mail</TableHead>
                 <TableHead className="text-center">Ativo LegalDesk</TableHead>
                 <TableHead>Perfil</TableHead>
-                <TableHead className="text-right">Acesso ao Sistema</TableHead>
+                <TableHead className="text-center">Acesso ao Sistema</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
+                  <TableCell colSpan={6} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                    Nenhum usuário encontrado.
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                    Nenhum colaborador encontrado.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredUsers.map((u) => {
-                  const currentAccess = pendingChanges[u.legaldesk_id]?.grant_access ?? u.ativo_sys
-                  const currentPerfil = pendingChanges[u.legaldesk_id]?.perfil ?? u.perfil
-                  const isChanged = !!pendingChanges[u.legaldesk_id]
+                  const isOperating = actionLoadingId === u.legaldesk_id
 
                   return (
-                    <TableRow key={u.legaldesk_id} className={isChanged ? 'bg-primary/5' : ''}>
+                    <TableRow key={u.legaldesk_id}>
+                      {/* 1. Nome */}
                       <TableCell className="font-medium">{u.nome}</TableCell>
+
+                      {/* 2. Sigla / E-mail */}
                       <TableCell>
                         <div className="flex flex-col">
                           {u.sigla && (
@@ -224,54 +444,126 @@ export default function UserManagement() {
                               {u.sigla}
                             </span>
                           )}
-                          <span className="text-[13px] text-muted-foreground truncate max-w-[200px]">
-                            {u.email || '-'}
+                          <span className="text-[13px] text-muted-foreground truncate max-w-[220px]">
+                            {u.email || 'Sem e-mail'}
                           </span>
                         </div>
                       </TableCell>
+
+                      {/* 3. Ativo LegalDesk */}
                       <TableCell className="text-center">
                         <Badge
                           variant={u.ativo_ld ? 'default' : 'secondary'}
                           className={
                             u.ativo_ld
-                              ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200'
-                              : ''
+                              ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200 dark:border-emerald-900/50'
+                              : 'text-muted-foreground'
                           }
                         >
                           {u.ativo_ld ? 'Sim' : 'Não'}
                         </Badge>
                       </TableCell>
+
+                      {/* 4. Perfil */}
                       <TableCell>
-                        <Select
-                          value={currentPerfil}
-                          onValueChange={(val) => handleChange(u.legaldesk_id, 'perfil', val)}
-                          disabled={!currentAccess}
-                        >
-                          <SelectTrigger className="h-8 w-[160px] text-[13px]">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
-                            <SelectItem value="gestor_area">Gestor de Área</SelectItem>
-                            <SelectItem value="advogado">Advogado</SelectItem>
-                            <SelectItem value="estagiario">Estagiário</SelectItem>
-                            <SelectItem value="administrativo">Administrativo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-3">
-                          <span className="text-[13px] font-medium text-muted-foreground w-16 text-right">
-                            {currentAccess ? 'Liberado' : 'Bloqueado'}
+                        {u.auth_user_exists && u.perfil ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-slate-50 dark:bg-zinc-800/60 font-medium text-slate-700 dark:text-slate-300"
+                          >
+                            {PERFIL_LABELS[u.perfil] || u.perfil}
+                          </Badge>
+                        ) : (
+                          <span className="text-[13px] text-muted-foreground italic">
+                            Sem perfil
                           </span>
-                          <Switch
-                            checked={currentAccess}
-                            onCheckedChange={(checked) =>
-                              handleChange(u.legaldesk_id, 'grant_access', checked)
-                            }
+                        )}
+                      </TableCell>
+
+                      {/* 5. Acesso ao Sistema */}
+                      <TableCell className="text-center">
+                        {u.auth_user_exists && u.ativo_sys ? (
+                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
+                            Liberado
+                          </Badge>
+                        ) : u.auth_user_exists && !u.ativo_sys ? (
+                          <Badge variant="destructive" className="font-medium">
+                            Bloqueado
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-muted-foreground font-normal">
+                            Sem acesso
+                          </Badge>
+                        )}
+                      </TableCell>
+
+                      {/* 6. Ações */}
+                      <TableCell className="text-right">
+                        {isOperating ? (
+                          <div className="flex items-center justify-end">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          </div>
+                        ) : !u.auth_user_exists ? (
+                          /* Usuário SEM profile (sem acesso) */
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/10 hover:text-primary font-medium"
                             disabled={!u.email}
-                          />
-                        </div>
+                            title={
+                              !u.email ? 'Usuário sem e-mail cadastrado no LegalDesk' : undefined
+                            }
+                            onClick={() => handleOpenGrantModal(u)}
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            Ativar Acesso
+                          </Button>
+                        ) : (
+                          /* Usuário COM profile */
+                          <div className="flex items-center justify-end gap-1.5">
+                            {u.ativo_sys ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 border-amber-200 dark:border-amber-900/50"
+                                onClick={() => handleOpenRevokeModal(u)}
+                              >
+                                <UserX className="h-3.5 w-3.5 mr-1" />
+                                Desativar
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50"
+                                onClick={() => handleOpenReactivateModal(u)}
+                              >
+                                <UserCheck className="h-3.5 w-3.5 mr-1" />
+                                Ativar
+                              </Button>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs"
+                              onClick={() => handleOpenChangePerfilModal(u)}
+                            >
+                              <UserCog className="h-3.5 w-3.5 mr-1" />
+                              Alterar Perfil
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                              onClick={() => handleOpenDeleteModal(u)}
+                              title="Excluir Acesso"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   )
@@ -282,36 +574,244 @@ export default function UserManagement() {
         </div>
       </div>
 
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+      {/* DIÁLOGO 1: Ativar Acesso (Novo usuário) */}
+      <Dialog open={!!grantModalUser} onOpenChange={(open) => !open && setGrantModalUser(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Alterações de Acesso</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Ativar Acesso
+            </DialogTitle>
             <DialogDescription>
-              Você está prestes a aplicar {summary.total} alteraç
-              {summary.total === 1 ? 'ão' : 'ões'} nos perfis de usuários.
+              Deseja liberar o acesso de{' '}
+              <strong className="text-foreground">{grantModalUser?.nome}</strong> (
+              {grantModalUser?.email}) ao sistema?
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="flex items-center justify-between p-4 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-lg border border-emerald-200 dark:border-emerald-900/50">
-              <span className="font-medium text-sm">Acessos a serem liberados:</span>
-              <span className="text-xl font-bold">{summary.granted}</span>
-            </div>
-            <div className="flex items-center justify-between p-4 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 rounded-lg border border-rose-200 dark:border-rose-900/50">
-              <span className="font-medium text-sm">Acessos a serem removidos:</span>
-              <span className="text-xl font-bold">{summary.revoked}</span>
-            </div>
+
+          <div className="py-4 space-y-3">
+            <label className="text-sm font-medium text-foreground">
+              Selecione o perfil de permissões:
+            </label>
+            <Select value={grantPerfil} onValueChange={setGrantPerfil}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione um perfil..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
+                <SelectItem value="gestor_area">Gestor de Área</SelectItem>
+                <SelectItem value="advogado">Advogado</SelectItem>
+                <SelectItem value="estagiario">Estagiário</SelectItem>
+                <SelectItem value="administrativo">Administrativo</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              O usuário receberá um convite por e-mail para definir a senha e acessar o sistema.
+            </p>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => setGrantModalUser(null)}
+              disabled={actionLoadingId === grantModalUser?.legaldesk_id}
+            >
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
+            <Button
+              onClick={handleConfirmGrant}
+              disabled={actionLoadingId === grantModalUser?.legaldesk_id}
+            >
+              {actionLoadingId === grantModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
               )}
-              Confirmar
+              Confirmar e Liberar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO 2: Reativar Acesso */}
+      <Dialog
+        open={!!reactivateModalUser}
+        onOpenChange={(open) => !open && setReactivateModalUser(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="h-5 w-5 text-emerald-600" />
+              Reativar Acesso
+            </DialogTitle>
+            <DialogDescription>
+              Deseja reativar o acesso de{' '}
+              <strong className="text-foreground">{reactivateModalUser?.nome}</strong> ao sistema?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3 text-sm text-muted-foreground">
+            O usuário voltará a ter acesso ao sistema com o perfil{' '}
+            <strong className="text-foreground">
+              {PERFIL_LABELS[reactivateModalUser?.perfil || 'advogado'] ||
+                reactivateModalUser?.perfil}
+            </strong>
+            .
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setReactivateModalUser(null)}
+              disabled={actionLoadingId === reactivateModalUser?.legaldesk_id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleConfirmReactivate}
+              disabled={actionLoadingId === reactivateModalUser?.legaldesk_id}
+            >
+              {actionLoadingId === reactivateModalUser?.legaldesk_id && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              Reativar Acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO 3: Desativar Acesso */}
+      <Dialog open={!!revokeModalUser} onOpenChange={(open) => !open && setRevokeModalUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <ShieldAlert className="h-5 w-5" />
+              Desativar Acesso
+            </DialogTitle>
+            <DialogDescription>
+              Deseja bloquear o acesso de{' '}
+              <strong className="text-foreground">{revokeModalUser?.nome}</strong>? O usuário não
+              conseguirá mais acessar o sistema.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRevokeModalUser(null)}
+              disabled={actionLoadingId === revokeModalUser?.legaldesk_id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmRevoke}
+              disabled={actionLoadingId === revokeModalUser?.legaldesk_id}
+            >
+              {actionLoadingId === revokeModalUser?.legaldesk_id && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              Confirmar Bloqueio
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO 4: Alterar Perfil */}
+      <Dialog open={!!changePerfilUser} onOpenChange={(open) => !open && setChangePerfilUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-5 w-5 text-primary" />
+              Alterar Perfil de Acesso
+            </DialogTitle>
+            <DialogDescription>
+              Alterar perfil de{' '}
+              <strong className="text-foreground">{changePerfilUser?.nome}</strong> de{' '}
+              <strong className="text-foreground">
+                {PERFIL_LABELS[changePerfilUser?.perfil || 'advogado'] || changePerfilUser?.perfil}
+              </strong>{' '}
+              para{' '}
+              <strong className="text-foreground">{PERFIL_LABELS[newPerfil] || newPerfil}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-3">
+            <label className="text-sm font-medium text-foreground">Novo perfil:</label>
+            <Select value={newPerfil} onValueChange={setNewPerfil}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o novo perfil..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
+                <SelectItem value="gestor_area">Gestor de Área</SelectItem>
+                <SelectItem value="advogado">Advogado</SelectItem>
+                <SelectItem value="estagiario">Estagiário</SelectItem>
+                <SelectItem value="administrativo">Administrativo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setChangePerfilUser(null)}
+              disabled={actionLoadingId === changePerfilUser?.legaldesk_id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmChangePerfil}
+              disabled={actionLoadingId === changePerfilUser?.legaldesk_id}
+            >
+              {actionLoadingId === changePerfilUser?.legaldesk_id && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              Salvar Alteração
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO 5: Excluir Acesso */}
+      <Dialog open={!!deleteModalUser} onOpenChange={(open) => !open && setDeleteModalUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-600">
+              <AlertTriangle className="h-5 w-5" />
+              Excluir Acesso ao Sistema
+            </DialogTitle>
+            <DialogDescription className="space-y-2 text-left pt-2">
+              <span className="block font-semibold text-rose-600 dark:text-rose-400">
+                ATENÇÃO! Isso removerá a conta de acesso ao Skip de {deleteModalUser?.nome}.
+              </span>
+              <span className="block text-muted-foreground text-xs leading-relaxed">
+                Os registros do LegalDesk <strong>NÃO</strong> serão afetados. Caso o colaborador
+                possua histórico de tarefas ou atendimentos vinculados, o acesso será desativado com
+                segurança para manter a integridade dos dados.
+              </span>
+              <span className="block text-xs font-medium pt-1">
+                Esta ação não pode ser desfeita. Deseja continuar?
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteModalUser(null)}
+              disabled={actionLoadingId === deleteModalUser?.legaldesk_id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={actionLoadingId === deleteModalUser?.legaldesk_id}
+            >
+              {actionLoadingId === deleteModalUser?.legaldesk_id && (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              )}
+              Sim, Excluir Acesso
             </Button>
           </DialogFooter>
         </DialogContent>
