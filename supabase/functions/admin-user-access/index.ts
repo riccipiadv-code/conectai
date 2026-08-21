@@ -269,18 +269,32 @@ Deno.serve(async (req: Request) => {
 
       const profileId = existingProfile.id
 
+      // 4. Proteção contra autoexclusão
+      if (profileId === user.id) {
+        throw new Error('Você não pode excluir sua própria conta.')
+      }
+
       // Verificar dependências em todas as tabelas relacionadas
       const [
-        { count: countTarefasResp },
-        { count: countTarefasAux },
-        { count: countSkipTarefasResp },
-        { count: countSkipTarefasAux },
-        { count: countManychatResp },
-        { count: countManychatManual },
-        { count: countHistorico },
-        { count: countComentarios },
-        { count: countAuditLog },
-        { count: countKanbanHistory },
+        resTarefasResp,
+        resTarefasAux,
+        resSkipTarefasResp,
+        resSkipTarefasAux,
+        resManychatRespUser,
+        resManychatManual,
+        resManychatDeletedBy,
+        resHistorico,
+        resComentarios,
+        resAuditLogUser,
+        resAuditLogChangedBy,
+        resKanbanHistory,
+        resAreasGestor,
+        resProfilesSubstituto,
+        resEmailSendLogs,
+        resEmailSettings,
+        resNotificacoes,
+        resAnexos,
+        resMcUserProfiles,
       ] = await Promise.all([
         supabase
           .from('tarefas')
@@ -301,11 +315,15 @@ Deno.serve(async (req: Request) => {
         supabase
           .from('manychat_contatos')
           .select('*', { count: 'exact', head: true })
-          .eq('responsavel_id', profileId),
+          .eq('responsible_user_id', profileId),
         supabase
           .from('manychat_contatos')
           .select('*', { count: 'exact', head: true })
           .eq('manual_updated_by', profileId),
+        supabase
+          .from('manychat_contatos')
+          .select('*', { count: 'exact', head: true })
+          .eq('deleted_by', profileId),
         supabase
           .from('historico_tarefas')
           .select('*', { count: 'exact', head: true })
@@ -319,26 +337,85 @@ Deno.serve(async (req: Request) => {
           .select('*', { count: 'exact', head: true })
           .eq('user_id', profileId),
         supabase
+          .from('mc_audit_log')
+          .select('*', { count: 'exact', head: true })
+          .eq('changed_by', profileId),
+        supabase
           .from('mc_kanban_history')
           .select('*', { count: 'exact', head: true })
           .eq('changed_by', profileId),
+        supabase
+          .from('areas')
+          .select('*', { count: 'exact', head: true })
+          .eq('gestor_id', profileId),
+        supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('substituto_id', profileId),
+        supabase
+          .from('email_send_logs')
+          .select('*', { count: 'exact', head: true })
+          .eq('created_by', profileId),
+        supabase
+          .from('email_settings')
+          .select('*', { count: 'exact', head: true })
+          .eq('updated_by', profileId),
+        supabase
+          .from('notificacoes')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', profileId),
+        supabase
+          .from('anexos')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', profileId),
+        supabase
+          .from('mc_user_profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', profileId),
       ])
 
-      const totalDependencies =
-        (countTarefasResp || 0) +
-        (countTarefasAux || 0) +
-        (countSkipTarefasResp || 0) +
-        (countSkipTarefasAux || 0) +
-        (countManychatResp || 0) +
-        (countManychatManual || 0) +
-        (countHistorico || 0) +
-        (countComentarios || 0) +
-        (countAuditLog || 0) +
-        (countKanbanHistory || 0)
+      // 1. Tratar explicitamente qualquer erro nas consultas de dependência
+      const checks = [
+        { name: 'tarefas.responsavel_id', res: resTarefasResp },
+        { name: 'tarefas.auxiliar_id', res: resTarefasAux },
+        { name: 'skip_tarefas.responsavel_id', res: resSkipTarefasResp },
+        { name: 'skip_tarefas.auxiliar_id', res: resSkipTarefasAux },
+        { name: 'manychat_contatos.responsible_user_id', res: resManychatRespUser },
+        { name: 'manychat_contatos.manual_updated_by', res: resManychatManual },
+        { name: 'manychat_contatos.deleted_by', res: resManychatDeletedBy },
+        { name: 'historico_tarefas.usuario_id', res: resHistorico },
+        { name: 'comentarios.user_id', res: resComentarios },
+        { name: 'mc_audit_log.user_id', res: resAuditLogUser },
+        { name: 'mc_audit_log.changed_by', res: resAuditLogChangedBy },
+        { name: 'mc_kanban_history.changed_by', res: resKanbanHistory },
+        { name: 'areas.gestor_id', res: resAreasGestor },
+        { name: 'profiles.substituto_id', res: resProfilesSubstituto },
+        { name: 'email_send_logs.created_by', res: resEmailSendLogs },
+        { name: 'email_settings.updated_by', res: resEmailSettings },
+        { name: 'notificacoes.user_id', res: resNotificacoes },
+        { name: 'anexos.user_id', res: resAnexos },
+        { name: 'mc_user_profiles.user_id', res: resMcUserProfiles },
+      ]
+
+      for (const check of checks) {
+        if (check.res.error) {
+          throw new Error(
+            `Erro ao verificar dependências em ${check.name}: ${check.res.error.message}`,
+          )
+        }
+      }
+
+      const totalDependencies = checks.reduce((sum, check) => sum + (check.res.count || 0), 0)
 
       if (totalDependencies > 0) {
         // Se HOUVER dependências: NÃO excluir fisicamente. Apenas desativar (ativo=false)
-        await supabase.from('profiles').update({ ativo: false }).eq('id', profileId)
+        const { error: deactivateError } = await supabase
+          .from('profiles')
+          .update({ ativo: false })
+          .eq('id', profileId)
+
+        if (deactivateError) throw deactivateError
+
         return new Response(
           JSON.stringify({
             success: true,
@@ -353,17 +430,27 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Se NÃO houver dependências: excluir o profile e depois excluir o auth user
+      // Se NÃO houver dependências:
+      // 6. Tratar explicitamente erro na exclusão do profile
       const { error: delProfileError } = await supabase
         .from('profiles')
         .delete()
         .eq('id', profileId)
 
-      if (delProfileError) throw delProfileError
+      if (delProfileError) {
+        throw new Error(`Erro ao excluir perfil do usuário: ${delProfileError.message}`)
+      }
 
+      // 5. Excluir auth user após remover profile (se o auth delete falhar, registrar log claro)
       const { error: delAuthError } = await supabase.auth.admin.deleteUser(profileId)
       if (delAuthError) {
-        console.warn('Aviso ao deletar auth user:', delAuthError)
+        console.error(
+          `ERRO CRÍTICO: Perfil ${profileId} excluído, mas falha ao excluir auth.users (${profileId}):`,
+          delAuthError,
+        )
+        throw new Error(
+          `Perfil excluído, mas ocorreu um erro ao remover credenciais do Auth: ${delAuthError.message}. Intervenção manual pode ser necessária.`,
+        )
       }
 
       return new Response(
