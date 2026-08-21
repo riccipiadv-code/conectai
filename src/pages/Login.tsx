@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
-import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,23 +12,44 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
-import { Lock, Mail } from 'lucide-react'
+import { Lock, Mail, AlertTriangle } from 'lucide-react'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isRecoveryMode, setIsRecoveryMode] = useState(false)
-  const { signIn, resetPassword } = useAuth()
+  const { user, profile, loading, signIn, resetPassword } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { toast } = useToast()
+
+  const reason = searchParams.get('reason')
+  const isDisabledParam = reason === 'disabled'
+
+  useEffect(() => {
+    if (isDisabledParam) {
+      toast({
+        title: 'Acesso desativado',
+        description: 'Seu acesso foi desativado. Entre em contato com o administrador.',
+        variant: 'destructive',
+      })
+    }
+  }, [isDisabledParam, toast])
+
+  useEffect(() => {
+    if (!loading && user && profile && profile.ativo !== false) {
+      navigate('/')
+    }
+  }, [user, profile, loading, navigate])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
-    const { error } = await signIn(email, password)
+    const { error, disabled } = await signIn(email, password)
 
     if (error) {
       toast({
@@ -37,27 +57,19 @@ export default function Login() {
         description: error.message || 'Verifique suas credenciais e tente novamente.',
         variant: 'destructive',
       })
+    } else if (disabled) {
+      toast({
+        title: 'Acesso Negado',
+        description: 'Seu acesso foi desativado. Entre em contato com o administrador.',
+        variant: 'destructive',
+      })
+      navigate('/login?reason=disabled')
     } else {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('ativo')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (!profile || profile.ativo === false) {
-        await supabase.auth.signOut()
-        toast({
-          title: 'Acesso Negado',
-          description: 'Usuário sem acesso ativo ao sistema. Contate o administrador.',
-          variant: 'destructive',
-        })
-      } else {
-        toast({
-          title: 'Bem-vindo!',
-          description: 'Login realizado com sucesso.',
-        })
-        navigate('/')
-      }
+      toast({
+        title: 'Bem-vindo!',
+        description: 'Login realizado com sucesso.',
+      })
+      navigate('/')
     }
 
     setIsLoading(false)
@@ -142,6 +154,22 @@ export default function Login() {
           <CardTitle className="text-2xl font-bold tracking-tight">ManySkip</CardTitle>
           <CardDescription>Entre com suas credenciais para acessar o sistema</CardDescription>
         </CardHeader>
+        {isDisabledParam && (
+          <div className="px-6 pb-2">
+            <Alert
+              variant="destructive"
+              className="border-rose-300 dark:border-rose-900 bg-rose-50/70 dark:bg-rose-950/40"
+            >
+              <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+              <AlertTitle className="text-rose-900 dark:text-rose-200 font-semibold text-sm">
+                Acesso Desativado
+              </AlertTitle>
+              <AlertDescription className="text-rose-800 dark:text-rose-300 text-xs">
+                Seu acesso foi desativado. Entre em contato com o administrador.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
             <div className="space-y-2">

@@ -2,10 +2,16 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 
+export interface UserProfile {
+  perfil: string
+  ativo: boolean
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
-  signIn: (email: string, password: string) => Promise<{ error: any }>
+  profile: UserProfile | null
+  signIn: (email: string, password: string) => Promise<{ error: any; disabled?: boolean }>
   signOut: () => Promise<{ error: any }>
   resetPassword: (email: string) => Promise<{ error: any }>
   updatePassword: (password: string) => Promise<{ error: any }>
@@ -23,29 +29,102 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
+  const handleSessionChange = async (currentSession: Session | null) => {
+    if (!currentSession?.user) {
+      setSession(null)
+      setUser(null)
+      setProfile(null)
       setLoading(false)
+      return
+    }
+
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('perfil, ativo')
+        .eq('id', currentSession.user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Erro ao buscar perfil do usuário:', error)
+      }
+
+      if (!profileData) {
+        setProfile(null)
+        setSession(currentSession)
+        setUser(currentSession.user)
+      } else if (profileData.ativo === false) {
+        // Usuário inativo: destruir sessão Supabase e manter user null
+        setProfile({
+          perfil: profileData.perfil ?? '',
+          ativo: false,
+        })
+        setUser(null)
+        setSession(null)
+        await supabase.auth.signOut()
+      } else {
+        setProfile({
+          perfil: profileData.perfil ?? '',
+          ativo: Boolean(profileData.ativo),
+        })
+        setSession(currentSession)
+        setUser(currentSession.user)
+      }
+    } catch (err) {
+      console.error('Exceção ao carregar perfil:', err)
+      setSession(currentSession)
+      setUser(currentSession.user)
+      setProfile(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    // Buscar sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSessionChange(session)
     })
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // Regra de integração: não colocar async/await direto dentro do callback síncrono, delegar para a função async
+      handleSessionChange(newSession)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) {
+      return { error }
+    }
+
+    if (data.user) {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('perfil, ativo')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (profileData && profileData.ativo === false) {
+        await supabase.auth.signOut()
+        setUser(null)
+        setSession(null)
+        setProfile({
+          perfil: profileData.perfil ?? '',
+          ativo: false,
+        })
+        return { error: null, disabled: true }
+      }
+    }
+
+    return { error: null, disabled: false }
   }
 
   const signOut = async () => {
@@ -67,7 +146,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, signIn, signOut, resetPassword, updatePassword, loading }}
+      value={{
+        user,
+        session,
+        profile,
+        signIn,
+        signOut,
+        resetPassword,
+        updatePassword,
+        loading,
+      }}
     >
       {children}
     </AuthContext.Provider>

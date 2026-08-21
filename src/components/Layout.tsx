@@ -30,15 +30,21 @@ import {
 } from 'lucide-react'
 
 export default function Layout() {
-  const { user, loading, signOut } = useAuth()
+  const { user, profile, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    if (!loading && !user && location.pathname !== '/login') {
-      navigate('/login')
+    if (!loading) {
+      if (profile && profile.ativo === false) {
+        signOut().then(() => {
+          navigate('/login?reason=disabled')
+        })
+      } else if (!user && location.pathname !== '/login') {
+        navigate('/login')
+      }
     }
-  }, [user, loading, navigate, location])
+  }, [user, profile, loading, navigate, location, signOut])
 
   if (loading) {
     return (
@@ -57,6 +63,24 @@ export default function Layout() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
+  }
+
+  const roleDisplay = () => {
+    if (!profile?.perfil) return 'Administrador'
+    switch (profile.perfil) {
+      case 'socio_gestor':
+        return 'Sócio Gestor'
+      case 'gestor_area':
+        return 'Gestor de Área'
+      case 'advogado':
+        return 'Advogado'
+      case 'estagiario':
+        return 'Estagiário'
+      case 'administrativo':
+        return 'Administrativo'
+      default:
+        return profile.perfil
+    }
   }
 
   return (
@@ -172,7 +196,7 @@ export default function Layout() {
                 {user.email}
               </span>
               <span className="text-[11px] text-slate-500 uppercase tracking-wide font-medium">
-                Administrador
+                {roleDisplay()}
               </span>
             </div>
             <Button
