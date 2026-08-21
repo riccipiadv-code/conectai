@@ -65,7 +65,7 @@ export async function getDashboardData(filters: DashboardFilters) {
     if (filters.origens && filters.origens.length > 0)
       query = query.in('origem_id', filters.origens)
     if (filters.servico_id) query = query.eq('servico_id', filters.servico_id)
-    if (filters.depto_id) query = query.eq('depto_id', filters.depto_id)
+    if (filters.depto_id) query = query.eq('depto_id', Number(filters.depto_id))
     if (filters.responsavel_id) query = query.eq('responsavel_id', filters.responsavel_id)
     if (filters.current_stage) query = query.eq('current_stage', filters.current_stage)
     if (filters.orcamento) query = query.eq('orcamento', filters.orcamento)

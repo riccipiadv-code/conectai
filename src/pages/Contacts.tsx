@@ -566,17 +566,20 @@ export default function Contacts() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Departamento</Label>
-              <Select value={filters.depto_id} onValueChange={(v) => updateFilter('depto_id', v)}>
+              <Select
+                value={filters.depto_id != null ? String(filters.depto_id) : 'all'}
+                onValueChange={(v) => updateFilter('depto_id', v)}
+              >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   {meta.deptos?.map((d: any) => (
-                    <SelectItem key={d.id} value={d.id.toString()}>
+                    <SelectItem key={d.id} value={String(d.id)}>
                       {d.nome}
                     </SelectItem>
-                  ))}
+                  ))}{' '}
                 </SelectContent>
               </Select>
             </div>

@@ -133,7 +133,7 @@ export async function createContact(payload: Partial<Contact>) {
   }
   const { data, error } = await supabase
     .from('manychat_contatos')
-    .insert([sanitized])
+    .insert([sanitized as any])
     .select()
     .single()
   if (error) throw error
@@ -278,9 +278,10 @@ export async function getContacts(
     query = query.eq('responsavel_id', filters.responsavel_id)
   if (filters.servico_id && filters.servico_id !== 'all')
     query = query.eq('servico_id', filters.servico_id)
-  if (filters.depto_id && filters.depto_id !== 'all') query = query.eq('depto_id', filters.depto_id)
+  if (filters.depto_id && filters.depto_id !== 'all')
+    query = query.eq('depto_id', Number(filters.depto_id))
   if (filters.origem_id && filters.origem_id !== 'all')
-    query = query.eq('origem_id', filters.origem_id)
+    query = query.eq('origem_id', Number(filters.origem_id))
 
   if (filters.sla && filters.sla !== 'all') {
     query = query.eq('sla_status', filters.sla)
@@ -390,7 +391,7 @@ export async function updateContact(id: string, updates: any, previousStage?: st
 
   const { data, error } = await supabase
     .from('manychat_contatos')
-    .update(payload)
+    .update(payload as any)
     .eq('id', id)
     .select()
     .single()

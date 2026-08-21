@@ -46,10 +46,11 @@ export type UserRow = {
   sigla: string
   email: string
   ativo_ld: boolean
-  profile_id?: string
+  profile_id?: string | null
   perfil: string | null // null quando não tem profile
   ativo_sys: boolean
   auth_user_exists: boolean
+  status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
 }
 
 const PERFIL_LABELS: Record<string, string> = {
@@ -84,51 +85,16 @@ export default function UserManagement() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [{ data: ldUsers, error: ldErr }, { data: profs, error: profErr }] = await Promise.all([
-        supabase.from('legaldesk_usuarios').select('*').order('nome'),
-        supabase.from('profiles').select('*'),
-      ])
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: { action: 'list_users' },
+      })
 
-      if (ldErr) throw ldErr
-      if (profErr) throw profErr
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Falha na comunicação com o servidor.')
+      }
 
-      if (ldUsers) {
-        const rows: UserRow[] = ldUsers.map((ld) => {
-          // Vínculo principal: legaldesk_usuario_id; Fallback: e-mail
-          const prof =
-            profs?.find((p) => p.legaldesk_usuario_id === ld.id) ||
-            (ld.email
-              ? profs?.find((p) => p.email?.toLowerCase() === ld.email?.toLowerCase())
-              : undefined)
-
-          if (prof) {
-            return {
-              legaldesk_id: ld.id,
-              nome: ld.nome,
-              sigla: ld.sigla || '',
-              email: ld.email || prof.email || '',
-              ativo_ld: ld.ativo ?? false,
-              profile_id: prof.id,
-              perfil: prof.perfil || null,
-              ativo_sys: prof.ativo ?? false,
-              auth_user_exists: true,
-            }
-          }
-
-          return {
-            legaldesk_id: ld.id,
-            nome: ld.nome,
-            sigla: ld.sigla || '',
-            email: ld.email || '',
-            ativo_ld: ld.ativo ?? false,
-            profile_id: undefined,
-            perfil: null,
-            ativo_sys: false,
-            auth_user_exists: false,
-          }
-        })
-
-        setUsers(rows)
+      if (data?.users) {
+        setUsers(data.users)
       }
     } catch (err: any) {
       toast({
@@ -366,8 +332,8 @@ export default function UserManagement() {
         u.sigla.toLowerCase().includes(search.toLowerCase())
       if (!matchesSearch) return false
 
-      if (filter === 'with_access') return u.auth_user_exists && u.ativo_sys
-      if (filter === 'without_access') return !u.auth_user_exists || !u.ativo_sys
+      if (filter === 'with_access') return u.status === 'ativo'
+      if (filter === 'without_access') return u.status !== 'ativo'
       if (filter === 'active_ld') return u.ativo_ld
       return true
     })
@@ -389,10 +355,10 @@ export default function UserManagement() {
           <TabsList className="w-full sm:w-auto overflow-x-auto">
             <TabsTrigger value="all">Todos ({users.length})</TabsTrigger>
             <TabsTrigger value="with_access">
-              Com Acesso ({users.filter((u) => u.auth_user_exists && u.ativo_sys).length})
+              Com Acesso ({users.filter((u) => u.status === 'ativo').length})
             </TabsTrigger>
             <TabsTrigger value="without_access">
-              Sem Acesso ({users.filter((u) => !u.auth_user_exists || !u.ativo_sys).length})
+              Sem Acesso ({users.filter((u) => u.status !== 'ativo').length})
             </TabsTrigger>
             <TabsTrigger value="active_ld">
               Ativos LD ({users.filter((u) => u.ativo_ld).length})
@@ -466,7 +432,14 @@ export default function UserManagement() {
 
                       {/* 4. Perfil */}
                       <TableCell>
-                        {u.auth_user_exists && u.perfil ? (
+                        {u.status === 'inconsistente' ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 font-medium"
+                          >
+                            Conta inconsistente
+                          </Badge>
+                        ) : u.auth_user_exists && u.perfil ? (
                           <Badge
                             variant="outline"
                             className="bg-slate-50 dark:bg-zinc-800/60 font-medium text-slate-700 dark:text-slate-300"
@@ -482,11 +455,18 @@ export default function UserManagement() {
 
                       {/* 5. Acesso ao Sistema */}
                       <TableCell className="text-center">
-                        {u.auth_user_exists && u.ativo_sys ? (
+                        {u.status === 'inconsistente' ? (
+                          <Badge
+                            variant="outline"
+                            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 font-medium"
+                          >
+                            Inconsistente
+                          </Badge>
+                        ) : u.status === 'ativo' ? (
                           <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
                             Liberado
                           </Badge>
-                        ) : u.auth_user_exists && !u.ativo_sys ? (
+                        ) : u.status === 'bloqueado' ? (
                           <Badge variant="destructive" className="font-medium">
                             Bloqueado
                           </Badge>
@@ -503,8 +483,8 @@ export default function UserManagement() {
                           <div className="flex items-center justify-end">
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           </div>
-                        ) : !u.auth_user_exists ? (
-                          /* Usuário SEM profile (sem acesso) */
+                        ) : u.status === 'sem_acesso' || u.status === 'inconsistente' ? (
+                          /* Usuário SEM acesso ou INCONSISTENTE: Ativar Acesso */
                           <Button
                             size="sm"
                             variant="outline"
@@ -519,9 +499,9 @@ export default function UserManagement() {
                             Ativar Acesso
                           </Button>
                         ) : (
-                          /* Usuário COM profile */
+                          /* Usuário COM profile e auth válido: ativo ou bloqueado */
                           <div className="flex items-center justify-end gap-1.5">
-                            {u.ativo_sys ? (
+                            {u.status === 'ativo' ? (
                               <Button
                                 size="sm"
                                 variant="outline"

@@ -52,9 +52,10 @@ export interface ContactModalProps {
   servicos: Servico[]
   deptos: Depto[]
   cancelReasons: CancelReason[]
-  origens: Origem[]
-  subservicos: Subservico[]
-  portesEmpresa: PorteEmpresa[]
+  origens?: Origem[]
+  subservicos?: Subservico[]
+  portesEmpresa?: PorteEmpresa[]
+  responsaveis?: Responsavel[]
 }
 
 export function ContactModal({
@@ -69,15 +70,20 @@ export function ContactModal({
   origens = [],
   subservicos = [],
   portesEmpresa = [],
+  responsaveis: initialResponsaveis,
 }: ContactModalProps) {
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
-  const [responsaveis, setResponsaveis] = useState<Responsavel[]>([])
+  const [responsaveis, setResponsaveis] = useState<Responsavel[]>(initialResponsaveis || [])
 
   useEffect(() => {
-    getResponsaveis().then(setResponsaveis).catch(console.error)
-  }, [])
+    if (!initialResponsaveis || initialResponsaveis.length === 0) {
+      getResponsaveis().then(setResponsaveis).catch(console.error)
+    } else {
+      setResponsaveis(initialResponsaveis)
+    }
+  }, [initialResponsaveis])
 
   useEffect(() => {
     if (isOpen) {

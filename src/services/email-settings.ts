@@ -20,7 +20,7 @@ export const getEmailSettings = async () => {
     .select('*')
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data as EmailSetting[]
+  return data as unknown as EmailSetting[]
 }
 
 export const saveEmailSetting = async (setting: EmailSetting, secret?: string) => {
