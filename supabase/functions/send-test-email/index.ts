@@ -1,6 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import nodemailer from 'nodemailer'
+import nodemailer from 'npm:nodemailer'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
       .select('perfil')
       .eq('id', user.id)
       .single()
-    if (profile?.perfil !== 'socio_gestor') {
+    if (profile?.perfil !== 'administrador') {
       throw new Error('Permissão negada: apenas gestores podem testar o envio de e-mails.')
     }
 

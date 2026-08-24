@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
       .select('perfil')
       .eq('id', user.id)
       .single()
-    if (profile?.perfil !== 'socio_gestor') {
+    if (profile?.perfil !== 'administrador') {
       throw new Error('Permissão negada: apenas gestores podem alterar configurações de e-mail.')
     }
 

@@ -7,14 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const VALID_PERFIS = [
-  'socio_gestor',
-  'gestor_area',
-  'advogado',
-  'estagiario',
-  'administrativo',
-] as const
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -180,8 +172,18 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'grant_access') {
-      const targetPerfil = perfil || 'advogado'
-      if (!VALID_PERFIS.includes(targetPerfil)) {
+      const targetPerfil = perfil || 'administrador'
+
+      // Consultar perfis válidos ativos no banco
+      const { data: validPerfisData, error: perfisError } = await supabase
+        .from('perfis_acesso')
+        .select('codigo')
+        .eq('ativo', true)
+
+      if (perfisError) throw perfisError
+
+      const validPerfis = (validPerfisData || []).map((p: { codigo: string }) => p.codigo)
+      if (!validPerfis.includes(targetPerfil)) {
         throw new Error(`Perfil inválido: ${targetPerfil}`)
       }
 
@@ -284,7 +286,20 @@ Deno.serve(async (req: Request) => {
       if (!existingProfile) {
         throw new Error('Usuário não possui perfil para alterar permissão.')
       }
-      if (!perfil || !VALID_PERFIS.includes(perfil)) {
+      if (!perfil) {
+        throw new Error('Perfil inválido.')
+      }
+
+      // Consultar perfis válidos ativos no banco
+      const { data: validPerfisData, error: perfisError } = await supabase
+        .from('perfis_acesso')
+        .select('codigo')
+        .eq('ativo', true)
+
+      if (perfisError) throw perfisError
+
+      const validPerfis = (validPerfisData || []).map((p: { codigo: string }) => p.codigo)
+      if (!validPerfis.includes(perfil)) {
         throw new Error(`Perfil inválido: ${perfil}`)
       }
 

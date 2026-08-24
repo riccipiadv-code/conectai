@@ -1378,6 +1378,36 @@ export type Database = {
         }
         Relationships: []
       }
+      perfis_acesso: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       prazos: {
         Row: {
           assunto: string | null
@@ -1691,7 +1721,7 @@ export type Database = {
       }
     }
     Enums: {
-      perfil_type: 'socio_gestor' | 'gestor_area' | 'advogado' | 'estagiario' | 'administrativo'
+      perfil_type: 'administrador' | 'operacional' | 'gestor'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1817,7 +1847,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      perfil_type: ['socio_gestor', 'gestor_area', 'advogado', 'estagiario', 'administrativo'],
+      perfil_type: ['administrador', 'operacional', 'gestor'],
     },
   },
 } as const

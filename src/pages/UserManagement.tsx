@@ -61,12 +61,9 @@ export type HiddenUser = {
   email: string | null
 }
 
-const PERFIL_LABELS: Record<string, string> = {
-  socio_gestor: 'Sócio Gestor',
-  gestor_area: 'Gestor de Área',
-  advogado: 'Advogado',
-  estagiario: 'Estagiário',
-  administrativo: 'Administrativo',
+type PerfilOption = {
+  codigo: string
+  nome: string
 }
 
 async function extractErrorMessage(
@@ -107,6 +104,15 @@ export default function UserManagement() {
   const [filter, setFilter] = useState('all')
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const { toast } = useToast()
+  const [perfisOptions, setPerfisOptions] = useState<PerfilOption[]>([
+    { codigo: 'administrador', nome: 'Administrador' },
+  ])
+
+  const getPerfilLabel = (codigo: string | null): string => {
+    if (!codigo) return ''
+    const match = perfisOptions.find((p) => p.codigo === codigo)
+    return match ? match.nome : codigo
+  }
 
   // Modal Criar Novo Acesso (colaboradores ocultos)
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -114,21 +120,40 @@ export default function UserManagement() {
   const [loadingHiddenUsers, setLoadingHiddenUsers] = useState(false)
   const [hiddenSearch, setHiddenSearch] = useState('')
   const [selectedHiddenUser, setSelectedHiddenUser] = useState<HiddenUser | null>(null)
-  const [createPerfil, setCreatePerfil] = useState<string>('advogado')
+  const [createPerfil, setCreatePerfil] = useState<string>('administrador')
   const [creatingAccess, setCreatingAccess] = useState(false)
 
   // Diálogos modais de linha
   const [grantModalUser, setGrantModalUser] = useState<UserRow | null>(null)
-  const [grantPerfil, setGrantPerfil] = useState<string>('advogado')
+  const [grantPerfil, setGrantPerfil] = useState<string>('administrador')
 
   const [reactivateModalUser, setReactivateModalUser] = useState<UserRow | null>(null)
 
   const [revokeModalUser, setRevokeModalUser] = useState<UserRow | null>(null)
 
   const [editModalUser, setEditModalUser] = useState<UserRow | null>(null)
-  const [editPerfil, setEditPerfil] = useState<string>('advogado')
+  const [editPerfil, setEditPerfil] = useState<string>('administrador')
 
   const [deleteModalUser, setDeleteModalUser] = useState<UserRow | null>(null)
+
+  const loadPerfis = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('perfis_acesso')
+        .select('codigo, nome')
+        .eq('ativo', true)
+        .order('ordem', { ascending: true })
+        .order('nome', { ascending: true })
+
+      if (error || !data || data.length === 0) {
+        setPerfisOptions([{ codigo: 'administrador', nome: 'Administrador' }])
+      } else {
+        setPerfisOptions(data)
+      }
+    } catch {
+      setPerfisOptions([{ codigo: 'administrador', nome: 'Administrador' }])
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -161,6 +186,7 @@ export default function UserManagement() {
   }
 
   useEffect(() => {
+    loadPerfis()
     loadData()
   }, [])
 
@@ -169,7 +195,7 @@ export default function UserManagement() {
     setCreateModalOpen(true)
     setHiddenSearch('')
     setSelectedHiddenUser(null)
-    setCreatePerfil('advogado')
+    setCreatePerfil('administrador')
     setLoadingHiddenUsers(true)
 
     try {
@@ -219,7 +245,7 @@ export default function UserManagement() {
 
       toast({
         title: 'Acesso liberado!',
-        description: `O acesso para ${selectedHiddenUser.nome} como "${PERFIL_LABELS[createPerfil] || createPerfil}" foi configurado com sucesso.`,
+        description: `O acesso para ${selectedHiddenUser.nome} como "${getPerfilLabel(createPerfil) || createPerfil}" foi configurado com sucesso.`,
       })
       setCreateModalOpen(false)
       setSelectedHiddenUser(null)
@@ -249,7 +275,7 @@ export default function UserManagement() {
   // 2. Ativar Acesso (para novo usuário da tabela sem profile)
   const handleOpenGrantModal = (user: UserRow) => {
     setGrantModalUser(user)
-    setGrantPerfil('advogado')
+    setGrantPerfil('administrador')
   }
 
   const handleConfirmGrant = async () => {
@@ -274,7 +300,7 @@ export default function UserManagement() {
 
       toast({
         title: 'Acesso liberado!',
-        description: `O acesso para ${user.nome} como "${PERFIL_LABELS[grantPerfil] || grantPerfil}" foi configurado com sucesso.`,
+        description: `O acesso para ${user.nome} como "${getPerfilLabel(grantPerfil) || grantPerfil}" foi configurado com sucesso.`,
       })
       setGrantModalUser(null)
       await loadData()
@@ -305,7 +331,7 @@ export default function UserManagement() {
           legaldesk_id: user.legaldesk_id,
           email: user.email,
           name: user.nome,
-          perfil: user.perfil || 'advogado',
+          perfil: user.perfil || 'administrador',
         },
       })
 
@@ -375,7 +401,7 @@ export default function UserManagement() {
   // 5. Editar Acesso (change_perfil)
   const handleOpenEditModal = (user: UserRow) => {
     setEditModalUser(user)
-    setEditPerfil(user.perfil || 'advogado')
+    setEditPerfil(user.perfil || 'administrador')
   }
 
   const handleConfirmEdit = async () => {
@@ -400,7 +426,7 @@ export default function UserManagement() {
 
       toast({
         title: 'Perfil alterado',
-        description: `O perfil de ${user.nome} foi atualizado para "${PERFIL_LABELS[editPerfil] || editPerfil}".`,
+        description: `O perfil de ${user.nome} foi atualizado para "${getPerfilLabel(editPerfil) || editPerfil}".`,
       })
       setEditModalUser(null)
       await loadData()
@@ -581,7 +607,7 @@ export default function UserManagement() {
                             variant="outline"
                             className="bg-slate-50 dark:bg-zinc-800/60 font-medium text-slate-700 dark:text-slate-300"
                           >
-                            {PERFIL_LABELS[u.perfil || 'advogado'] || u.perfil || 'Advogado'}
+                            {getPerfilLabel(u.perfil) || 'Sem perfil'}
                           </Badge>
                         ) : (
                           <span className="text-[13px] text-muted-foreground italic">
@@ -733,11 +759,11 @@ export default function UserManagement() {
                       <SelectValue placeholder="Selecione um perfil..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
-                      <SelectItem value="gestor_area">Gestor de Área</SelectItem>
-                      <SelectItem value="advogado">Advogado</SelectItem>
-                      <SelectItem value="estagiario">Estagiário</SelectItem>
-                      <SelectItem value="administrativo">Administrativo</SelectItem>
+                      {perfisOptions.map((p) => (
+                        <SelectItem key={p.codigo} value={p.codigo}>
+                          {p.nome}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -788,11 +814,11 @@ export default function UserManagement() {
                 <SelectValue placeholder="Selecione um perfil..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
-                <SelectItem value="gestor_area">Gestor de Área</SelectItem>
-                <SelectItem value="advogado">Advogado</SelectItem>
-                <SelectItem value="estagiario">Estagiário</SelectItem>
-                <SelectItem value="administrativo">Administrativo</SelectItem>
+                {perfisOptions.map((p) => (
+                  <SelectItem key={p.codigo} value={p.codigo}>
+                    {p.nome}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
@@ -841,7 +867,7 @@ export default function UserManagement() {
           <div className="py-3 text-sm text-muted-foreground">
             O usuário voltará a ter acesso ao sistema com o perfil{' '}
             <strong className="text-foreground">
-              {PERFIL_LABELS[reactivateModalUser?.perfil || 'advogado'] ||
+              {getPerfilLabel(reactivateModalUser?.perfil || 'administrador') ||
                 reactivateModalUser?.perfil}
             </strong>
             .
@@ -972,11 +998,11 @@ export default function UserManagement() {
                   <SelectValue placeholder="Selecione o perfil..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
-                  <SelectItem value="gestor_area">Gestor de Área</SelectItem>
-                  <SelectItem value="advogado">Advogado</SelectItem>
-                  <SelectItem value="estagiario">Estagiário</SelectItem>
-                  <SelectItem value="administrativo">Administrativo</SelectItem>
+                  {perfisOptions.map((p) => (
+                    <SelectItem key={p.codigo} value={p.codigo}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
+import { supabase } from '@/lib/supabase/client'
 import {
   Sidebar,
   SidebarContent,
@@ -33,6 +34,33 @@ export default function Layout() {
   const { user, profile, loading, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [perfilLabels, setPerfilLabels] = useState<Record<string, string>>({})
+  const [loadingPerfis, setLoadingPerfis] = useState(true)
+
+  useEffect(() => {
+    async function fetchPerfis() {
+      try {
+        const { data, error } = await supabase
+          .from('perfis_acesso')
+          .select('codigo, nome')
+          .eq('ativo', true)
+
+        if (!error && data) {
+          const map: Record<string, string> = {}
+          data.forEach((p: { codigo: string; nome: string }) => {
+            map[p.codigo] = p.nome
+          })
+          setPerfilLabels(map)
+        }
+      } catch (err) {
+        console.error('Erro ao buscar perfis de acesso no Layout:', err)
+      } finally {
+        setLoadingPerfis(false)
+      }
+    }
+
+    fetchPerfis()
+  }, [])
 
   useEffect(() => {
     if (!loading) {
@@ -67,20 +95,10 @@ export default function Layout() {
 
   const roleDisplay = () => {
     if (!profile?.perfil) return 'Administrador'
-    switch (profile.perfil) {
-      case 'socio_gestor':
-        return 'Sócio Gestor'
-      case 'gestor_area':
-        return 'Gestor de Área'
-      case 'advogado':
-        return 'Advogado'
-      case 'estagiario':
-        return 'Estagiário'
-      case 'administrativo':
-        return 'Administrativo'
-      default:
-        return profile.perfil
+    if (loadingPerfis && Object.keys(perfilLabels).length === 0) {
+      return profile.perfil || 'Carregando...'
     }
+    return perfilLabels[profile.perfil] || profile.perfil || 'Administrador'
   }
 
   return (
