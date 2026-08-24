@@ -63,10 +63,11 @@ Deno.serve(async (req: Request) => {
       if (!profile || !profile.ativo) {
         throw new Error('Permissão negada. Usuário sem perfil ativo.')
       }
-      // 1. Consultar todos os legaldesk_usuarios ordenados por nome
+      // 1. Consultar todos os legaldesk_usuarios onde exibir_gestao_usuarios = true ordenados por nome
       const { data: ldUsers, error: ldError } = await supabase
         .from('legaldesk_usuarios')
         .select('*')
+        .eq('exibir_gestao_usuarios', true)
         .order('nome')
 
       if (ldError) throw ldError
@@ -135,7 +136,25 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Para as demais ações (grant_access, revoke_access, change_perfil, delete_access):
+    if (action === 'list_hidden_users') {
+      if (!profile || !profile.ativo) {
+        throw new Error('Permissão negada. Usuário sem perfil ativo.')
+      }
+
+      const { data: hiddenUsers, error: hiddenError } = await supabase
+        .from('legaldesk_usuarios')
+        .select('id, nome, sigla, email')
+        .eq('exibir_gestao_usuarios', false)
+        .order('nome')
+
+      if (hiddenError) throw hiddenError
+
+      return new Response(JSON.stringify({ users: hiddenUsers || [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Para as demais ações administrativas (grant_access, revoke_access, change_perfil, hide_from_management):
     // Manter a exigência de socio_gestor + ativo === true
     if (profile?.perfil !== 'socio_gestor' || !profile?.ativo) {
       throw new Error('Permissão negada. Apenas Sócios Gestores podem gerenciar usuários.')
@@ -148,14 +167,14 @@ Deno.serve(async (req: Request) => {
     // 1. Localizar o profile existente: PRIMEIRO por legaldesk_usuario_id, DEPOIS fallback por email
     let { data: existingProfile } = await supabase
       .from('profiles')
-      .select('id, email, legaldesk_usuario_id, perfil, ativo')
+      .select('id, email, legaldesk_usuario_id, perfil, ativo, name')
       .eq('legaldesk_usuario_id', legaldesk_id)
       .maybeSingle()
 
     if (!existingProfile && email) {
       const { data: profileByEmail } = await supabase
         .from('profiles')
-        .select('id, email, legaldesk_usuario_id, perfil, ativo')
+        .select('id, email, legaldesk_usuario_id, perfil, ativo, name')
         .eq('email', email)
         .maybeSingle()
       existingProfile = profileByEmail
@@ -226,6 +245,20 @@ Deno.serve(async (req: Request) => {
 
       if (upsertError) throw upsertError
 
+      // Após criar/upsertar o profile com sucesso, atualizar legaldesk_usuarios
+      // Se a atualização do legaldesk_usuarios falhar, NÃO reverter o profile — apenas logar e continuar
+      const { error: ldUpdateError } = await supabase
+        .from('legaldesk_usuarios')
+        .update({ exibir_gestao_usuarios: true })
+        .eq('id', legaldesk_id)
+
+      if (ldUpdateError) {
+        console.error(
+          'Erro ao atualizar exibir_gestao_usuarios em legaldesk_usuarios:',
+          ldUpdateError,
+        )
+      }
+
       return new Response(JSON.stringify({ success: true, profile_id: profileId }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -268,126 +301,44 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    if (action === 'delete_access') {
-      if (!existingProfile) {
-        throw new Error('Usuário não possui perfil para exclusão de acesso.')
+    if (action === 'hide_from_management') {
+      // Proteção contra autoexclusão
+      if (existingProfile?.id && existingProfile.id === user.id) {
+        throw new Error('Você não pode ocultar sua própria conta.')
       }
 
-      const profileId = existingProfile.id
+      // Passo 1: UPDATE legaldesk_usuarios SET exibir_gestao_usuarios = false WHERE id = legaldesk_id
+      // Se falhar -> ABORTAR (throw error)
+      const { error: ldHideError } = await supabase
+        .from('legaldesk_usuarios')
+        .update({ exibir_gestao_usuarios: false })
+        .eq('id', legaldesk_id)
 
-      // 4. Proteção contra autoexclusão
-      if (profileId === user.id) {
-        throw new Error('Você não pode excluir sua própria conta.')
+      if (ldHideError) {
+        throw new Error(`Falha ao ocultar usuário no LegalDesk: ${ldHideError.message}`)
       }
 
-      // Verificar dependências nas 10 tabelas/colunas reais do schema
-      const [
-        resManychatRespUser,
-        resManychatManual,
-        resManychatDeletedBy,
-        resAuditLogUser,
-        resAuditLogChangedBy,
-        resKanbanHistory,
-        resEmailSendLogs,
-        resEmailSettings,
-        resMcUserProfiles,
-        resProfilesSubstituto,
-      ] = await Promise.all([
-        supabase
-          .from('manychat_contatos')
-          .select('*', { count: 'exact', head: true })
-          .eq('responsible_user_id', profileId),
-        supabase
-          .from('manychat_contatos')
-          .select('*', { count: 'exact', head: true })
-          .eq('manual_updated_by', profileId),
-        supabase
-          .from('manychat_contatos')
-          .select('*', { count: 'exact', head: true })
-          .eq('deleted_by', profileId),
-        supabase
-          .from('mc_audit_log')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', profileId),
-        supabase
-          .from('mc_audit_log')
-          .select('*', { count: 'exact', head: true })
-          .eq('changed_by', profileId),
-        supabase
-          .from('mc_kanban_history')
-          .select('*', { count: 'exact', head: true })
-          .eq('changed_by', profileId),
-        supabase
-          .from('email_send_logs')
-          .select('*', { count: 'exact', head: true })
-          .eq('created_by', profileId),
-        supabase
-          .from('email_settings')
-          .select('*', { count: 'exact', head: true })
-          .eq('updated_by', profileId),
-        supabase
-          .from('mc_user_profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', profileId),
-        supabase
+      // Passo 2: Se existir profile, UPDATE profiles SET ativo = false WHERE legaldesk_usuario_id = legaldesk_id
+      // Se falhar -> logar mas NÃO reverter o passo 1 (o usuário já foi ocultado da gestão)
+      let deactivated = false
+      if (existingProfile) {
+        const { error: profDeactivateError } = await supabase
           .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('substituto_id', profileId),
-      ])
+          .update({ ativo: false })
+          .eq('legaldesk_usuario_id', legaldesk_id)
 
-      // 1. Tratar explicitamente qualquer erro nas consultas de dependência
-      const checks = [
-        { name: 'manychat_contatos.responsible_user_id', res: resManychatRespUser },
-        { name: 'manychat_contatos.manual_updated_by', res: resManychatManual },
-        { name: 'manychat_contatos.deleted_by', res: resManychatDeletedBy },
-        { name: 'mc_audit_log.user_id', res: resAuditLogUser },
-        { name: 'mc_audit_log.changed_by', res: resAuditLogChangedBy },
-        { name: 'mc_kanban_history.changed_by', res: resKanbanHistory },
-        { name: 'email_send_logs.created_by', res: resEmailSendLogs },
-        { name: 'email_settings.updated_by', res: resEmailSettings },
-        { name: 'mc_user_profiles.user_id', res: resMcUserProfiles },
-        { name: 'profiles.substituto_id', res: resProfilesSubstituto },
-      ]
-
-      for (const check of checks) {
-        if (check.res.error) {
-          throw new Error(
-            `Erro ao verificar dependências em ${check.name}: ${check.res.error.message}`,
-          )
+        if (profDeactivateError) {
+          console.error('Erro ao desativar perfil do usuário:', profDeactivateError)
+        } else {
+          deactivated = true
         }
-      }
-
-      const totalDependencies = checks.reduce((sum, check) => sum + (check.res.count || 0), 0)
-
-      // Atualizar para inativo em vez de exclusão física para garantir integridade e atomicidade
-      const { error: deactivateError } = await supabase
-        .from('profiles')
-        .update({ ativo: false })
-        .eq('id', profileId)
-
-      if (deactivateError) throw deactivateError
-
-      if (totalDependencies > 0) {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            deleted: false,
-            deactivated: true,
-            reason: 'dependencies',
-            totalDependencies,
-          }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          },
-        )
       }
 
       return new Response(
         JSON.stringify({
           success: true,
-          deleted: false,
-          deactivated: true,
-          reason: 'atomicity_not_safe',
+          hidden: true,
+          deactivated,
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

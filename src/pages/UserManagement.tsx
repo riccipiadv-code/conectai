@@ -27,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Search,
@@ -35,9 +36,10 @@ import {
   UserX,
   UserCog,
   Trash2,
-  ShieldAlert,
   ShieldCheck,
   AlertTriangle,
+  Plus,
+  UserPlus,
 } from 'lucide-react'
 
 export type UserRow = {
@@ -51,6 +53,13 @@ export type UserRow = {
   ativo_sys: boolean
   auth_user_exists: boolean
   status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
+}
+
+export type HiddenUser = {
+  id: string
+  nome: string
+  sigla: string | null
+  email: string | null
 }
 
 const PERFIL_LABELS: Record<string, string> = {
@@ -69,7 +78,16 @@ export default function UserManagement() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const { toast } = useToast()
 
-  // Diálogos modais
+  // Modal Criar Novo Acesso (colaboradores ocultos)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [hiddenUsers, setHiddenUsers] = useState<HiddenUser[]>([])
+  const [loadingHiddenUsers, setLoadingHiddenUsers] = useState(false)
+  const [hiddenSearch, setHiddenSearch] = useState('')
+  const [selectedHiddenUser, setSelectedHiddenUser] = useState<HiddenUser | null>(null)
+  const [createPerfil, setCreatePerfil] = useState<string>('advogado')
+  const [creatingAccess, setCreatingAccess] = useState(false)
+
+  // Diálogos modais de linha
   const [grantModalUser, setGrantModalUser] = useState<UserRow | null>(null)
   const [grantPerfil, setGrantPerfil] = useState<string>('advogado')
 
@@ -77,8 +95,8 @@ export default function UserManagement() {
 
   const [revokeModalUser, setRevokeModalUser] = useState<UserRow | null>(null)
 
-  const [changePerfilUser, setChangePerfilUser] = useState<UserRow | null>(null)
-  const [newPerfil, setNewPerfil] = useState<string>('advogado')
+  const [editModalUser, setEditModalUser] = useState<UserRow | null>(null)
+  const [editPerfil, setEditPerfil] = useState<string>('advogado')
 
   const [deleteModalUser, setDeleteModalUser] = useState<UserRow | null>(null)
 
@@ -140,7 +158,83 @@ export default function UserManagement() {
     loadData()
   }, [])
 
-  // 1. Ativar Acesso (novo usuário sem profile)
+  // 1. Modal "Criar Novo"
+  const handleOpenCreateModal = async () => {
+    setCreateModalOpen(true)
+    setHiddenSearch('')
+    setSelectedHiddenUser(null)
+    setCreatePerfil('advogado')
+    setLoadingHiddenUsers(true)
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: { action: 'list_hidden_users' },
+      })
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao carregar colaboradores ocultos.')
+      }
+
+      setHiddenUsers(data?.users || [])
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao listar colaboradores',
+        description: err.message || 'Falha ao buscar usuários ocultos.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoadingHiddenUsers(false)
+    }
+  }
+
+  const handleConfirmCreateAccess = async () => {
+    if (!selectedHiddenUser) return
+    setCreatingAccess(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'grant_access',
+          legaldesk_id: selectedHiddenUser.id,
+          email: selectedHiddenUser.email,
+          name: selectedHiddenUser.nome,
+          perfil: createPerfil,
+        },
+      })
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao liberar acesso.')
+      }
+
+      toast({
+        title: 'Acesso liberado!',
+        description: `O acesso para ${selectedHiddenUser.nome} como "${PERFIL_LABELS[createPerfil] || createPerfil}" foi configurado com sucesso.`,
+      })
+      setCreateModalOpen(false)
+      setSelectedHiddenUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao liberar acesso',
+        description: err.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setCreatingAccess(false)
+    }
+  }
+
+  const filteredHiddenUsers = useMemo(() => {
+    if (!hiddenSearch) return hiddenUsers
+    const s = hiddenSearch.toLowerCase()
+    return hiddenUsers.filter((u) => {
+      const matchNome = u.nome?.toLowerCase().includes(s)
+      const matchEmail = u.email?.toLowerCase().includes(s)
+      const matchSigla = u.sigla?.toLowerCase().includes(s)
+      return matchNome || matchEmail || matchSigla
+    })
+  }, [hiddenUsers, hiddenSearch])
+
+  // 2. Ativar Acesso (para novo usuário da tabela sem profile)
   const handleOpenGrantModal = (user: UserRow) => {
     setGrantModalUser(user)
     setGrantPerfil('advogado')
@@ -182,7 +276,7 @@ export default function UserManagement() {
     }
   }
 
-  // 2. Reativar Acesso (usuário com profile e ativo_sys=false)
+  // 3. Reativar Acesso (usuário bloqueado)
   const handleOpenReactivateModal = (user: UserRow) => {
     setReactivateModalUser(user)
   }
@@ -223,7 +317,7 @@ export default function UserManagement() {
     }
   }
 
-  // 3. Desativar Acesso (usuário com profile e ativo_sys=true)
+  // 4. Desativar Acesso (revoke_access)
   const handleOpenRevokeModal = (user: UserRow) => {
     setRevokeModalUser(user)
   }
@@ -263,15 +357,15 @@ export default function UserManagement() {
     }
   }
 
-  // 4. Alterar Perfil
-  const handleOpenChangePerfilModal = (user: UserRow) => {
-    setChangePerfilUser(user)
-    setNewPerfil(user.perfil || 'advogado')
+  // 5. Editar Acesso (change_perfil)
+  const handleOpenEditModal = (user: UserRow) => {
+    setEditModalUser(user)
+    setEditPerfil(user.perfil || 'advogado')
   }
 
-  const handleConfirmChangePerfil = async () => {
-    if (!changePerfilUser) return
-    const user = changePerfilUser
+  const handleConfirmEdit = async () => {
+    if (!editModalUser) return
+    const user = editModalUser
     setActionLoadingId(user.legaldesk_id)
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
@@ -280,7 +374,7 @@ export default function UserManagement() {
           legaldesk_id: user.legaldesk_id,
           email: user.email,
           name: user.nome,
-          perfil: newPerfil,
+          perfil: editPerfil,
         },
       })
 
@@ -290,9 +384,9 @@ export default function UserManagement() {
 
       toast({
         title: 'Perfil alterado',
-        description: `O perfil de ${user.nome} foi atualizado para "${PERFIL_LABELS[newPerfil] || newPerfil}".`,
+        description: `O perfil de ${user.nome} foi atualizado para "${PERFIL_LABELS[editPerfil] || editPerfil}".`,
       })
-      setChangePerfilUser(null)
+      setEditModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
@@ -305,7 +399,7 @@ export default function UserManagement() {
     }
   }
 
-  // 5. Excluir Acesso
+  // 6. Remover da Gestão (hide_from_management)
   const handleOpenDeleteModal = (user: UserRow) => {
     setDeleteModalUser(user)
   }
@@ -317,7 +411,7 @@ export default function UserManagement() {
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
         body: {
-          action: 'delete_access',
+          action: 'hide_from_management',
           legaldesk_id: user.legaldesk_id,
           email: user.email,
           name: user.nome,
@@ -325,26 +419,19 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao excluir acesso.')
+        throw new Error(error?.message || data?.error || 'Erro ao remover usuário da gestão.')
       }
 
-      if (data?.deleted === false && data?.deactivated) {
-        toast({
-          title: 'Acesso desativado (com dependências)',
-          description: `O usuário ${user.nome} possui registros vinculados no sistema. A conta de acesso foi desativada em vez de excluída fisicamente.`,
-        })
-      } else {
-        toast({
-          title: 'Acesso excluído',
-          description: `A conta de acesso ao Skip de ${user.nome} foi removida com sucesso. O registro no LegalDesk permanece intacto.`,
-        })
-      }
+      toast({
+        title: 'Usuário removido da gestão',
+        description: `O usuário ${user.nome} foi ocultado da gestão e teve seu acesso desativado. Os dados permanecem preservados no banco.`,
+      })
 
       setDeleteModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao excluir acesso',
+        title: 'Falha ao remover usuário',
         description: err.message,
         variant: 'destructive',
       })
@@ -370,6 +457,14 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Botão Criar Novo no topo, acima da busca */}
+      <div className="flex justify-start">
+        <Button onClick={handleOpenCreateModal} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Criar Novo
+        </Button>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -460,12 +555,12 @@ export default function UserManagement() {
 
                       {/* 4. Perfil */}
                       <TableCell>
-                        {u.status === 'ativo' ? (
+                        {u.status === 'ativo' || u.status === 'bloqueado' ? (
                           <Badge
                             variant="outline"
                             className="bg-slate-50 dark:bg-zinc-800/60 font-medium text-slate-700 dark:text-slate-300"
                           >
-                            Administrador
+                            {PERFIL_LABELS[u.perfil || 'advogado'] || u.perfil || 'Advogado'}
                           </Badge>
                         ) : (
                           <span className="text-[13px] text-muted-foreground italic">
@@ -481,7 +576,7 @@ export default function UserManagement() {
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           </div>
                         ) : u.status === 'sem_acesso' || u.status === 'inconsistente' ? (
-                          /* Usuário SEM acesso ou INCONSISTENTE: Ativar Acesso */
+                          /* Usuário SEM acesso ou INCONSISTENTE: apenas "Ativar Acesso" */
                           <Button
                             size="sm"
                             variant="outline"
@@ -496,7 +591,7 @@ export default function UserManagement() {
                             Ativar Acesso
                           </Button>
                         ) : (
-                          /* Usuário COM profile e auth válido: ativo ou bloqueado */
+                          /* Usuário COM acesso (ativo ou bloqueado) */
                           <div className="flex items-center justify-end gap-1.5">
                             {u.status === 'ativo' ? (
                               <Button
@@ -524,10 +619,10 @@ export default function UserManagement() {
                               size="sm"
                               variant="outline"
                               className="h-8 text-xs"
-                              onClick={() => handleOpenChangePerfilModal(u)}
+                              onClick={() => handleOpenEditModal(u)}
                             >
                               <UserCog className="h-3.5 w-3.5 mr-1" />
-                              Alterar Perfil
+                              Editar
                             </Button>
 
                             <Button
@@ -535,7 +630,7 @@ export default function UserManagement() {
                               variant="ghost"
                               className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                               onClick={() => handleOpenDeleteModal(u)}
-                              title="Excluir Acesso"
+                              title="Excluir"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -551,7 +646,129 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* DIÁLOGO 1: Ativar Acesso (Novo usuário) */}
+      {/* MODAL CRIAR NOVO: Listar colaboradores ocultos e conceder acesso */}
+      <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+        <DialogContent className="max-w-md sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Criar Novo Acesso
+            </DialogTitle>
+            <DialogDescription>
+              Selecione um colaborador do LegalDesk para liberar o acesso ao Skip.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por nome, sigla ou e-mail..."
+                value={hiddenSearch}
+                onChange={(e) => setHiddenSearch(e.target.value)}
+                className="pl-9 h-9"
+              />
+            </div>
+
+            <div className="border rounded-md overflow-hidden bg-slate-50/50 dark:bg-zinc-900/50">
+              {loadingHiddenUsers ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground text-sm">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  Carregando colaboradores...
+                </div>
+              ) : filteredHiddenUsers.length === 0 ? (
+                <div className="py-8 text-center text-sm text-muted-foreground px-4">
+                  Nenhum colaborador oculto encontrado para os termos buscados.
+                </div>
+              ) : (
+                <ScrollArea className="h-52">
+                  <div className="divide-y divide-border/60">
+                    {filteredHiddenUsers.map((u) => {
+                      const isSelected = selectedHiddenUser?.id === u.id
+                      const hasEmail = Boolean(u.email)
+
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          disabled={!hasEmail}
+                          onClick={() => setSelectedHiddenUser(u)}
+                          className={`w-full text-left px-3 py-2.5 transition-colors flex items-center justify-between gap-3 text-sm ${
+                            isSelected
+                              ? 'bg-primary/10 text-primary font-medium'
+                              : 'hover:bg-accent/60'
+                          } ${!hasEmail ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate">{u.nome}</span>
+                              {u.sigla && (
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1 py-0">
+                                  {u.sigla}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {u.email || 'Sem e-mail cadastrado no LegalDesk'}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </ScrollArea>
+              )}
+            </div>
+
+            {selectedHiddenUser && (
+              <div className="p-3 bg-primary/5 rounded-md border border-primary/20 space-y-3">
+                <div className="text-xs font-semibold text-primary">
+                  Colaborador selecionado: {selectedHiddenUser.nome}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-foreground">
+                    Perfil de Permissão:
+                  </label>
+                  <Select value={createPerfil} onValueChange={setCreatePerfil}>
+                    <SelectTrigger className="w-full h-9 text-xs">
+                      <SelectValue placeholder="Selecione um perfil..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
+                      <SelectItem value="gestor_area">Gestor de Área</SelectItem>
+                      <SelectItem value="advogado">Advogado</SelectItem>
+                      <SelectItem value="estagiario">Estagiário</SelectItem>
+                      <SelectItem value="administrativo">Administrativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateModalOpen(false)}
+              disabled={creatingAccess}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmCreateAccess}
+              disabled={!selectedHiddenUser || creatingAccess || !selectedHiddenUser.email}
+            >
+              {creatingAccess && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Liberar Acesso
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO: Ativar Acesso (Para usuário da tabela sem profile) */}
       <Dialog open={!!grantModalUser} onOpenChange={(open) => !open && setGrantModalUser(null)}>
         <DialogContent>
           <DialogHeader>
@@ -608,7 +825,7 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO 2: Reativar Acesso */}
+      {/* DIÁLOGO: Reativar Acesso */}
       <Dialog
         open={!!reactivateModalUser}
         onOpenChange={(open) => !open && setReactivateModalUser(null)}
@@ -656,12 +873,12 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO 3: Desativar Acesso */}
+      {/* DIÁLOGO: Desativar Acesso */}
       <Dialog open={!!revokeModalUser} onOpenChange={(open) => !open && setRevokeModalUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-600">
-              <ShieldAlert className="h-5 w-5" />
+              <AlertTriangle className="h-5 w-5" />
               Desativar Acesso
             </DialogTitle>
             <DialogDescription>
@@ -693,54 +910,95 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO 4: Alterar Perfil */}
-      <Dialog open={!!changePerfilUser} onOpenChange={(open) => !open && setChangePerfilUser(null)}>
+      {/* DIÁLOGO: Editar Acesso (Completamente reformulado) */}
+      <Dialog open={!!editModalUser} onOpenChange={(open) => !open && setEditModalUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="h-5 w-5 text-primary" />
-              Alterar Perfil de Acesso
+              Editar Acesso
             </DialogTitle>
             <DialogDescription>
-              Alterar perfil de{' '}
-              <strong className="text-foreground">{changePerfilUser?.nome}</strong> de{' '}
-              <strong className="text-foreground">
-                {PERFIL_LABELS[changePerfilUser?.perfil || 'advogado'] || changePerfilUser?.perfil}
-              </strong>{' '}
-              para{' '}
-              <strong className="text-foreground">{PERFIL_LABELS[newPerfil] || newPerfil}</strong>?
+              Atualize as configurações de perfil e permissões de acesso do colaborador.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-3">
-            <label className="text-sm font-medium text-foreground">Novo perfil:</label>
-            <Select value={newPerfil} onValueChange={setNewPerfil}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione o novo perfil..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
-                <SelectItem value="gestor_area">Gestor de Área</SelectItem>
-                <SelectItem value="advogado">Advogado</SelectItem>
-                <SelectItem value="estagiario">Estagiário</SelectItem>
-                <SelectItem value="administrativo">Administrativo</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                <Input
+                  value={editModalUser?.nome || ''}
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Sigla</label>
+                <Input
+                  value={editModalUser?.sigla || '-'}
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed h-9"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 items-center">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">E-mail</label>
+                <Input
+                  value={editModalUser?.email || '-'}
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Status Ativo</label>
+                <div className="h-9 flex items-center">
+                  <Badge
+                    variant={editModalUser?.status === 'ativo' ? 'default' : 'secondary'}
+                    className={
+                      editModalUser?.status === 'ativo'
+                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-900/50'
+                        : 'text-muted-foreground'
+                    }
+                  >
+                    {editModalUser?.status === 'ativo' ? 'Sim' : 'Não'}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t">
+              <label className="text-sm font-medium text-foreground">Perfil de Acesso:</label>
+              <Select value={editPerfil} onValueChange={setEditPerfil}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o perfil..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="socio_gestor">Sócio Gestor</SelectItem>
+                  <SelectItem value="gestor_area">Gestor de Área</SelectItem>
+                  <SelectItem value="advogado">Advogado</SelectItem>
+                  <SelectItem value="estagiario">Estagiário</SelectItem>
+                  <SelectItem value="administrativo">Administrativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setChangePerfilUser(null)}
-              disabled={actionLoadingId === changePerfilUser?.legaldesk_id}
+              onClick={() => setEditModalUser(null)}
+              disabled={actionLoadingId === editModalUser?.legaldesk_id}
             >
               Cancelar
             </Button>
             <Button
-              onClick={handleConfirmChangePerfil}
-              disabled={actionLoadingId === changePerfilUser?.legaldesk_id}
+              onClick={handleConfirmEdit}
+              disabled={actionLoadingId === editModalUser?.legaldesk_id}
             >
-              {actionLoadingId === changePerfilUser?.legaldesk_id && (
+              {actionLoadingId === editModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
               Salvar Alteração
@@ -749,28 +1007,30 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO 5: Excluir Acesso */}
+      {/* DIÁLOGO: Remover da Gestão (Completamente reformulado) */}
       <Dialog open={!!deleteModalUser} onOpenChange={(open) => !open && setDeleteModalUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-600">
               <AlertTriangle className="h-5 w-5" />
-              Excluir Acesso ao Sistema
+              Remover da Gestão
             </DialogTitle>
-            <DialogDescription className="space-y-2 text-left pt-2">
-              <span className="block font-semibold text-rose-600 dark:text-rose-400">
-                ATENÇÃO! Isso removerá a conta de acesso ao Skip de {deleteModalUser?.nome}.
-              </span>
-              <span className="block text-muted-foreground text-xs leading-relaxed">
-                Os registros do LegalDesk <strong>NÃO</strong> serão afetados. Caso o colaborador
-                possua histórico de tarefas ou atendimentos vinculados, o acesso será desativado com
-                segurança para manter a integridade dos dados.
-              </span>
-              <span className="block text-xs font-medium pt-1">
-                Esta ação não pode ser desfeita. Deseja continuar?
-              </span>
+            <DialogDescription className="space-y-2 text-left pt-2 text-foreground font-normal">
+              Deseja remover este usuário da Gestão de Usuários? O cadastro será preservado no banco
+              de dados e o acesso ao sistema será desativado.
             </DialogDescription>
           </DialogHeader>
+
+          {deleteModalUser && (
+            <div className="p-3 bg-muted/40 rounded-md border text-xs space-y-1">
+              <div>
+                <strong>Nome:</strong> {deleteModalUser.nome}
+              </div>
+              <div>
+                <strong>E-mail:</strong> {deleteModalUser.email || '-'}
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="mt-4">
             <Button
@@ -788,7 +1048,7 @@ export default function UserManagement() {
               {actionLoadingId === deleteModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Sim, Excluir Acesso
+              Sim, Remover
             </Button>
           </DialogFooter>
         </DialogContent>

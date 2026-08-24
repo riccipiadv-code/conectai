@@ -451,6 +451,7 @@ export type Database = {
           data_criacao_origem: string | null
           departamento: string | null
           email: string | null
+          exibir_gestao_usuarios: boolean
           id: string
           nome: string
           origem: string | null
@@ -465,6 +466,7 @@ export type Database = {
           data_criacao_origem?: string | null
           departamento?: string | null
           email?: string | null
+          exibir_gestao_usuarios?: boolean
           id?: string
           nome: string
           origem?: string | null
@@ -479,6 +481,7 @@ export type Database = {
           data_criacao_origem?: string | null
           departamento?: string | null
           email?: string | null
+          exibir_gestao_usuarios?: boolean
           id?: string
           nome?: string
           origem?: string | null
