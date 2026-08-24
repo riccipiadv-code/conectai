@@ -32,7 +32,6 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Search,
   Loader2,
-  UserCheck,
   UserX,
   UserCog,
   ShieldCheck,
@@ -124,10 +123,8 @@ export default function UserManagement() {
   const [creatingAccess, setCreatingAccess] = useState(false)
 
   // Diálogos modais de linha
-  const [grantModalUser, setGrantModalUser] = useState<UserRow | null>(null)
-  const [grantPerfil, setGrantPerfil] = useState<string>('administrador')
-
-  const [reactivateModalUser, setReactivateModalUser] = useState<UserRow | null>(null)
+  const [activateModalUser, setActivateModalUser] = useState<UserRow | null>(null)
+  const [activatePerfil, setActivatePerfil] = useState<string>('')
 
   const [revokeModalUser, setRevokeModalUser] = useState<UserRow | null>(null)
 
@@ -272,57 +269,23 @@ export default function UserManagement() {
     })
   }, [hiddenUsers, hiddenSearch])
 
-  // 2. Ativar Acesso (para novo usuário da tabela sem profile)
-  const handleOpenGrantModal = (user: UserRow) => {
-    setGrantModalUser(user)
-    setGrantPerfil('administrador')
+  // 2. Ativar Acesso (unificado para sem_acesso, bloqueado e inconsistente)
+  const handleOpenActivateModal = (user: UserRow) => {
+    setActivateModalUser(user)
+    setActivatePerfil('')
   }
 
-  const handleConfirmGrant = async () => {
-    if (!grantModalUser) return
-    const user = grantModalUser
-    setActionLoadingId(user.legaldesk_id)
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
-        body: {
-          action: 'grant_access',
-          legaldesk_id: user.legaldesk_id,
-          email: user.email,
-          name: user.nome,
-          perfil: grantPerfil,
-        },
-      })
-
-      if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao conceder acesso.')
-        throw new Error(finalErrorMessage)
-      }
-
+  const handleConfirmActivate = async () => {
+    if (!activateModalUser) return
+    if (!activatePerfil) {
       toast({
-        title: 'Acesso liberado!',
-        description: `O acesso para ${user.nome} como "${getPerfilLabel(grantPerfil) || grantPerfil}" foi configurado com sucesso.`,
-      })
-      setGrantModalUser(null)
-      await loadData()
-    } catch (err: any) {
-      toast({
-        title: 'Falha ao liberar acesso',
-        description: err.message,
+        title: 'Perfil obrigatório',
+        description: 'Selecione um perfil de acesso.',
         variant: 'destructive',
       })
-    } finally {
-      setActionLoadingId(null)
+      return
     }
-  }
-
-  // 3. Reativar Acesso (usuário bloqueado)
-  const handleOpenReactivateModal = (user: UserRow) => {
-    setReactivateModalUser(user)
-  }
-
-  const handleConfirmReactivate = async () => {
-    if (!reactivateModalUser) return
-    const user = reactivateModalUser
+    const user = activateModalUser
     setActionLoadingId(user.legaldesk_id)
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
@@ -331,24 +294,24 @@ export default function UserManagement() {
           legaldesk_id: user.legaldesk_id,
           email: user.email,
           name: user.nome,
-          perfil: user.perfil || 'administrador',
+          perfil: activatePerfil,
         },
       })
 
       if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao reativar acesso.')
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao ativar acesso.')
         throw new Error(finalErrorMessage)
       }
 
       toast({
-        title: 'Acesso reativado!',
-        description: `O acesso de ${user.nome} foi reativado com sucesso.`,
+        title: 'Acesso ativado!',
+        description: `O acesso para ${user.nome} como "${getPerfilLabel(activatePerfil) || activatePerfil}" foi ativado com sucesso.`,
       })
-      setReactivateModalUser(null)
+      setActivateModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao reativar acesso',
+        title: 'Falha ao ativar acesso',
         description: err.message,
         variant: 'destructive',
       })
@@ -407,12 +370,11 @@ export default function UserManagement() {
   const handleConfirmEdit = async () => {
     if (!editModalUser) return
     const user = editModalUser
-    const isActivating = user.status !== 'ativo'
     setActionLoadingId(user.legaldesk_id)
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
         body: {
-          action: isActivating ? 'grant_access' : 'change_perfil',
+          action: 'change_perfil',
           legaldesk_id: user.legaldesk_id,
           email: user.email,
           name: user.nome,
@@ -421,27 +383,19 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        const fallbackMsg = isActivating ? 'Erro ao ativar acesso.' : 'Erro ao alterar perfil.'
-        const finalErrorMessage = await extractErrorMessage(error, data, fallbackMsg)
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Falha ao alterar perfil.')
         throw new Error(finalErrorMessage)
       }
 
-      if (isActivating) {
-        toast({
-          title: 'Acesso ativado!',
-          description: `O acesso de ${user.nome} foi ativado com sucesso.`,
-        })
-      } else {
-        toast({
-          title: 'Perfil alterado',
-          description: `O perfil de ${user.nome} foi atualizado para "${getPerfilLabel(editPerfil) || editPerfil}".`,
-        })
-      }
+      toast({
+        title: 'Perfil alterado',
+        description: `O perfil de ${user.nome} foi atualizado para "${getPerfilLabel(editPerfil) || editPerfil}".`,
+      })
       setEditModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: isActivating ? 'Falha ao ativar acesso' : 'Falha ao alterar perfil',
+        title: 'Falha ao alterar perfil',
         description: err.message,
         variant: 'destructive',
       })
@@ -598,10 +552,8 @@ export default function UserManagement() {
                           onClick={() => {
                             if (u.status === 'ativo') {
                               handleOpenRevokeModal(u)
-                            } else if (u.status === 'bloqueado') {
-                              handleOpenEditModal(u)
                             } else {
-                              handleOpenGrantModal(u)
+                              handleOpenActivateModal(u)
                             }
                           }}
                           className="inline-flex focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-full"
@@ -809,8 +761,11 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO: Ativar Acesso (Para usuário da tabela sem profile) */}
-      <Dialog open={!!grantModalUser} onOpenChange={(open) => !open && setGrantModalUser(null)}>
+      {/* DIÁLOGO: Ativar Acesso (Único) */}
+      <Dialog
+        open={!!activateModalUser}
+        onOpenChange={(open) => !open && setActivateModalUser(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -818,97 +773,74 @@ export default function UserManagement() {
               Ativar Acesso
             </DialogTitle>
             <DialogDescription>
-              Deseja liberar o acesso de{' '}
-              <strong className="text-foreground">{grantModalUser?.nome}</strong> (
-              {grantModalUser?.email}) ao sistema?
+              Configure o acesso ao sistema para este colaborador.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-3">
-            <label className="text-sm font-medium text-foreground">
-              Selecione o perfil de permissões:
-            </label>
-            <Select value={grantPerfil} onValueChange={setGrantPerfil}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione um perfil..." />
-              </SelectTrigger>
-              <SelectContent>
-                {perfisOptions.map((p) => (
-                  <SelectItem key={p.codigo} value={p.codigo}>
-                    {p.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              O usuário receberá um convite por e-mail para definir a senha e acessar o sistema.
-            </p>
+          <div className="py-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                <Input
+                  value={activateModalUser?.nome || ''}
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed h-9"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Sigla</label>
+                <Input
+                  value={activateModalUser?.sigla || '-'}
+                  readOnly
+                  className="bg-muted/50 cursor-not-allowed h-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">E-mail</label>
+              <Input
+                value={activateModalUser?.email || '-'}
+                readOnly
+                className="bg-muted/50 cursor-not-allowed h-9"
+              />
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t">
+              <label className="text-sm font-medium text-foreground">
+                Perfil de Acesso: <span className="text-rose-500">*</span>
+              </label>
+              <Select value={activatePerfil} onValueChange={setActivatePerfil}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione um perfil..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {perfisOptions.map((p) => (
+                    <SelectItem key={p.codigo} value={p.codigo}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setGrantModalUser(null)}
-              disabled={actionLoadingId === grantModalUser?.legaldesk_id}
+              onClick={() => setActivateModalUser(null)}
+              disabled={actionLoadingId === activateModalUser?.legaldesk_id}
             >
               Cancelar
             </Button>
             <Button
-              onClick={handleConfirmGrant}
-              disabled={actionLoadingId === grantModalUser?.legaldesk_id}
+              onClick={handleConfirmActivate}
+              disabled={!activatePerfil || actionLoadingId === activateModalUser?.legaldesk_id}
             >
-              {actionLoadingId === grantModalUser?.legaldesk_id && (
+              {actionLoadingId === activateModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Confirmar e Liberar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* DIÁLOGO: Reativar Acesso */}
-      <Dialog
-        open={!!reactivateModalUser}
-        onOpenChange={(open) => !open && setReactivateModalUser(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-emerald-600" />
-              Reativar Acesso
-            </DialogTitle>
-            <DialogDescription>
-              Deseja reativar o acesso de{' '}
-              <strong className="text-foreground">{reactivateModalUser?.nome}</strong> ao sistema?
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-3 text-sm text-muted-foreground">
-            O usuário voltará a ter acesso ao sistema com o perfil{' '}
-            <strong className="text-foreground">
-              {getPerfilLabel(reactivateModalUser?.perfil || 'administrador') ||
-                reactivateModalUser?.perfil}
-            </strong>
-            .
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setReactivateModalUser(null)}
-              disabled={actionLoadingId === reactivateModalUser?.legaldesk_id}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={handleConfirmReactivate}
-              disabled={actionLoadingId === reactivateModalUser?.legaldesk_id}
-            >
-              {actionLoadingId === reactivateModalUser?.legaldesk_id && (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              )}
-              Reativar Acesso
+              Ativar Acesso
             </Button>
           </DialogFooter>
         </DialogContent>

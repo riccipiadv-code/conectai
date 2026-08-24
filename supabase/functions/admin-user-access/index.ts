@@ -172,7 +172,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'grant_access') {
-      const targetPerfil = perfil || 'administrador'
+      if (!perfil) {
+        throw new Error('Perfil é obrigatório para conceder acesso.')
+      }
+      const targetPerfil = perfil
 
       // Consultar perfis válidos ativos no banco
       const { data: validPerfisData, error: perfisError } = await supabase
