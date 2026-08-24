@@ -27,7 +27,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Search,
@@ -50,13 +49,6 @@ export type UserRow = {
   ativo_sys: boolean
   auth_user_exists: boolean
   status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
-}
-
-export type HiddenUser = {
-  id: string
-  nome: string
-  sigla: string | null
-  email: string | null
 }
 
 type PerfilOption = {
@@ -110,14 +102,13 @@ export default function UserManagement() {
     return match ? match.nome : codigo
   }
 
-  // Modal Criar Novo Acesso (colaboradores ocultos)
+  // Modal Criar Novo Usuário
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [hiddenUsers, setHiddenUsers] = useState<HiddenUser[]>([])
-  const [loadingHiddenUsers, setLoadingHiddenUsers] = useState(false)
-  const [hiddenSearch, setHiddenSearch] = useState('')
-  const [selectedHiddenUser, setSelectedHiddenUser] = useState<HiddenUser | null>(null)
-  const [createPerfil, setCreatePerfil] = useState<string>('administrador')
-  const [creatingAccess, setCreatingAccess] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createSigla, setCreateSigla] = useState('')
+  const [createEmail, setCreateEmail] = useState('')
+  const [createPerfil, setCreatePerfil] = useState('')
+  const [createErrors, setCreateErrors] = useState<Record<string, string>>({})
 
   // Diálogos modais de linha
   const [activateModalUser, setActivateModalUser] = useState<UserRow | null>(null)
@@ -191,87 +182,50 @@ export default function UserManagement() {
     loadData()
   }, [])
 
-  // 1. Modal "Criar Novo"
-  const handleOpenCreateModal = async () => {
+  // 1. Modal "Criar Novo Usuário"
+  const handleOpenCreateModal = () => {
+    setCreateName('')
+    setCreateSigla('')
+    setCreateEmail('')
+    setCreatePerfil('')
+    setCreateErrors({})
     setCreateModalOpen(true)
-    setHiddenSearch('')
-    setSelectedHiddenUser(null)
-    setCreatePerfil('administrador')
-    setLoadingHiddenUsers(true)
-
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
-        body: { action: 'list_hidden_users' },
-      })
-
-      if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(
-          error,
-          data,
-          'Erro ao carregar colaboradores ocultos.',
-        )
-        throw new Error(finalErrorMessage)
-      }
-
-      setHiddenUsers(data?.users || [])
-    } catch (err: any) {
-      toast({
-        title: 'Erro ao listar colaboradores',
-        description: err.message || 'Falha ao buscar usuários ocultos.',
-        variant: 'destructive',
-      })
-    } finally {
-      setLoadingHiddenUsers(false)
-    }
   }
 
-  const handleConfirmCreateAccess = async () => {
-    if (!selectedHiddenUser) return
-    setCreatingAccess(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
-        body: {
-          action: 'grant_access',
-          legaldesk_id: selectedHiddenUser.id,
-          email: selectedHiddenUser.email,
-          name: selectedHiddenUser.nome,
-          perfil: createPerfil,
-        },
-      })
+  const handleCreateUser = () => {
+    const errors: Record<string, string> = {}
 
-      if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao liberar acesso.')
-        throw new Error(finalErrorMessage)
-      }
-
-      toast({
-        title: 'Acesso liberado!',
-        description: `O acesso para ${selectedHiddenUser.nome} como "${getPerfilLabel(createPerfil) || createPerfil}" foi configurado com sucesso.`,
-      })
-      setCreateModalOpen(false)
-      setSelectedHiddenUser(null)
-      await loadData()
-    } catch (err: any) {
-      toast({
-        title: 'Falha ao liberar acesso',
-        description: err.message,
-        variant: 'destructive',
-      })
-    } finally {
-      setCreatingAccess(false)
+    if (!createName.trim()) {
+      errors.name = 'Nome é obrigatório.'
     }
-  }
 
-  const filteredHiddenUsers = useMemo(() => {
-    if (!hiddenSearch) return hiddenUsers
-    const s = hiddenSearch.toLowerCase()
-    return hiddenUsers.filter((u) => {
-      const matchNome = u.nome?.toLowerCase().includes(s)
-      const matchEmail = u.email?.toLowerCase().includes(s)
-      const matchSigla = u.sigla?.toLowerCase().includes(s)
-      return matchNome || matchEmail || matchSigla
+    if (!createSigla.trim()) {
+      errors.sigla = 'Sigla é obrigatória.'
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!createEmail.trim()) {
+      errors.email = 'E-mail é obrigatório.'
+    } else if (!emailRegex.test(createEmail.trim())) {
+      errors.email = 'Formato de e-mail inválido.'
+    }
+
+    if (!createPerfil) {
+      errors.perfil = 'Selecione um perfil de acesso.'
+    }
+
+    setCreateErrors(errors)
+
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+
+    toast({
+      description:
+        'Dados validados com sucesso! Implementação da criação será feita na próxima etapa.',
     })
-  }, [hiddenUsers, hiddenSearch])
+    setCreateModalOpen(false)
+  }
 
   // 2. Ativar Acesso (unificado para sem_acesso, bloqueado e inconsistente)
   const handleOpenActivateModal = (user: UserRow) => {
@@ -639,125 +593,112 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* MODAL CRIAR NOVO: Listar colaboradores ocultos e conceder acesso */}
+      {/* MODAL CRIAR NOVO USUÁRIO */}
       <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
         <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-primary" />
-              Criar Novo Acesso
+              Criar Novo Usuário
             </DialogTitle>
             <DialogDescription>
-              Selecione um colaborador do LegalDesk para liberar o acesso ao Skip.
+              Preencha os dados para cadastrar um novo usuário no sistema.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleCreateUser()
+            }}
+            className="space-y-4 py-2"
+          >
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Nome <span className="text-rose-500">*</span>
+              </label>
               <Input
-                placeholder="Filtrar por nome, sigla ou e-mail..."
-                value={hiddenSearch}
-                onChange={(e) => setHiddenSearch(e.target.value)}
-                className="pl-9 h-9"
+                placeholder="Nome completo"
+                value={createName}
+                onChange={(e) => {
+                  setCreateName(e.target.value)
+                  if (createErrors.name) {
+                    setCreateErrors((prev) => ({ ...prev, name: '' }))
+                  }
+                }}
               />
+              {createErrors.name && <p className="text-xs text-red-500">{createErrors.name}</p>}
             </div>
 
-            <div className="border rounded-md overflow-hidden bg-slate-50/50 dark:bg-zinc-900/50">
-              {loadingHiddenUsers ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-2 text-muted-foreground text-sm">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  Carregando colaboradores...
-                </div>
-              ) : filteredHiddenUsers.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground px-4">
-                  Nenhum colaborador oculto encontrado para os termos buscados.
-                </div>
-              ) : (
-                <ScrollArea className="h-52">
-                  <div className="divide-y divide-border/60">
-                    {filteredHiddenUsers.map((u) => {
-                      const isSelected = selectedHiddenUser?.id === u.id
-                      const hasEmail = Boolean(u.email)
-
-                      return (
-                        <button
-                          key={u.id}
-                          type="button"
-                          disabled={!hasEmail}
-                          onClick={() => setSelectedHiddenUser(u)}
-                          className={`w-full text-left px-3 py-2.5 transition-colors flex items-center justify-between gap-3 text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 text-primary font-medium'
-                              : 'hover:bg-accent/60'
-                          } ${!hasEmail ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="truncate">{u.nome}</span>
-                              {u.sigla && (
-                                <Badge variant="secondary" className="text-[10px] h-4 px-1 py-0">
-                                  {u.sigla}
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {u.email || 'Sem e-mail cadastrado no LegalDesk'}
-                            </p>
-                          </div>
-                          {isSelected && (
-                            <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </ScrollArea>
-              )}
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Sigla <span className="text-rose-500">*</span>
+              </label>
+              <Input
+                placeholder="Ex: BFM"
+                value={createSigla}
+                onChange={(e) => {
+                  setCreateSigla(e.target.value.toUpperCase())
+                  if (createErrors.sigla) {
+                    setCreateErrors((prev) => ({ ...prev, sigla: '' }))
+                  }
+                }}
+              />
+              {createErrors.sigla && <p className="text-xs text-red-500">{createErrors.sigla}</p>}
             </div>
 
-            {selectedHiddenUser && (
-              <div className="p-3 bg-primary/5 rounded-md border border-primary/20 space-y-3">
-                <div className="text-xs font-semibold text-primary">
-                  Colaborador selecionado: {selectedHiddenUser.nome}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">
-                    Perfil de Permissão:
-                  </label>
-                  <Select value={createPerfil} onValueChange={setCreatePerfil}>
-                    <SelectTrigger className="w-full h-9 text-xs">
-                      <SelectValue placeholder="Selecione um perfil..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {perfisOptions.map((p) => (
-                        <SelectItem key={p.codigo} value={p.codigo}>
-                          {p.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                E-mail <span className="text-rose-500">*</span>
+              </label>
+              <Input
+                type="email"
+                placeholder="email@exemplo.com"
+                value={createEmail}
+                onChange={(e) => {
+                  setCreateEmail(e.target.value.toLowerCase())
+                  if (createErrors.email) {
+                    setCreateErrors((prev) => ({ ...prev, email: '' }))
+                  }
+                }}
+              />
+              {createErrors.email && <p className="text-xs text-red-500">{createErrors.email}</p>}
+            </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCreateModalOpen(false)}
-              disabled={creatingAccess}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmCreateAccess}
-              disabled={!selectedHiddenUser || creatingAccess || !selectedHiddenUser.email}
-            >
-              {creatingAccess && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Liberar Acesso
-            </Button>
-          </DialogFooter>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Perfil de Acesso <span className="text-rose-500">*</span>
+              </label>
+              <Select
+                value={createPerfil}
+                onValueChange={(val) => {
+                  setCreatePerfil(val)
+                  if (createErrors.perfil) {
+                    setCreateErrors((prev) => ({ ...prev, perfil: '' }))
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione um perfil..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {perfisOptions.map((p) => (
+                    <SelectItem key={p.codigo} value={p.codigo}>
+                      {p.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {createErrors.perfil && <p className="text-xs text-red-500">{createErrors.perfil}</p>}
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setCreateModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Criar Usuário</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
