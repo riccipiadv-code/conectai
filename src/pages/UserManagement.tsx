@@ -45,7 +45,6 @@ export type UserRow = {
   nome: string
   sigla: string
   email: string
-  ativo_ld: boolean
   profile_id?: string | null
   perfil: string | null // null quando não tem profile
   ativo_sys: boolean
@@ -461,7 +460,6 @@ export default function UserManagement() {
 
       if (filter === 'with_access') return u.status === 'ativo'
       if (filter === 'without_access') return u.status !== 'ativo'
-      if (filter === 'active_ld') return u.ativo_ld
       return true
     })
   }, [users, search, filter])
@@ -494,9 +492,6 @@ export default function UserManagement() {
             </TabsTrigger>
             <TabsTrigger value="without_access">
               Sem Acesso ({users.filter((u) => u.status !== 'ativo').length})
-            </TabsTrigger>
-            <TabsTrigger value="active_ld">
-              Ativos LD ({users.filter((u) => u.ativo_ld).length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
