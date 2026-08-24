@@ -315,17 +315,18 @@ Deno.serve(async (req: Request) => {
         .eq('id', legaldesk_id)
 
       if (ldHideError) {
-        throw new Error(`Falha ao ocultar usuário no LegalDesk: ${ldHideError.message}`)
+        throw new Error(`Falha ao inativar usuário no LegalDesk: ${ldHideError.message}`)
       }
 
-      // Passo 2: Se existir profile, UPDATE profiles SET ativo = false WHERE legaldesk_usuario_id = legaldesk_id
-      // Se falhar -> logar mas NÃO reverter o passo 1 (o usuário já foi ocultado da gestão)
+      // Passo 2: Se existir profile, UPDATE profiles SET ativo = false WHERE id = existingProfile.id
+      // Se falhar -> logar mas NÃO reverter o passo 1 (o usuário já foi inativado da gestão)
+      // Se NÃO existir profile -> não faz nada em profiles, nunca cria profile e nunca faz DELETE
       let deactivated = false
-      if (existingProfile) {
+      if (existingProfile?.id) {
         const { error: profDeactivateError } = await supabase
           .from('profiles')
           .update({ ativo: false })
-          .eq('legaldesk_usuario_id', legaldesk_id)
+          .eq('id', existingProfile.id)
 
         if (profDeactivateError) {
           console.error('Erro ao desativar perfil do usuário:', profDeactivateError)

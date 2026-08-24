@@ -35,7 +35,6 @@ import {
   UserCheck,
   UserX,
   UserCog,
-  Trash2,
   ShieldCheck,
   AlertTriangle,
   Plus,
@@ -399,12 +398,12 @@ export default function UserManagement() {
     }
   }
 
-  // 6. Remover da Gestão (hide_from_management)
-  const handleOpenDeleteModal = (user: UserRow) => {
+  // 6. Inativar Usuário (hide_from_management)
+  const handleOpenInactivateModal = (user: UserRow) => {
     setDeleteModalUser(user)
   }
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmInactivate = async () => {
     if (!deleteModalUser) return
     const user = deleteModalUser
     setActionLoadingId(user.legaldesk_id)
@@ -419,19 +418,19 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao remover usuário da gestão.')
+        throw new Error(error?.message || data?.error || 'Erro ao inativar usuário.')
       }
 
       toast({
-        title: 'Usuário removido da gestão',
-        description: `O usuário ${user.nome} foi ocultado da gestão e teve seu acesso desativado. Os dados permanecem preservados no banco.`,
+        title: 'Usuário inativado',
+        description: `O usuário ${user.nome} foi inativado na Gestão de Usuários com sucesso.`,
       })
 
       setDeleteModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao remover usuário',
+        title: 'Falha ao inativar usuário',
         description: err.message,
         variant: 'destructive',
       })
@@ -575,64 +574,39 @@ export default function UserManagement() {
                           <div className="flex items-center justify-end">
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           </div>
-                        ) : u.status === 'sem_acesso' || u.status === 'inconsistente' ? (
-                          /* Usuário SEM acesso ou INCONSISTENTE: apenas "Ativar Acesso" */
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-8 gap-1.5 text-xs text-primary border-primary/30 hover:bg-primary/10 hover:text-primary font-medium"
-                            disabled={!u.email}
-                            title={
-                              !u.email ? 'Usuário sem e-mail cadastrado no LegalDesk' : undefined
-                            }
-                            onClick={() => handleOpenGrantModal(u)}
-                          >
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                            Ativar Acesso
-                          </Button>
-                        ) : (
-                          /* Usuário COM acesso (ativo ou bloqueado) */
-                          <div className="flex items-center justify-end gap-1.5">
-                            {u.status === 'ativo' ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 border-amber-200 dark:border-amber-900/50"
-                                onClick={() => handleOpenRevokeModal(u)}
-                              >
-                                <UserX className="h-3.5 w-3.5 mr-1" />
-                                Desativar
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50"
-                                onClick={() => handleOpenReactivateModal(u)}
-                              >
-                                <UserCheck className="h-3.5 w-3.5 mr-1" />
-                                Ativar
-                              </Button>
-                            )}
-
+                        ) : u.status === 'ativo' ? (
+                          /* Ativo = Sim: mostrar Editar + Inativar */
+                          <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-8 text-xs"
+                              className="h-8 text-xs gap-1.5"
                               onClick={() => handleOpenEditModal(u)}
                             >
-                              <UserCog className="h-3.5 w-3.5 mr-1" />
+                              <UserCog className="h-3.5 w-3.5" />
                               Editar
                             </Button>
-
                             <Button
                               size="sm"
-                              variant="ghost"
-                              className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                              onClick={() => handleOpenDeleteModal(u)}
-                              title="Excluir"
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                              onClick={() => handleOpenInactivateModal(u)}
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <UserX className="h-3.5 w-3.5" />
+                              Inativar
+                            </Button>
+                          </div>
+                        ) : (
+                          /* Ativo = Não (sem_acesso, bloqueado, inconsistente): mostrar apenas Inativar */
+                          <div className="flex items-center justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                              onClick={() => handleOpenInactivateModal(u)}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                              Inativar
                             </Button>
                           </div>
                         )}
@@ -1007,17 +981,18 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO: Remover da Gestão (Completamente reformulado) */}
+      {/* DIÁLOGO: Inativar Usuário */}
       <Dialog open={!!deleteModalUser} onOpenChange={(open) => !open && setDeleteModalUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-600">
               <AlertTriangle className="h-5 w-5" />
-              Remover da Gestão
+              Inativar usuário
             </DialogTitle>
             <DialogDescription className="space-y-2 text-left pt-2 text-foreground font-normal">
-              Deseja remover este usuário da Gestão de Usuários? O cadastro será preservado no banco
-              de dados e o acesso ao sistema será desativado.
+              Deseja inativar este usuário na Gestão de Usuários? Ele deixará de aparecer nesta tela
+              e, caso possua acesso ao sistema, esse acesso também será desativado. Nenhum cadastro
+              será excluído do banco de dados.
             </DialogDescription>
           </DialogHeader>
 
@@ -1042,13 +1017,13 @@ export default function UserManagement() {
             </Button>
             <Button
               variant="destructive"
-              onClick={handleConfirmDelete}
+              onClick={handleConfirmInactivate}
               disabled={actionLoadingId === deleteModalUser?.legaldesk_id}
             >
               {actionLoadingId === deleteModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Sim, Remover
+              Inativar
             </Button>
           </DialogFooter>
         </DialogContent>
