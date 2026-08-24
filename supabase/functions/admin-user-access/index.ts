@@ -170,6 +170,172 @@ Deno.serve(async (req: Request) => {
       throw new Error('Permissão negada. Usuário sem perfil ativo.')
     }
 
+    if (action === 'create_user') {
+      const { nome, sigla, email: inputEmail, perfil: inputPerfil } = body
+
+      if (!nome || !sigla || !inputEmail || !inputPerfil) {
+        throw new Error('Parâmetros obrigatórios ausentes: nome, sigla, email e perfil.')
+      }
+
+      // 1a. Normalização
+      const normNome = String(nome).trim()
+      const normSigla = String(sigla).trim().toUpperCase()
+      const normEmail = String(inputEmail).trim().toLowerCase()
+      const targetPerfil = String(inputPerfil).trim()
+
+      if (!normNome || !normSigla || !normEmail || !targetPerfil) {
+        throw new Error('Preencha todos os campos obrigatórios.')
+      }
+
+      // 1b. Validar perfil em public.perfis_acesso com ativo = true
+      const { data: validPerfil, error: perfilError } = await supabase
+        .from('perfis_acesso')
+        .select('codigo')
+        .eq('codigo', targetPerfil)
+        .eq('ativo', true)
+        .maybeSingle()
+
+      if (perfilError || !validPerfil) {
+        throw new Error('Perfil inválido.')
+      }
+
+      // 1c. Verificar duplicidade de e-mail (case-insensitive)
+      // - legaldesk_usuarios.email
+      const { data: ldEmailMatch, error: ldEmailErr } = await supabase
+        .from('legaldesk_usuarios')
+        .select('id')
+        .ilike('email', normEmail)
+        .limit(1)
+
+      if (ldEmailErr) throw ldEmailErr
+      if (ldEmailMatch && ldEmailMatch.length > 0) {
+        throw new Error('Já existe um usuário cadastrado com este e-mail.')
+      }
+
+      // - profiles.email
+      const { data: profEmailMatch, error: profEmailErr } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('email', normEmail)
+        .limit(1)
+
+      if (profEmailErr) throw profEmailErr
+      if (profEmailMatch && profEmailMatch.length > 0) {
+        throw new Error('Já existe um usuário cadastrado com este e-mail.')
+      }
+
+      // - Supabase Auth (listUsers)
+      const {
+        data: { users: authUsersList },
+        error: authListErr,
+      } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+
+      if (authListErr) throw authListErr
+      const authEmailExists = (authUsersList || []).some(
+        (u) => u.email?.toLowerCase() === normEmail,
+      )
+      if (authEmailExists) {
+        throw new Error('Já existe um usuário cadastrado com este e-mail.')
+      }
+
+      // 1d. Verificar duplicidade de sigla (case-insensitive)
+      const { data: ldSiglaMatch, error: ldSiglaErr } = await supabase
+        .from('legaldesk_usuarios')
+        .select('id')
+        .ilike('sigla', normSigla)
+        .limit(1)
+
+      if (ldSiglaErr) throw ldSiglaErr
+      if (ldSiglaMatch && ldSiglaMatch.length > 0) {
+        throw new Error('Já existe um usuário cadastrado com esta sigla.')
+      }
+
+      // 1e. Criar legaldesk_usuarios
+      const newLdId = crypto.randomUUID()
+      const { error: ldInsertErr } = await supabase.from('legaldesk_usuarios').insert({
+        id: newLdId,
+        source_id: `CONECTAI:${newLdId}`,
+        origem: 'CONECTAI',
+        nome: normNome,
+        sigla: normSigla,
+        email: normEmail,
+        ativo: true,
+        exibir_gestao_usuarios: true,
+      })
+
+      if (ldInsertErr) {
+        throw new Error(`Erro ao salvar usuário no LegalDesk: ${ldInsertErr.message}`)
+      }
+
+      // 1f. Criar Auth
+      let authUserId: string | null = null
+      const { data: authData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(
+        normEmail,
+        {
+          data: { name: normNome },
+        },
+      )
+
+      if (inviteErr) {
+        if (
+          inviteErr.message.includes('already exists') ||
+          inviteErr.message.includes('already registered')
+        ) {
+          const {
+            data: { users: recheckUsers },
+          } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+          const existingUser = (recheckUsers || []).find(
+            (u) => u.email?.toLowerCase() === normEmail,
+          )
+          if (existingUser) {
+            authUserId = existingUser.id
+          } else {
+            throw new Error(
+              `Usuário já existe no Auth mas não foi localizado: ${inviteErr.message}`,
+            )
+          }
+        } else {
+          throw new Error(`Erro ao convidar usuário por e-mail: ${inviteErr.message}`)
+        }
+      } else {
+        authUserId = authData.user?.id || null
+      }
+
+      if (!authUserId) {
+        throw new Error('Não foi possível obter o ID do usuário Auth.')
+      }
+
+      // 1g. Completar Profile
+      // O trigger on_auth_user_created -> handle_new_user() pode já ter inserido o profile correspondente pelo authUserId.
+      // Usamos upsert ou update por id.
+      const { error: profileUpsertErr } = await supabase.from('profiles').upsert(
+        {
+          id: authUserId,
+          name: normNome,
+          email: normEmail,
+          legaldesk_usuario_id: newLdId,
+          perfil: targetPerfil,
+          ativo: true,
+        },
+        { onConflict: 'id' },
+      )
+
+      if (profileUpsertErr) {
+        throw new Error(`Erro ao salvar perfil do usuário: ${profileUpsertErr.message}`)
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          legaldesk_id: newLdId,
+          profile_id: authUserId,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
     if (!legaldesk_id) {
       throw new Error('Parâmetros obrigatórios ausentes: legaldesk_id.')
     }

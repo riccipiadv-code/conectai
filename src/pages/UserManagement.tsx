@@ -109,6 +109,7 @@ export default function UserManagement() {
   const [createEmail, setCreateEmail] = useState('')
   const [createPerfil, setCreatePerfil] = useState('')
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({})
+  const [creatingUser, setCreatingUser] = useState(false)
 
   // Diálogos modais de linha
   const [activateModalUser, setActivateModalUser] = useState<UserRow | null>(null)
@@ -192,7 +193,7 @@ export default function UserManagement() {
     setCreateModalOpen(true)
   }
 
-  const handleCreateUser = () => {
+  const handleCreateUser = async () => {
     const errors: Record<string, string> = {}
 
     if (!createName.trim()) {
@@ -220,11 +221,38 @@ export default function UserManagement() {
       return
     }
 
-    toast({
-      description:
-        'Dados validados com sucesso! Implementação da criação será feita na próxima etapa.',
-    })
-    setCreateModalOpen(false)
+    setCreatingUser(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'create_user',
+          nome: createName.trim(),
+          sigla: createSigla.trim().toUpperCase(),
+          email: createEmail.trim().toLowerCase(),
+          perfil: createPerfil,
+        },
+      })
+
+      if (error || data?.error) {
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Falha ao criar usuário.')
+        throw new Error(finalErrorMessage)
+      }
+
+      toast({
+        title: 'Usuário criado!',
+        description: 'Usuário criado com sucesso.',
+      })
+      setCreateModalOpen(false)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao criar usuário',
+        description: err.message || 'Falha ao criar usuário.',
+        variant: 'destructive',
+      })
+    } finally {
+      setCreatingUser(false)
+    }
   }
 
   // 2. Ativar Acesso (unificado para sem_acesso, bloqueado e inconsistente)
@@ -693,10 +721,18 @@ export default function UserManagement() {
             </div>
 
             <DialogFooter className="pt-2">
-              <Button type="button" variant="outline" onClick={() => setCreateModalOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setCreateModalOpen(false)}
+                disabled={creatingUser}
+              >
                 Cancelar
               </Button>
-              <Button type="submit">Criar Usuário</Button>
+              <Button type="submit" disabled={creatingUser}>
+                {creatingUser && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Criar Usuário
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
