@@ -277,31 +277,24 @@ Deno.serve(async (req: Request) => {
       )
 
       if (inviteErr) {
+        // Rollback: deletar SOMENTE o registro recém-criado em legaldesk_usuarios
+        await supabase.from('legaldesk_usuarios').delete().eq('id', newLdId)
+
         if (
           inviteErr.message.includes('already exists') ||
           inviteErr.message.includes('already registered')
         ) {
-          const {
-            data: { users: recheckUsers },
-          } = await supabase.auth.admin.listUsers({ perPage: 1000 })
-          const existingUser = (recheckUsers || []).find(
-            (u) => u.email?.toLowerCase() === normEmail,
-          )
-          if (existingUser) {
-            authUserId = existingUser.id
-          } else {
-            throw new Error(
-              `Usuário já existe no Auth mas não foi localizado: ${inviteErr.message}`,
-            )
-          }
+          throw new Error('Já existe um usuário cadastrado com este e-mail.')
         } else {
           throw new Error(`Erro ao convidar usuário por e-mail: ${inviteErr.message}`)
         }
-      } else {
-        authUserId = authData.user?.id || null
       }
 
+      authUserId = authData.user?.id || null
+
       if (!authUserId) {
+        // Rollback: deletar SOMENTE o registro recém-criado em legaldesk_usuarios
+        await supabase.from('legaldesk_usuarios').delete().eq('id', newLdId)
         throw new Error('Não foi possível obter o ID do usuário Auth.')
       }
 
@@ -321,7 +314,15 @@ Deno.serve(async (req: Request) => {
       )
 
       if (profileUpsertErr) {
-        throw new Error(`Erro ao salvar perfil do usuário: ${profileUpsertErr.message}`)
+        // Marcar usuário no LegalDesk como inconsistente (sem exibir na gestão e inativo)
+        await supabase
+          .from('legaldesk_usuarios')
+          .update({ exibir_gestao_usuarios: false, ativo: false })
+          .eq('id', newLdId)
+
+        throw new Error(
+          'O acesso ao sistema foi criado, mas a configuração do perfil falhou. O usuário foi marcado como inconsistente. Contate o suporte técnico.',
+        )
       }
 
       return new Response(
