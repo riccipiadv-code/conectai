@@ -1721,7 +1721,7 @@ export type Database = {
       }
     }
     Enums: {
-      perfil_type: 'administrador' | 'operacional' | 'gestor'
+      perfil_type: 'socio_gestor' | 'gestor_area' | 'advogado' | 'estagiario' | 'administrativo'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1847,7 +1847,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      perfil_type: ['administrador', 'operacional', 'gestor'],
+      perfil_type: ['socio_gestor', 'gestor_area', 'advogado', 'estagiario', 'administrativo'],
     },
   },
 } as const

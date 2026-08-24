@@ -1,7 +1,7 @@
 {
   "_versions": {
-    "sync-manychat": 40,
-    "manychat-webhook": 40,
+    "sync-manychat": 42,
+    "manychat-webhook": 42,
     "send-test-email": 3,
     "save-email-settings": 2,
     "admin-user-access": 10

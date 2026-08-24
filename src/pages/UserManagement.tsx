@@ -407,11 +407,12 @@ export default function UserManagement() {
   const handleConfirmEdit = async () => {
     if (!editModalUser) return
     const user = editModalUser
+    const isActivating = user.status !== 'ativo'
     setActionLoadingId(user.legaldesk_id)
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
         body: {
-          action: 'change_perfil',
+          action: isActivating ? 'grant_access' : 'change_perfil',
           legaldesk_id: user.legaldesk_id,
           email: user.email,
           name: user.nome,
@@ -420,19 +421,27 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao alterar perfil.')
+        const fallbackMsg = isActivating ? 'Erro ao ativar acesso.' : 'Erro ao alterar perfil.'
+        const finalErrorMessage = await extractErrorMessage(error, data, fallbackMsg)
         throw new Error(finalErrorMessage)
       }
 
-      toast({
-        title: 'Perfil alterado',
-        description: `O perfil de ${user.nome} foi atualizado para "${getPerfilLabel(editPerfil) || editPerfil}".`,
-      })
+      if (isActivating) {
+        toast({
+          title: 'Acesso ativado!',
+          description: `O acesso de ${user.nome} foi ativado com sucesso.`,
+        })
+      } else {
+        toast({
+          title: 'Perfil alterado',
+          description: `O perfil de ${user.nome} foi atualizado para "${getPerfilLabel(editPerfil) || editPerfil}".`,
+        })
+      }
       setEditModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao alterar perfil',
+        title: isActivating ? 'Falha ao ativar acesso' : 'Falha ao alterar perfil',
         description: err.message,
         variant: 'destructive',
       })
@@ -441,7 +450,7 @@ export default function UserManagement() {
     }
   }
 
-  // 6. Inativar Usuário (hide_from_management)
+  // 6. Remover Usuário da Gestão (hide_from_management)
   const handleOpenInactivateModal = (user: UserRow) => {
     setDeleteModalUser(user)
   }
@@ -461,24 +470,20 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(
-          error,
-          data,
-          'Erro ao inativar usuário.',
-        )
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao remover usuário.')
         throw new Error(finalErrorMessage)
       }
 
       toast({
-        title: 'Usuário inativado',
-        description: `O usuário ${user.nome} foi inativado na Gestão de Usuários com sucesso.`,
+        title: 'Usuário removido',
+        description: `O usuário ${user.nome} foi removido da Gestão de Usuários com sucesso.`,
       })
 
       setDeleteModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao inativar usuário',
+        title: 'Falha ao remover usuário',
         description: err.message,
         variant: 'destructive',
       })
@@ -586,18 +591,32 @@ export default function UserManagement() {
                         </div>
                       </TableCell>
 
-                      {/* 3. Ativo */}
+                      {/* 3. Ativo (Botão Toggle) */}
                       <TableCell className="text-center">
-                        <Badge
-                          variant={u.status === 'ativo' ? 'default' : 'secondary'}
-                          className={
-                            u.status === 'ativo'
-                              ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200 dark:border-emerald-900/50'
-                              : 'text-muted-foreground'
-                          }
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (u.status === 'ativo') {
+                              handleOpenRevokeModal(u)
+                            } else if (u.status === 'bloqueado') {
+                              handleOpenEditModal(u)
+                            } else {
+                              handleOpenGrantModal(u)
+                            }
+                          }}
+                          className="inline-flex focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 rounded-full"
                         >
-                          {u.status === 'ativo' ? 'Sim' : 'Não'}
-                        </Badge>
+                          <Badge
+                            variant={u.status === 'ativo' ? 'default' : 'secondary'}
+                            className={`cursor-pointer transition-colors ${
+                              u.status === 'ativo'
+                                ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200 dark:border-emerald-900/50'
+                                : 'text-muted-foreground hover:bg-secondary/80'
+                            }`}
+                          >
+                            {u.status === 'ativo' ? 'Sim' : 'Não'}
+                          </Badge>
+                        </button>
                       </TableCell>
 
                       {/* 4. Perfil */}
@@ -623,7 +642,7 @@ export default function UserManagement() {
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           </div>
                         ) : u.status === 'ativo' ? (
-                          /* Ativo = Sim: mostrar Editar + Inativar */
+                          /* Ativo = Sim: mostrar Editar + Remover */
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
@@ -641,11 +660,11 @@ export default function UserManagement() {
                               onClick={() => handleOpenInactivateModal(u)}
                             >
                               <UserX className="h-3.5 w-3.5" />
-                              Inativar
+                              Remover
                             </Button>
                           </div>
                         ) : (
-                          /* Ativo = Não (sem_acesso, bloqueado, inconsistente): mostrar apenas Inativar */
+                          /* Ativo = Não (sem_acesso, bloqueado, inconsistente): mostrar apenas Remover */
                           <div className="flex items-center justify-end">
                             <Button
                               size="sm"
@@ -654,7 +673,7 @@ export default function UserManagement() {
                               onClick={() => handleOpenInactivateModal(u)}
                             >
                               <UserX className="h-3.5 w-3.5" />
-                              Inativar
+                              Remover
                             </Button>
                           </div>
                         )}
@@ -1029,16 +1048,16 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO: Inativar Usuário */}
+      {/* DIÁLOGO: Remover Usuário */}
       <Dialog open={!!deleteModalUser} onOpenChange={(open) => !open && setDeleteModalUser(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-rose-600">
               <AlertTriangle className="h-5 w-5" />
-              Inativar usuário
+              Remover usuário
             </DialogTitle>
             <DialogDescription className="space-y-2 text-left pt-2 text-foreground font-normal">
-              Deseja inativar este usuário na Gestão de Usuários? Ele deixará de aparecer nesta tela
+              Deseja remover este usuário da Gestão de Usuários? Ele deixará de aparecer nesta tela
               e, caso possua acesso ao sistema, esse acesso também será desativado. Nenhum cadastro
               será excluído do banco de dados.
             </DialogDescription>
@@ -1071,7 +1090,7 @@ export default function UserManagement() {
               {actionLoadingId === deleteModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Inativar
+              Remover
             </Button>
           </DialogFooter>
         </DialogContent>
