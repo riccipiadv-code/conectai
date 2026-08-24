@@ -69,6 +69,37 @@ const PERFIL_LABELS: Record<string, string> = {
   administrativo: 'Administrativo',
 }
 
+async function extractErrorMessage(
+  error: any,
+  data?: any,
+  fallback = 'Falha na comunicação com o servidor.',
+): Promise<string> {
+  let extractedMessage: string | null = null
+
+  if (error) {
+    const errAny = error as any
+    if (errAny.context && typeof errAny.context.json === 'function') {
+      try {
+        const bodyJson = await errAny.context.json()
+        extractedMessage = bodyJson?.error || bodyJson?.message
+      } catch {
+        // Ignore parse error
+      }
+    } else if (errAny.context?.error) {
+      extractedMessage = errAny.context.error
+    } else if (typeof errAny.context === 'string') {
+      try {
+        const parsed = JSON.parse(errAny.context)
+        extractedMessage = parsed?.error || parsed?.message
+      } catch {
+        extractedMessage = errAny.context
+      }
+    }
+  }
+
+  return extractedMessage || data?.error || error?.message || fallback
+}
+
 export default function UserManagement() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -107,35 +138,11 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        let extractedMessage: string | null = null
-
-        // Tentar extrair mensagem detalhada do erro (ex: error.context response body no Supabase FunctionsHttpError)
-        if (error) {
-          const errAny = error as any
-          if (errAny.context && typeof errAny.context.json === 'function') {
-            try {
-              const bodyJson = await errAny.context.json()
-              extractedMessage = bodyJson?.error || bodyJson?.message
-            } catch {
-              // Ignore parse error
-            }
-          } else if (errAny.context?.error) {
-            extractedMessage = errAny.context.error
-          } else if (typeof errAny.context === 'string') {
-            try {
-              const parsed = JSON.parse(errAny.context)
-              extractedMessage = parsed?.error || parsed?.message
-            } catch {
-              extractedMessage = errAny.context
-            }
-          }
-        }
-
-        const finalErrorMessage =
-          extractedMessage ||
-          data?.error ||
-          error?.message ||
-          'Falha na comunicação com o servidor.'
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Falha na comunicação com o servidor.',
+        )
         throw new Error(finalErrorMessage)
       }
 
@@ -171,7 +178,12 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao carregar colaboradores ocultos.')
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Erro ao carregar colaboradores ocultos.',
+        )
+        throw new Error(finalErrorMessage)
       }
 
       setHiddenUsers(data?.users || [])
@@ -201,7 +213,8 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao liberar acesso.')
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao liberar acesso.')
+        throw new Error(finalErrorMessage)
       }
 
       toast({
@@ -255,7 +268,8 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao conceder acesso.')
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao conceder acesso.')
+        throw new Error(finalErrorMessage)
       }
 
       toast({
@@ -296,7 +310,8 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao reativar acesso.')
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao reativar acesso.')
+        throw new Error(finalErrorMessage)
       }
 
       toast({
@@ -336,7 +351,8 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao revogar acesso.')
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao revogar acesso.')
+        throw new Error(finalErrorMessage)
       }
 
       toast({
@@ -378,7 +394,8 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao alterar perfil.')
+        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao alterar perfil.')
+        throw new Error(finalErrorMessage)
       }
 
       toast({
@@ -418,7 +435,12 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Erro ao inativar usuário.')
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Erro ao inativar usuário.',
+        )
+        throw new Error(finalErrorMessage)
       }
 
       toast({

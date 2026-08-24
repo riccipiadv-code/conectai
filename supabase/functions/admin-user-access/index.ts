@@ -155,9 +155,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // Para as demais ações administrativas (grant_access, revoke_access, change_perfil, hide_from_management):
-    // Manter a exigência de socio_gestor + ativo === true
-    if (profile?.perfil !== 'socio_gestor' || !profile?.ativo) {
-      throw new Error('Permissão negada. Apenas Sócios Gestores podem gerenciar usuários.')
+    if (!profile || !profile.ativo) {
+      throw new Error('Permissão negada. Usuário sem perfil ativo.')
     }
 
     if (!legaldesk_id) {
