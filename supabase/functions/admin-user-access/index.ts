@@ -128,6 +128,25 @@ Deno.serve(async (req: Request) => {
       })
     }
 
+    if (action === 'list_perfis') {
+      if (!profile || !profile.ativo) {
+        throw new Error('Permissão negada. Usuário sem perfil ativo.')
+      }
+
+      const { data: perfis, error: perfisError } = await supabase
+        .from('perfis_acesso')
+        .select('codigo, nome')
+        .eq('ativo', true)
+        .order('ordem', { ascending: true })
+        .order('nome', { ascending: true })
+
+      if (perfisError) throw perfisError
+
+      return new Response(JSON.stringify({ perfis: perfis || [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     if (action === 'list_hidden_users') {
       if (!profile || !profile.ativo) {
         throw new Error('Permissão negada. Usuário sem perfil ativo.')

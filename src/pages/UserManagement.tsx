@@ -103,9 +103,7 @@ export default function UserManagement() {
   const [filter, setFilter] = useState('all')
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const { toast } = useToast()
-  const [perfisOptions, setPerfisOptions] = useState<PerfilOption[]>([
-    { codigo: 'administrador', nome: 'Administrador' },
-  ])
+  const [perfisOptions, setPerfisOptions] = useState<PerfilOption[]>([])
 
   const getPerfilLabel = (codigo: string | null): string => {
     if (!codigo) return ''
@@ -135,20 +133,27 @@ export default function UserManagement() {
 
   const loadPerfis = async () => {
     try {
-      const { data, error } = await supabase
-        .from('perfis_acesso')
-        .select('codigo, nome')
-        .eq('ativo', true)
-        .order('ordem', { ascending: true })
-        .order('nome', { ascending: true })
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: { action: 'list_perfis' },
+      })
 
-      if (error || !data || data.length === 0) {
-        setPerfisOptions([{ codigo: 'administrador', nome: 'Administrador' }])
-      } else {
-        setPerfisOptions(data)
+      if (error || data?.error) {
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Falha ao carregar perfis de acesso.',
+        )
+        throw new Error(finalErrorMessage)
       }
-    } catch {
-      setPerfisOptions([{ codigo: 'administrador', nome: 'Administrador' }])
+
+      setPerfisOptions(data?.perfis || [])
+    } catch (err: any) {
+      setPerfisOptions([])
+      toast({
+        title: 'Erro ao carregar perfis',
+        description: err.message || 'Falha ao carregar perfis de acesso.',
+        variant: 'destructive',
+      })
     }
   }
 
