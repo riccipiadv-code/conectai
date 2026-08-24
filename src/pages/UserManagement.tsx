@@ -374,22 +374,21 @@ export default function UserManagement() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Sigla / E-mail</TableHead>
-                <TableHead className="text-center">Ativo LegalDesk</TableHead>
+                <TableHead className="text-center">Ativo</TableHead>
                 <TableHead>Perfil</TableHead>
-                <TableHead className="text-center">Acesso ao Sistema</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center">
+                  <TableCell colSpan={5} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                     Nenhum colaborador encontrado.
                   </TableCell>
                 </TableRow>
@@ -416,35 +415,28 @@ export default function UserManagement() {
                         </div>
                       </TableCell>
 
-                      {/* 3. Ativo LegalDesk */}
+                      {/* 3. Ativo */}
                       <TableCell className="text-center">
                         <Badge
-                          variant={u.ativo_ld ? 'default' : 'secondary'}
+                          variant={u.status === 'ativo' ? 'default' : 'secondary'}
                           className={
-                            u.ativo_ld
+                            u.status === 'ativo'
                               ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-200 dark:border-emerald-900/50'
                               : 'text-muted-foreground'
                           }
                         >
-                          {u.ativo_ld ? 'Sim' : 'Não'}
+                          {u.status === 'ativo' ? 'Sim' : 'Não'}
                         </Badge>
                       </TableCell>
 
                       {/* 4. Perfil */}
                       <TableCell>
-                        {u.status === 'inconsistente' ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 font-medium"
-                          >
-                            Conta inconsistente
-                          </Badge>
-                        ) : u.auth_user_exists && u.perfil ? (
+                        {u.status === 'ativo' ? (
                           <Badge
                             variant="outline"
                             className="bg-slate-50 dark:bg-zinc-800/60 font-medium text-slate-700 dark:text-slate-300"
                           >
-                            {PERFIL_LABELS[u.perfil] || u.perfil}
+                            Administrador
                           </Badge>
                         ) : (
                           <span className="text-[13px] text-muted-foreground italic">
@@ -453,31 +445,7 @@ export default function UserManagement() {
                         )}
                       </TableCell>
 
-                      {/* 5. Acesso ao Sistema */}
-                      <TableCell className="text-center">
-                        {u.status === 'inconsistente' ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 font-medium"
-                          >
-                            Inconsistente
-                          </Badge>
-                        ) : u.status === 'ativo' ? (
-                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
-                            Liberado
-                          </Badge>
-                        ) : u.status === 'bloqueado' ? (
-                          <Badge variant="destructive" className="font-medium">
-                            Bloqueado
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-muted-foreground font-normal">
-                            Sem acesso
-                          </Badge>
-                        )}
-                      </TableCell>
-
-                      {/* 6. Ações */}
+                      {/* 5. Ações */}
                       <TableCell className="text-right">
                         {isOperating ? (
                           <div className="flex items-center justify-end">
