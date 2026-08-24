@@ -90,7 +90,36 @@ export default function UserManagement() {
       })
 
       if (error || data?.error) {
-        throw new Error(error?.message || data?.error || 'Falha na comunicação com o servidor.')
+        let extractedMessage: string | null = null
+
+        // Tentar extrair mensagem detalhada do erro (ex: error.context response body no Supabase FunctionsHttpError)
+        if (error) {
+          const errAny = error as any
+          if (errAny.context && typeof errAny.context.json === 'function') {
+            try {
+              const bodyJson = await errAny.context.json()
+              extractedMessage = bodyJson?.error || bodyJson?.message
+            } catch {
+              // Ignore parse error
+            }
+          } else if (errAny.context?.error) {
+            extractedMessage = errAny.context.error
+          } else if (typeof errAny.context === 'string') {
+            try {
+              const parsed = JSON.parse(errAny.context)
+              extractedMessage = parsed?.error || parsed?.message
+            } catch {
+              extractedMessage = errAny.context
+            }
+          }
+        }
+
+        const finalErrorMessage =
+          extractedMessage ||
+          data?.error ||
+          error?.message ||
+          'Falha na comunicação com o servidor.'
+        throw new Error(finalErrorMessage)
       }
 
       if (data?.users) {

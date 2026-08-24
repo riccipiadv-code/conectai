@@ -46,15 +46,6 @@ Deno.serve(async (req: Request) => {
     } = await supabase.auth.getUser(token)
     if (userError || !user) throw new Error('Não autorizado.')
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('perfil, ativo')
-      .eq('id', user.id)
-      .single()
-    if (profile?.perfil !== 'socio_gestor' || !profile?.ativo) {
-      throw new Error('Permissão negada. Apenas Sócios Gestores podem gerenciar usuários.')
-    }
-
     const body = await req.json()
     const { action, legaldesk_id, email, name, perfil } = body
 
@@ -62,7 +53,16 @@ Deno.serve(async (req: Request) => {
       throw new Error('Parâmetro obrigatório ausente: action.')
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('perfil, ativo')
+      .eq('id', user.id)
+      .single()
+
     if (action === 'list_users') {
+      if (!profile || !profile.ativo) {
+        throw new Error('Permissão negada. Usuário sem perfil ativo.')
+      }
       // 1. Consultar todos os legaldesk_usuarios ordenados por nome
       const { data: ldUsers, error: ldError } = await supabase
         .from('legaldesk_usuarios')
@@ -133,6 +133,12 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ users: usersList }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    }
+
+    // Para as demais ações (grant_access, revoke_access, change_perfil, delete_access):
+    // Manter a exigência de socio_gestor + ativo === true
+    if (profile?.perfil !== 'socio_gestor' || !profile?.ativo) {
+      throw new Error('Permissão negada. Apenas Sócios Gestores podem gerenciar usuários.')
     }
 
     if (!legaldesk_id) {
