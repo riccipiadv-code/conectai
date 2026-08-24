@@ -103,9 +103,9 @@ Deno.serve(async (req: Request) => {
       from: `"${setting.sender_name}" <${setting.sender_email}>`,
       to: to_email,
       replyTo: setting.reply_to || undefined,
-      subject: 'Teste de envio - ManySkip',
-      text: 'Este é um e-mail de teste do sistema ManySkip. Se você recebeu isso, a configuração está correta!',
-      html: '<h3>Teste ManySkip</h3><p>Este é um e-mail de teste do sistema ManySkip.</p><p>Se você recebeu isso, a configuração está correta!</p>',
+      subject: 'Teste de envio - Conectaí',
+      text: 'Este é um e-mail de teste do sistema Conectaí. Se você recebeu isso, a configuração está correta!',
+      html: '<h3>Teste Conectaí</h3><p>Este é um e-mail de teste do sistema Conectaí.</p><p>Se você recebeu isso, a configuração está correta!</p>',
     }
 
     try {

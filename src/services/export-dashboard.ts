@@ -179,6 +179,6 @@ export function exportDashboardExcel(
       cancelSheet,
       baseSheet,
     ],
-    `dashboard-manyskip-${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
+    `dashboard-conectai-${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
   )
 }

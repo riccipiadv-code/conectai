@@ -109,7 +109,7 @@ export default function Layout() {
             <div className="h-9 w-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/20">
               <Blocks className="h-5 w-5" />
             </div>
-            ManySkip
+            Conectaí
           </div>
         </SidebarHeader>
         <SidebarContent className="px-3 py-4">

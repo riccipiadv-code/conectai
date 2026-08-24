@@ -151,7 +151,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md animate-fade-in-up">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">ManySkip</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">Conectaí</CardTitle>
           <CardDescription>Entre com suas credenciais para acessar o sistema</CardDescription>
         </CardHeader>
         {isDisabledParam && (
