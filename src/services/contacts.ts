@@ -591,6 +591,7 @@ export async function saveContatoAnexos(contatoId: string, anexos: ContatoAnexo[
     const { error: delError } = await supabase
       .from('manychat_contatos_anexos')
       .delete()
+      .eq('contato_id', contatoId)
       .in('id', toDeleteIds)
 
     if (delError) {
@@ -608,6 +609,7 @@ export async function saveContatoAnexos(contatoId: string, anexos: ContatoAnexo[
         ordem: item.ordem,
         updated_at: new Date().toISOString(),
       })
+      .eq('contato_id', contatoId)
       .eq('id', item.id)
 
     if (updError) {

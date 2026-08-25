@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, Paperclip, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,10 @@ import {
   Subservico,
   getContatoSubservicos,
   PorteEmpresa,
+  ContatoAnexo,
+  getContatoAnexos,
 } from '@/services/contacts'
+import { AnexosModal } from '@/components/shared/anexos-modal'
 import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 import { useAuth } from '@/hooks/use-auth'
@@ -78,6 +81,26 @@ export function ContactModal({
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>(initialResponsaveis || [])
+  const [anexos, setAnexos] = useState<ContatoAnexo[]>([])
+  const [anexosLoading, setAnexosLoading] = useState(false)
+  const [anexosModalOpen, setAnexosModalOpen] = useState(false)
+
+  const fetchAnexos = useCallback(async () => {
+    if (!contact?.id) {
+      setAnexos([])
+      return
+    }
+    setAnexosLoading(true)
+    try {
+      const data = await getContatoAnexos(contact.id)
+      setAnexos(data)
+    } catch (error) {
+      console.error('Erro ao buscar anexos:', error)
+      setAnexos([])
+    } finally {
+      setAnexosLoading(false)
+    }
+  }, [contact?.id])
 
   useEffect(() => {
     if (!initialResponsaveis || initialResponsaveis.length === 0) {
@@ -100,7 +123,10 @@ export function ContactModal({
             setSelectedSubservicos(ids)
           })
           .catch(console.error)
+
+        fetchAnexos()
       } else {
+        setAnexos([])
         setSelectedSubservicos([])
         const whatsappOrigem = origens?.find((o) => o.nome === 'Whatsapp')
         setFormData({
@@ -127,7 +153,7 @@ export function ContactModal({
         })
       }
     }
-  }, [isOpen, contact, mode])
+  }, [isOpen, contact, mode, fetchAnexos])
 
   const handleChange = (field: keyof Contact, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -454,9 +480,52 @@ export function ContactModal({
 
             <div className="grid gap-2">
               <Label>Anexos</Label>
-              <div className="border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 min-h-[120px] flex items-center justify-center">
-                <span className="text-sm text-muted-foreground">Nenhum anexo</span>
+              <div className="border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 min-h-[120px]">
+                {anexosLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : anexos.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <span className="text-sm text-muted-foreground">Nenhum anexo cadastrado</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {anexos.map((anexo, idx) => (
+                      <div
+                        key={anexo.id || idx}
+                        onClick={() => {
+                          if (anexo.link) window.open(anexo.link, '_blank', 'noopener,noreferrer')
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            if (anexo.link) window.open(anexo.link, '_blank', 'noopener,noreferrer')
+                          }
+                        }}
+                        className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline cursor-pointer transition-colors"
+                      >
+                        <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
+                        <span className="truncate">{anexo.nome}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+              {/* Botão Gerenciar - só em modo edit/create, não em view */}
+              {!isView && contact && mode !== 'create' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 w-fit"
+                  onClick={() => setAnexosModalOpen(true)}
+                >
+                  <Paperclip className="h-4 w-4" />
+                  Gerenciar
+                </Button>
+              )}
             </div>
           </div>
 
@@ -617,6 +686,18 @@ export function ContactModal({
           )}
         </DialogFooter>
       </DialogContent>
+
+      {contact && contact.id && (
+        <AnexosModal
+          isOpen={anexosModalOpen}
+          onClose={() => {
+            setAnexosModalOpen(false)
+            // Recarregar anexos ao fechar
+            fetchAnexos()
+          }}
+          contatoId={contact.id}
+        />
+      )}
     </Dialog>
   )
 }
