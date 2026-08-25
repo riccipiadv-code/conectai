@@ -412,42 +412,51 @@ export function ContactModal({
             )}
           </div>
 
-          {/* Serviços Contratados */}
-          <div className="grid grid-cols-1 gap-2">
-            <Label>Serviços Contratados</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800">
-              {subservicos?.length > 0 ? (
-                subservicos.map((sub) => (
-                  <div key={sub.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={`sub-${sub.id}`}
-                      disabled={isView}
-                      checked={selectedSubservicos.includes(sub.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedSubservicos((prev) => [...prev, sub.id])
-                        } else {
-                          setSelectedSubservicos((prev) => prev.filter((id) => id !== sub.id))
-                        }
-                      }}
-                      className="mt-0.5"
-                    />
-                    <Label
-                      htmlFor={`sub-${sub.id}`}
-                      className={cn(
-                        'text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-700 dark:text-slate-300',
-                        isView && 'cursor-default',
-                      )}
-                    >
-                      {sub.nome}
-                    </Label>
+          {/* Serviços Contratados e Anexos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid gap-2">
+              <Label>Serviços Contratados</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800">
+                {subservicos?.length > 0 ? (
+                  subservicos.map((sub) => (
+                    <div key={sub.id} className="flex items-start space-x-3">
+                      <Checkbox
+                        id={`sub-${sub.id}`}
+                        disabled={isView}
+                        checked={selectedSubservicos.includes(sub.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedSubservicos((prev) => [...prev, sub.id])
+                          } else {
+                            setSelectedSubservicos((prev) => prev.filter((id) => id !== sub.id))
+                          }
+                        }}
+                        className="mt-0.5"
+                      />
+                      <Label
+                        htmlFor={`sub-${sub.id}`}
+                        className={cn(
+                          'text-sm font-medium leading-none cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-700 dark:text-slate-300',
+                          isView && 'cursor-default',
+                        )}
+                      >
+                        {sub.nome}
+                      </Label>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-muted-foreground col-span-full">
+                    Nenhum serviço contratado disponível.
                   </div>
-                ))
-              ) : (
-                <div className="text-sm text-muted-foreground col-span-full">
-                  Nenhum serviço contratado disponível.
-                </div>
-              )}
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Anexos</Label>
+              <div className="border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 min-h-[120px] flex items-center justify-center">
+                <span className="text-sm text-muted-foreground">Nenhum anexo</span>
+              </div>
             </div>
           </div>
 
