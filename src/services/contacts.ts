@@ -473,3 +473,159 @@ export async function getCancelReasons() {
   }
   return data || []
 }
+
+export interface ContatoAnexo {
+  id?: string
+  nome: string
+  link: string
+  ordem: number
+  contato_id?: string
+}
+
+export async function getContatoAnexos(contatoId: string): Promise<ContatoAnexo[]> {
+  try {
+    const { data, error } = await supabase
+      .from('manychat_contatos_anexos')
+      .select('id, nome, link, ordem')
+      .eq('contato_id', contatoId)
+      .order('ordem', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Erro ao buscar anexos do contato:', error)
+      return []
+    }
+
+    return (data || []).map((item) => ({
+      id: item.id,
+      nome: item.nome,
+      link: item.link,
+      ordem: item.ordem,
+    }))
+  } catch (err) {
+    console.error('Erro inesperado ao buscar anexos:', err)
+    return []
+  }
+}
+
+export async function saveContatoAnexos(contatoId: string, anexos: ContatoAnexo[]): Promise<void> {
+  // 1. Validar cada anexo
+  for (let i = 0; i < anexos.length; i++) {
+    const anexo = anexos[i]
+    const nomeTrimmed = anexo.nome ? anexo.nome.trim() : ''
+    const linkTrimmed = anexo.link ? anexo.link.trim() : ''
+
+    if (!nomeTrimmed) {
+      throw new Error(`O anexo #${i + 1} deve ter um nome preenchido.`)
+    }
+
+    if (!linkTrimmed) {
+      throw new Error(`O anexo "${nomeTrimmed}" deve ter um link preenchido.`)
+    }
+
+    if (!linkTrimmed.startsWith('http://') && !linkTrimmed.startsWith('https://')) {
+      throw new Error(`O link do anexo "${nomeTrimmed}" deve começar com http:// ou https://`)
+    }
+  }
+
+  // Obter usuário autenticado para created_by
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError) {
+    console.warn('Não foi possível obter usuário autenticado:', authError)
+  }
+  const currentUserId = authData?.user?.id || null
+
+  // 2. Obter anexos atuais do banco
+  const { data: currentRows, error: fetchError } = await supabase
+    .from('manychat_contatos_anexos')
+    .select('id')
+    .eq('contato_id', contatoId)
+
+  if (fetchError) {
+    throw new Error(`Erro ao buscar anexos atuais: ${fetchError.message}`)
+  }
+
+  const currentIds = new Set<string>((currentRows || []).map((r) => r.id))
+
+  // 3. Identificar operações
+  const incomingIds = new Set<string>()
+  const toUpdate: Array<{ id: string; nome: string; link: string; ordem: number }> = []
+  const toInsert: Array<{
+    contato_id: string
+    nome: string
+    link: string
+    ordem: number
+    created_by: string | null
+  }> = []
+
+  for (let i = 0; i < anexos.length; i++) {
+    const item = anexos[i]
+    const nome = item.nome.trim()
+    const link = item.link.trim()
+    const ordem = typeof item.ordem === 'number' ? item.ordem : i
+
+    if (item.id && currentIds.has(item.id)) {
+      toUpdate.push({
+        id: item.id,
+        nome,
+        link,
+        ordem,
+      })
+      incomingIds.add(item.id)
+    } else {
+      toInsert.push({
+        contato_id: contatoId,
+        nome,
+        link,
+        ordem,
+        created_by: currentUserId,
+      })
+    }
+  }
+
+  // 4. Identificar anexos removidos
+  const toDeleteIds: string[] = []
+  for (const id of currentIds) {
+    if (!incomingIds.has(id)) {
+      toDeleteIds.push(id)
+    }
+  }
+
+  // Executar deleções
+  if (toDeleteIds.length > 0) {
+    const { error: delError } = await supabase
+      .from('manychat_contatos_anexos')
+      .delete()
+      .in('id', toDeleteIds)
+
+    if (delError) {
+      throw new Error(`Erro ao remover anexos: ${delError.message}`)
+    }
+  }
+
+  // Executar updates
+  for (const item of toUpdate) {
+    const { error: updError } = await supabase
+      .from('manychat_contatos_anexos')
+      .update({
+        nome: item.nome,
+        link: item.link,
+        ordem: item.ordem,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', item.id)
+
+    if (updError) {
+      throw new Error(`Erro ao atualizar anexo "${item.nome}": ${updError.message}`)
+    }
+  }
+
+  // Executar inserts
+  if (toInsert.length > 0) {
+    const { error: insError } = await supabase.from('manychat_contatos_anexos').insert(toInsert)
+
+    if (insError) {
+      throw new Error(`Erro ao inserir novos anexos: ${insError.message}`)
+    }
+  }
+}

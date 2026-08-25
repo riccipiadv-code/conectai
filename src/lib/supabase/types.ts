@@ -772,6 +772,47 @@ export type Database = {
           },
         ]
       }
+      manychat_contatos_anexos: {
+        Row: {
+          contato_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          link: string
+          nome: string
+          ordem: number
+          updated_at: string
+        }
+        Insert: {
+          contato_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          link: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+        }
+        Update: {
+          contato_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          link?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'manychat_contatos_anexos_contato_id_fkey'
+            columns: ['contato_id']
+            isOneToOne: false
+            referencedRelation: 'manychat_contatos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       manychat_contatos_subservicos: {
         Row: {
           contato_id: string
