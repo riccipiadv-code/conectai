@@ -208,6 +208,9 @@ export default function Contacts() {
   const formatPhone = (p: string) => (p ? p : '-')
 
   const handleManyChat = (c: any) => {
+    if (c.manychat_origens?.nome?.toLowerCase() !== 'whatsapp') {
+      return
+    }
     if (c.manychat_live_chat_url) {
       window.open(c.manychat_live_chat_url, '_blank')
     }
@@ -772,19 +775,36 @@ export default function Contacts() {
 
                       <TableCell className="min-w-[160px] align-top py-3 text-center">
                         <div className="flex justify-center items-center gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
-                                onClick={() => handleManyChat(c)}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Abrir ManyChat</TooltipContent>
-                          </Tooltip>
+                          {(() => {
+                            const isWhatsApp =
+                              c.manychat_origens?.nome?.toLowerCase() === 'whatsapp'
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      disabled={!isWhatsApp}
+                                      className={cn(
+                                        'h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50',
+                                        !isWhatsApp &&
+                                          'opacity-50 cursor-not-allowed hover:bg-transparent dark:hover:bg-transparent text-slate-400 dark:text-slate-600',
+                                      )}
+                                      onClick={() => isWhatsApp && handleManyChat(c)}
+                                    >
+                                      <MessageSquare className="h-4 w-4" />
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {isWhatsApp
+                                    ? 'Abrir ManyChat'
+                                    : 'Disponível apenas para atendimentos de origem WhatsApp.'}
+                                </TooltipContent>
+                              </Tooltip>
+                            )
+                          })()}
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
