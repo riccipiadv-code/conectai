@@ -222,6 +222,22 @@ export default function Contacts() {
     }
   }
 
+  const handleSendEmail = (c: any) => {
+    const email = c.lead_email?.trim()
+    if (!email) {
+      toast({
+        title: 'Aviso',
+        description: 'Este contato não possui e-mail cadastrado.',
+      })
+      return
+    }
+
+    const bcc = 'riccipi.adv@gmail.com'
+    const subject = `[CONECTAI:${c.controle || ''}]`
+    const mailtoUrl = `mailto:${encodeURIComponent(email)}?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}`
+    window.location.href = mailtoUrl
+  }
+
   const renderSlaBadge = (status: string | null) => {
     switch (status) {
       case 'green':
@@ -769,9 +785,14 @@ export default function Contacts() {
                       </TableCell>
 
                       <TableCell className="w-[80px] align-top py-3 text-center">
-                        <div className="flex justify-center items-center h-8">
-                          <Mail className="h-4 w-4 text-slate-400" />
-                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                          onClick={() => handleSendEmail(c)}
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
                       </TableCell>
 
                       <TableCell className="align-top py-3 text-center">
