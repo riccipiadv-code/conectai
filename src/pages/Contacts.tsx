@@ -70,6 +70,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
+import { AnexosModal } from '@/components/shared/anexos-modal'
 import { exportVisibleContactsExcel, exportAllContactsExcel } from '@/services/export-contacts'
 import {
   Dialog,
@@ -126,6 +127,9 @@ export default function Contacts() {
   const [updatingContact, setUpdatingContact] = useState<any | null>(null)
   const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('create')
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const [anexosModalOpen, setAnexosModalOpen] = useState(false)
+  const [anexosContatoId, setAnexosContatoId] = useState<string | null>(null)
 
   const [deletingContact, setDeletingContact] = useState<any | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -767,6 +771,10 @@ export default function Contacts() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                          onClick={() => {
+                            setAnexosContatoId(c.id)
+                            setAnexosModalOpen(true)
+                          }}
                         >
                           <Paperclip className="h-4 w-4" />
                         </Button>
@@ -963,6 +971,15 @@ export default function Contacts() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AnexosModal
+        isOpen={anexosModalOpen}
+        onClose={() => {
+          setAnexosModalOpen(false)
+          setAnexosContatoId(null)
+        }}
+        contatoId={anexosContatoId || ''}
+      />
     </div>
   )
 }

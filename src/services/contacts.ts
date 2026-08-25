@@ -483,29 +483,24 @@ export interface ContatoAnexo {
 }
 
 export async function getContatoAnexos(contatoId: string): Promise<ContatoAnexo[]> {
-  try {
-    const { data, error } = await supabase
-      .from('manychat_contatos_anexos')
-      .select('id, nome, link, ordem')
-      .eq('contato_id', contatoId)
-      .order('ordem', { ascending: true })
-      .order('created_at', { ascending: true })
+  const { data, error } = await supabase
+    .from('manychat_contatos_anexos')
+    .select('id, nome, link, ordem')
+    .eq('contato_id', contatoId)
+    .order('ordem', { ascending: true })
+    .order('created_at', { ascending: true })
 
-    if (error) {
-      console.error('Erro ao buscar anexos do contato:', error)
-      return []
-    }
-
-    return (data || []).map((item) => ({
-      id: item.id,
-      nome: item.nome,
-      link: item.link,
-      ordem: item.ordem,
-    }))
-  } catch (err) {
-    console.error('Erro inesperado ao buscar anexos:', err)
-    return []
+  if (error) {
+    console.error('Erro ao buscar anexos do contato:', error)
+    throw error
   }
+
+  return (data || []).map((item) => ({
+    id: item.id,
+    nome: item.nome,
+    link: item.link,
+    ordem: item.ordem,
+  }))
 }
 
 export async function saveContatoAnexos(contatoId: string, anexos: ContatoAnexo[]): Promise<void> {
