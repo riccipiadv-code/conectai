@@ -85,16 +85,16 @@ export function AnexosModal({ isOpen, onClose, contatoId }: AnexosModalProps) {
           ordem: a.ordem,
           contato_id: a.contato_id,
         })),
-        { nome: '', link: '', ordem: savedAnexos.length },
+        { nome: 'Proposta', link: '', ordem: savedAnexos.length },
       ])
     } else {
-      setEditingAnexos([{ nome: '', link: '', ordem: 0 }])
+      setEditingAnexos([{ nome: 'Proposta', link: '', ordem: 0 }])
     }
     setIsEditing(true)
   }
 
   const handleAddNewRow = () => {
-    setEditingAnexos((prev) => [...prev, { nome: '', link: '', ordem: prev.length }])
+    setEditingAnexos((prev) => [...prev, { nome: 'Proposta', link: '', ordem: prev.length }])
   }
 
   const handleRemoveRow = (index: number) => {
