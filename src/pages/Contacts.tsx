@@ -78,9 +78,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 
 export default function Contacts() {
+  const { profile } = useAuth()
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [meta, setMeta] = useState<{
@@ -369,6 +371,10 @@ export default function Contacts() {
     subservicoIds?: number[],
   ) => {
     try {
+      if (profile?.perfil !== 'administrador') {
+        delete payload.valor
+      }
+
       if (modalMode === 'create') {
         const newContact = await createContact(payload)
         if (newContact?.id && subservicoIds) {

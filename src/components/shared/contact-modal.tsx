@@ -37,6 +37,7 @@ import {
 } from '@/services/contacts'
 import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
+import { useAuth } from '@/hooks/use-auth'
 
 export interface ContactModalProps {
   contact: Contact | null
@@ -72,6 +73,7 @@ export function ContactModal({
   portesEmpresa = [],
   responsaveis: initialResponsaveis,
 }: ContactModalProps) {
+  const { profile } = useAuth()
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
@@ -397,15 +399,17 @@ export function ContactModal({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label>Valor Faturado</Label>
-              <Input
-                value={formatCurrency(formData.valor)}
-                onChange={handleValorChange}
-                disabled={isView}
-                placeholder="R$ 0,00"
-              />
-            </div>
+            {profile?.perfil === 'administrador' && (
+              <div className="grid gap-2">
+                <Label>Valor Faturado</Label>
+                <Input
+                  value={formatCurrency(formData.valor)}
+                  onChange={handleValorChange}
+                  disabled={isView}
+                  placeholder="R$ 0,00"
+                />
+              </div>
+            )}
           </div>
 
           {/* Serviços Contratados */}
