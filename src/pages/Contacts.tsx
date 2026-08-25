@@ -66,6 +66,7 @@ import {
   AlertCircle,
   Clock,
   CheckCircle,
+  Paperclip,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
@@ -667,6 +668,7 @@ export default function Contacts() {
                 </TableHead>
                 <TableHead className="w-[350px] max-w-[350px] font-semibold">Consulta</TableHead>
                 <TableHead className="font-semibold">Estágio</TableHead>
+                <TableHead className="w-[80px] font-semibold text-center">Anexos</TableHead>
                 <TableHead
                   className="w-[110px] cursor-pointer font-semibold select-none hover:text-primary transition-colors"
                   onClick={() => toggleSort('data_follow_up')}
@@ -683,7 +685,7 @@ export default function Contacts() {
             <TableBody>
               {filteredData.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <FileText className="h-8 w-8 text-slate-300" />
                       <span>Nenhum atendimento encontrado para os filtros selecionados.</span>
@@ -758,6 +760,16 @@ export default function Contacts() {
                         >
                           {stageLabel}
                         </Badge>
+                      </TableCell>
+
+                      <TableCell className="align-top py-3 text-center">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                        >
+                          <Paperclip className="h-4 w-4" />
+                        </Button>
                       </TableCell>
 
                       <TableCell className="w-[110px] align-top py-3">
