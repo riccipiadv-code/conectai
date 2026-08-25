@@ -147,6 +147,64 @@ Deno.serve(async (req: Request) => {
       })
     }
 
+    if (action === 'list_responsaveis') {
+      if (!profile || !profile.ativo) {
+        throw new Error('Permissão negada. Usuário sem perfil ativo.')
+      }
+
+      // 1. Consultar todos os legaldesk_usuarios onde exibir_gestao_usuarios = true ordenados por nome
+      const { data: ldUsers, error: ldError } = await supabase
+        .from('legaldesk_usuarios')
+        .select('id, nome, email')
+        .eq('exibir_gestao_usuarios', true)
+        .order('nome')
+
+      if (ldError) throw ldError
+
+      // 2. Consultar todos os profiles
+      const { data: profiles, error: profError } = await supabase
+        .from('profiles')
+        .select('id, email, legaldesk_usuario_id, ativo')
+
+      if (profError) throw profError
+
+      // 3. Consultar todos os usuários de auth.users via listUsers (uma única chamada)
+      const {
+        data: { users: authUsers },
+        error: authListError,
+      } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+
+      if (authListError) throw authListError
+
+      // Criar Set dos IDs de auth existentes
+      const authUserIdsSet = new Set((authUsers || []).map((u) => u.id))
+
+      // 4. Filtrar e mapear apenas os que possuem status "ativo"
+      const responsaveisList = (ldUsers || [])
+        .filter((ld) => {
+          const prof =
+            profiles?.find((p) => p.legaldesk_usuario_id === ld.id) ||
+            (ld.email
+              ? profiles?.find((p) => p.email?.toLowerCase() === ld.email?.toLowerCase())
+              : undefined)
+
+          const profileId = prof?.id || null
+          const ativoSys = prof?.ativo ?? false
+          const authUserExists = profileId ? authUserIdsSet.has(profileId) : false
+
+          return prof && authUserExists && ativoSys
+        })
+        .map((ld) => ({
+          id: ld.id,
+          nome: ld.nome,
+        }))
+        .sort((a, b) => a.nome.localeCompare(b.nome))
+
+      return new Response(JSON.stringify({ responsaveis: responsaveisList }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     if (action === 'list_hidden_users') {
       if (!profile || !profile.ativo) {
         throw new Error('Permissão negada. Usuário sem perfil ativo.')

@@ -145,13 +145,20 @@ export async function deleteContact(id: string) {
   if (error) throw error
 }
 
-export async function getResponsaveis() {
-  const { data } = await supabase
-    .from('legaldesk_usuarios')
-    .select('id, nome')
-    .eq('ativo', true)
-    .order('nome')
-  return data?.map((d: any) => ({ id: d.id, nome: d.nome })) || []
+export async function getResponsaveis(): Promise<Responsavel[]> {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      body: { action: 'list_responsaveis' },
+    })
+
+    if (error || !data || !Array.isArray(data.responsaveis)) {
+      return []
+    }
+
+    return data.responsaveis
+  } catch {
+    return []
+  }
 }
 
 export async function getServicos() {
