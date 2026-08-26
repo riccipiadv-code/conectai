@@ -35,81 +35,144 @@ class ImapSocketClient {
     }
   }
 
+  /**
+   * Reads one line at a time from the internal buffer, fetching more data from the stream as needed.
+   * Strips the trailing \r\n or \n.
+   */
+  async readLine(timeoutMs = 15000): Promise<string> {
+    const readLineInternal = async (): Promise<string> => {
+      while (true) {
+        const crlfIndex = this.buffer.indexOf('\r\n')
+        if (crlfIndex !== -1) {
+          const line = this.buffer.substring(0, crlfIndex)
+          this.buffer = this.buffer.substring(crlfIndex + 2)
+          return line
+        }
+
+        const lfIndex = this.buffer.indexOf('\n')
+        if (lfIndex !== -1) {
+          const line = this.buffer.substring(0, lfIndex)
+          this.buffer = this.buffer.substring(lfIndex + 1)
+          return line
+        }
+
+        if (!this.reader) throw new Error('Reader not initialized')
+        const { value, done } = await this.reader.read()
+        if (done) {
+          if (this.buffer.length > 0) {
+            const line = this.buffer
+            this.buffer = ''
+            return line
+          }
+          throw new Error('Connection closed by remote host')
+        }
+        if (value) {
+          this.buffer += this.decoder.decode(value, { stream: true })
+        }
+      }
+    }
+
+    return await this.withTimeout(readLineInternal(), timeoutMs, 'Timeout waiting for line')
+  }
+
+  private async sendRaw(data: string): Promise<void> {
+    if (!this.writer) throw new Error('Not connected')
+    await this.writer.write(this.encoder.encode(data))
+  }
+
   async readGreeting(timeoutMs = 10000): Promise<string> {
-    return await this.withTimeout(
-      this.readUntilTaggedOrGreeting(),
-      timeoutMs,
-      'Timeout waiting for greeting',
-    )
+    const line = await this.readLine(timeoutMs)
+    return line
+  }
+
+  async readTaggedResponse(
+    tag: string,
+    timeoutMs = 15000,
+  ): Promise<{ isOk: boolean; responseLine: string }> {
+    const startTime = Date.now()
+    while (true) {
+      const remainingTime = Math.max(1000, timeoutMs - (Date.now() - startTime))
+      const line = await this.readLine(remainingTime)
+
+      if (line.startsWith(`${tag} `)) {
+        const isOk = line.startsWith(`${tag} OK`)
+        return { isOk, responseLine: line }
+      }
+      // Untagged responses (e.g. starting with `*`) or continuation lines are ignored here
+    }
   }
 
   async sendCommand(
     command: string,
-    timeoutMs = 10000,
-  ): Promise<{ tag: string; response: string; isOk: boolean }> {
+    timeoutMs = 15000,
+  ): Promise<{ tag: string; isOk: boolean; responseLine: string }> {
     this.tagCounter += 1
     const tag = `A${String(this.tagCounter).padStart(4, '0')}`
-    const rawCommand = `${tag} ${command}\r\n`
 
-    if (!this.writer) throw new Error('Not connected')
-    await this.writer.write(this.encoder.encode(rawCommand))
+    await this.sendRaw(`${tag} ${command}\r\n`)
+    const { isOk, responseLine } = await this.readTaggedResponse(tag, timeoutMs)
 
-    const response = await this.withTimeout(
-      this.readUntilTagged(tag),
-      timeoutMs,
-      `Timeout waiting for response to ${tag}`,
-    )
-
-    const isOk = response.includes(`${tag} OK`)
-    return { tag, response, isOk }
+    return { tag, isOk, responseLine }
   }
 
-  private async readUntilGreeting(): Promise<string> {
-    while (true) {
-      if (this.buffer.includes('\r\n') || this.buffer.includes('\n')) {
-        const line = this.buffer
-        this.buffer = ''
-        return line
-      }
-      if (!this.reader) throw new Error('Reader not initialized')
-      const { value, done } = await this.reader.read()
-      if (done) throw new Error('Connection closed by remote host')
-      if (value) {
-        this.buffer += this.decoder.decode(value, { stream: true })
-      }
+  /**
+   * Performs IMAP LOGIN using RFC 3501 literal syntax:
+   * 1. A0001 LOGIN {byte_length}\r\n
+   * 2. Wait for '+' continuation response
+   * 3. Send username\r\n + {byte_length}\r\n
+   * 4. Wait for '+' continuation response
+   * 5. Send password\r\n
+   * 6. Read tagged response
+   */
+  async loginWithLiteral(
+    user: string,
+    pass: string,
+    timeoutMs = 15000,
+  ): Promise<{ tag: string; isOk: boolean; responseLine: string }> {
+    this.tagCounter += 1
+    const tag = `A${String(this.tagCounter).padStart(4, '0')}`
+
+    const userBytes = this.encoder.encode(user)
+    const passBytes = this.encoder.encode(pass)
+
+    // Step 1: Send LOGIN with user literal byte length
+    await this.sendRaw(`${tag} LOGIN {${userBytes.length}}\r\n`)
+
+    // Step 2: Wait for continuation '+'
+    const cont1 = await this.readLine(timeoutMs)
+    if (!cont1.startsWith('+')) {
+      throw new Error(`Unexpected server response waiting for user continuation: ${cont1}`)
     }
-  }
 
-  private async readUntilTaggedOrGreeting(): Promise<string> {
-    return await this.readUntilGreeting()
-  }
+    // Step 3: Send username and password literal byte length
+    await this.sendRaw(`${user} {${passBytes.length}}\r\n`)
 
-  private async readUntilTagged(tag: string): Promise<string> {
-    while (true) {
-      const matchIndex = this.buffer.search(new RegExp(`(^|\\r\\n|\\n)${tag} (OK|NO|BAD)`, 'm'))
-      if (matchIndex !== -1) {
-        const endLineIndex = this.buffer.indexOf('\n', matchIndex)
-        if (endLineIndex !== -1) {
-          const result = this.buffer.substring(0, endLineIndex + 1)
-          this.buffer = this.buffer.substring(endLineIndex + 1)
-          return result
-        }
-      }
-
-      if (!this.reader) throw new Error('Reader not initialized')
-      const { value, done } = await this.reader.read()
-      if (done) {
-        const remaining = this.buffer
-        this.buffer = ''
-        return remaining
-      }
-      if (value) {
-        this.buffer += this.decoder.decode(value, { stream: true })
-      }
+    // Step 4: Wait for continuation '+'
+    const cont2 = await this.readLine(timeoutMs)
+    if (!cont2.startsWith('+')) {
+      throw new Error(`Unexpected server response waiting for pass continuation: ${cont2}`)
     }
+
+    // Step 5: Send password
+    await this.sendRaw(`${pass}\r\n`)
+
+    // Step 6: Read final tagged response
+    const { isOk, responseLine } = await this.readTaggedResponse(tag, timeoutMs)
+
+    return { tag, isOk, responseLine }
   }
 
   async close(): Promise<void> {
+    try {
+      if (this.writer) {
+        this.tagCounter += 1
+        const tag = `A${String(this.tagCounter).padStart(4, '0')}`
+        await this.writer.write(this.encoder.encode(`${tag} LOGOUT\r\n`))
+      }
+    } catch {
+      // Best effort logout, ignore error
+    }
+
     try {
       if (this.reader) {
         this.reader.releaseLock()
@@ -139,10 +202,6 @@ class ImapSocketClient {
   }
 }
 
-function escapeImapString(str: string): string {
-  return '"' + str.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -151,10 +210,15 @@ Deno.serve(async (req: Request) => {
   const client = new ImapSocketClient()
 
   try {
-    const imapUser = Deno.env.get('GMAIL_IMAP_USER')
-    const imapPass = Deno.env.get('GMAIL_IMAP_APP_PASSWORD')
-    const imapHost = Deno.env.get('GMAIL_IMAP_HOST') || 'imap.gmail.com'
-    const imapPortRaw = Deno.env.get('GMAIL_IMAP_PORT') || '993'
+    const rawUser = Deno.env.get('GMAIL_IMAP_USER')
+    const rawPass = Deno.env.get('GMAIL_IMAP_APP_PASSWORD')
+    const rawHost = Deno.env.get('GMAIL_IMAP_HOST')
+    const rawPort = Deno.env.get('GMAIL_IMAP_PORT')
+
+    const imapUser = rawUser ? rawUser.trim() : ''
+    const imapPass = rawPass ? rawPass.trim() : ''
+    const imapHost = (rawHost ? rawHost.trim() : '') || 'imap.gmail.com'
+    const imapPortRaw = (rawPort ? rawPort.trim() : '') || '993'
     const imapPort = parseInt(imapPortRaw, 10)
 
     if (!imapUser || !imapPass || !imapHost || isNaN(imapPort)) {
@@ -171,10 +235,11 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Connect TLS
     try {
-      await client.connect(imapHost, imapPort, 10000)
+      await client.connect(imapHost, imapPort, 15000)
     } catch (err) {
-      console.error('IMAP TLS connection failed.')
+      console.error('IMAP TLS connection failed:', err instanceof Error ? err.message : String(err))
       return new Response(
         JSON.stringify({
           success: false,
@@ -189,9 +254,9 @@ Deno.serve(async (req: Request) => {
 
     // 1. Read greeting
     try {
-      const greeting = await client.readGreeting(10000)
+      const greeting = await client.readGreeting(15000)
       if (!greeting.startsWith('* OK')) {
-        console.error('Invalid IMAP greeting received.')
+        console.error('Invalid IMAP greeting received:', greeting)
         await client.close()
         return new Response(
           JSON.stringify({
@@ -204,8 +269,11 @@ Deno.serve(async (req: Request) => {
           },
         )
       }
-    } catch {
-      console.error('Failed reading IMAP greeting.')
+    } catch (err) {
+      console.error(
+        'Failed reading IMAP greeting:',
+        err instanceof Error ? err.message : String(err),
+      )
       await client.close()
       return new Response(
         JSON.stringify({
@@ -219,14 +287,11 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 2. Send LOGIN
+    // 2. Send LOGIN with literal syntax
     try {
-      const loginRes = await client.sendCommand(
-        `LOGIN ${escapeImapString(imapUser)} ${escapeImapString(imapPass)}`,
-        10000,
-      )
+      const loginRes = await client.loginWithLiteral(imapUser, imapPass, 15000)
       if (!loginRes.isOk) {
-        console.error('IMAP authentication failed.')
+        console.error('IMAP authentication failed. Server response:', loginRes.responseLine)
         await client.close()
         return new Response(
           JSON.stringify({
@@ -239,8 +304,8 @@ Deno.serve(async (req: Request) => {
           },
         )
       }
-    } catch {
-      console.error('IMAP login command failed.')
+    } catch (err) {
+      console.error('IMAP login command failed:', err instanceof Error ? err.message : String(err))
       await client.close()
       return new Response(
         JSON.stringify({
@@ -256,9 +321,9 @@ Deno.serve(async (req: Request) => {
 
     // 3. Send SELECT INBOX
     try {
-      const selectRes = await client.sendCommand('SELECT INBOX', 10000)
+      const selectRes = await client.sendCommand('SELECT INBOX', 15000)
       if (!selectRes.isOk) {
-        console.error('IMAP SELECT INBOX failed.')
+        console.error('IMAP SELECT INBOX failed. Server response:', selectRes.responseLine)
         await client.close()
         return new Response(
           JSON.stringify({
@@ -271,8 +336,11 @@ Deno.serve(async (req: Request) => {
           },
         )
       }
-    } catch {
-      console.error('IMAP select command failed.')
+    } catch (err) {
+      console.error(
+        'IMAP SELECT INBOX command failed:',
+        err instanceof Error ? err.message : String(err),
+      )
       await client.close()
       return new Response(
         JSON.stringify({
@@ -286,13 +354,7 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 4. Send LOGOUT
-    try {
-      await client.sendCommand('LOGOUT', 5000)
-    } catch {
-      // Best-effort logout
-    }
-
+    // 4. Close connection (best-effort LOGOUT inside close)
     await client.close()
 
     return new Response(
@@ -306,7 +368,10 @@ Deno.serve(async (req: Request) => {
       },
     )
   } catch (err) {
-    console.error('Unexpected error during IMAP test.')
+    console.error(
+      'Unexpected error during IMAP test:',
+      err instanceof Error ? err.message : String(err),
+    )
     await client.close()
     return new Response(
       JSON.stringify({

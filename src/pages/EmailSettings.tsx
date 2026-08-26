@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import {
   getEmailSettings,
@@ -34,6 +35,13 @@ export default function EmailSettings() {
   const [testing, setTesting] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [secret, setSecret] = useState('')
+
+  // Estados da aba E-mail Leitura (somente visual)
+  const [imapEmail, setImapEmail] = useState('')
+  const [imapHost, setImapHost] = useState('')
+  const [imapPort, setImapPort] = useState('')
+  const [imapPassword, setImapPassword] = useState('')
+
   const { toast } = useToast()
 
   useEffect(() => {
@@ -143,209 +151,288 @@ export default function EmailSettings() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <form onSubmit={handleSave} className="space-y-6 md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Provedor e Remetente</CardTitle>
-              <CardDescription>
-                Defina como os e-mails serão enviados e apresentados.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Status da Integração</Label>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={settings.active}
-                    onCheckedChange={(checked) => setSettings({ ...settings, active: checked })}
-                  />
-                  <span className="text-sm font-medium">
-                    {settings.active ? 'Ativo' : 'Inativo'}
-                  </span>
-                </div>
-              </div>
+      <Tabs defaultValue="geral" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="geral">E-mail Geral</TabsTrigger>
+          <TabsTrigger value="leitura">E-mail Leitura</TabsTrigger>
+        </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="provider">Provedor</Label>
-                <Select
-                  value={settings.provider}
-                  onValueChange={(val) => setSettings({ ...settings, provider: val })}
-                >
-                  <SelectTrigger id="provider">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="smtp">SMTP</SelectItem>
-                    <SelectItem value="resend">Resend API</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sender_name">Nome do Remetente *</Label>
-                <Input
-                  id="sender_name"
-                  value={settings.sender_name}
-                  onChange={(e) => setSettings({ ...settings, sender_name: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sender_email">E-mail do Remetente *</Label>
-                <Input
-                  id="sender_email"
-                  type="email"
-                  value={settings.sender_email}
-                  onChange={(e) => setSettings({ ...settings, sender_email: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="reply_to">Responder para (Opcional)</Label>
-                <Input
-                  id="reply_to"
-                  type="email"
-                  value={settings.reply_to || ''}
-                  onChange={(e) => setSettings({ ...settings, reply_to: e.target.value })}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Credenciais {settings.provider === 'smtp' ? 'SMTP' : 'API'}</CardTitle>
-              <CardDescription>
-                Informe as credenciais de acesso ao servidor. Senhas não são exibidas após salvas.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {settings.provider === 'smtp' && (
-                <>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="space-y-2 col-span-3">
-                      <Label htmlFor="smtp_host">Host SMTP</Label>
-                      <Input
-                        id="smtp_host"
-                        value={settings.smtp_host || ''}
-                        onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
-                        required={settings.provider === 'smtp'}
+        <TabsContent value="geral" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSave} className="space-y-6 md:col-span-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Provedor e Remetente</CardTitle>
+                  <CardDescription>
+                    Defina como os e-mails serão enviados e apresentados.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Status da Integração</Label>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={settings.active}
+                        onCheckedChange={(checked) => setSettings({ ...settings, active: checked })}
                       />
-                    </div>
-                    <div className="space-y-2 col-span-1">
-                      <Label htmlFor="smtp_port">Porta</Label>
-                      <Input
-                        id="smtp_port"
-                        type="number"
-                        value={settings.smtp_port || ''}
-                        onChange={(e) =>
-                          setSettings({ ...settings, smtp_port: parseInt(e.target.value) || null })
-                        }
-                        required={settings.provider === 'smtp'}
-                      />
+                      <span className="text-sm font-medium">
+                        {settings.active ? 'Ativo' : 'Inativo'}
+                      </span>
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="smtp_user">Usuário SMTP</Label>
+                    <Label htmlFor="provider">Provedor</Label>
+                    <Select
+                      value={settings.provider}
+                      onValueChange={(val) => setSettings({ ...settings, provider: val })}
+                    >
+                      <SelectTrigger id="provider">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="smtp">SMTP</SelectItem>
+                        <SelectItem value="resend">Resend API</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="sender_name">Nome do Remetente *</Label>
                     <Input
-                      id="smtp_user"
-                      value={settings.smtp_user || ''}
-                      onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
-                      required={settings.provider === 'smtp'}
+                      id="sender_name"
+                      value={settings.sender_name}
+                      onChange={(e) => setSettings({ ...settings, sender_name: e.target.value })}
+                      required
                     />
                   </div>
 
-                  <div className="space-y-2 pt-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Usar Conexão Segura (TLS/SSL)</Label>
-                      <Switch
-                        checked={settings.smtp_secure}
-                        onCheckedChange={(checked) =>
-                          setSettings({ ...settings, smtp_secure: checked })
-                        }
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sender_email">E-mail do Remetente *</Label>
+                    <Input
+                      id="sender_email"
+                      type="email"
+                      value={settings.sender_email}
+                      onChange={(e) => setSettings({ ...settings, sender_email: e.target.value })}
+                      required
+                    />
                   </div>
-                </>
-              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="secret">
-                  {settings.provider === 'smtp' ? 'Senha SMTP' : 'Chave de API'}
-                </Label>
-                <Input
-                  id="secret"
-                  type="password"
-                  placeholder={
-                    settings.secret_configured
-                      ? 'Preencher somente para alterar'
-                      : 'Informe a credencial'
-                  }
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                  required={!settings.secret_configured}
-                />
-                {settings.secret_configured && !secret && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Credencial já configurada. Preencha apenas se quiser atualizar.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" disabled={saving} className="w-full">
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Salvar Configurações
-              </Button>
-            </CardFooter>
-          </Card>
-        </form>
+                  <div className="space-y-2">
+                    <Label htmlFor="reply_to">Responder para (Opcional)</Label>
+                    <Input
+                      id="reply_to"
+                      type="email"
+                      value={settings.reply_to || ''}
+                      onChange={(e) => setSettings({ ...settings, reply_to: e.target.value })}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-        <div className="space-y-6 md:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Testar Envio
-              </CardTitle>
-              <CardDescription>
-                Verifique se as configurações estão corretas enviando um e-mail de teste.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="testEmail">E-mail de Destino</Label>
-                <Input
-                  id="testEmail"
-                  type="email"
-                  placeholder="seu.email@exemplo.com"
-                  value={testEmail}
-                  onChange={(e) => setTestEmail(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={handleTest}
-                disabled={testing || !testEmail}
-              >
-                {testing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
-                Enviar Teste
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Credenciais {settings.provider === 'smtp' ? 'SMTP' : 'API'}</CardTitle>
+                  <CardDescription>
+                    Informe as credenciais de acesso ao servidor. Senhas não são exibidas após
+                    salvas.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {settings.provider === 'smtp' && (
+                    <>
+                      <div className="grid grid-cols-4 gap-4">
+                        <div className="space-y-2 col-span-3">
+                          <Label htmlFor="smtp_host">Host SMTP</Label>
+                          <Input
+                            id="smtp_host"
+                            value={settings.smtp_host || ''}
+                            onChange={(e) =>
+                              setSettings({ ...settings, smtp_host: e.target.value })
+                            }
+                            required={settings.provider === 'smtp'}
+                          />
+                        </div>
+                        <div className="space-y-2 col-span-1">
+                          <Label htmlFor="smtp_port">Porta</Label>
+                          <Input
+                            id="smtp_port"
+                            type="number"
+                            value={settings.smtp_port || ''}
+                            onChange={(e) =>
+                              setSettings({
+                                ...settings,
+                                smtp_port: parseInt(e.target.value) || null,
+                              })
+                            }
+                            required={settings.provider === 'smtp'}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="smtp_user">Usuário SMTP</Label>
+                        <Input
+                          id="smtp_user"
+                          value={settings.smtp_user || ''}
+                          onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
+                          required={settings.provider === 'smtp'}
+                        />
+                      </div>
+
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Usar Conexão Segura (TLS/SSL)</Label>
+                          <Switch
+                            checked={settings.smtp_secure}
+                            onCheckedChange={(checked) =>
+                              setSettings({ ...settings, smtp_secure: checked })
+                            }
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="secret">
+                      {settings.provider === 'smtp' ? 'Senha SMTP' : 'Chave de API'}
+                    </Label>
+                    <Input
+                      id="secret"
+                      type="password"
+                      placeholder={
+                        settings.secret_configured
+                          ? 'Preencher somente para alterar'
+                          : 'Informe a credencial'
+                      }
+                      value={secret}
+                      onChange={(e) => setSecret(e.target.value)}
+                      required={!settings.secret_configured}
+                    />
+                    {settings.secret_configured && !secret && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Credencial já configurada. Preencha apenas se quiser atualizar.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button type="submit" disabled={saving} className="w-full">
+                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Salvar Configurações
+                  </Button>
+                </CardFooter>
+              </Card>
+            </form>
+
+            <div className="space-y-6 md:col-span-1">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Mail className="h-5 w-5" />
+                    Testar Envio
+                  </CardTitle>
+                  <CardDescription>
+                    Verifique se as configurações estão corretas enviando um e-mail de teste.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="testEmail">E-mail de Destino</Label>
+                    <Input
+                      id="testEmail"
+                      type="email"
+                      placeholder="seu.email@exemplo.com"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={handleTest}
+                    disabled={testing || !testEmail}
+                  >
+                    {testing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="mr-2 h-4 w-4" />
+                    )}
+                    Enviar Teste
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="leitura" className="space-y-6">
+          <div className="max-w-xl">
+            <Card>
+              <CardHeader>
+                <CardTitle>Leitura de E-mails (IMAP)</CardTitle>
+                <CardDescription>
+                  Configure o acesso à caixa de entrada para leitura de e-mails.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="imap_email">E-mail</Label>
+                  <Input
+                    id="imap_email"
+                    type="email"
+                    placeholder="riccipi.adv@gmail.com"
+                    value={imapEmail}
+                    onChange={(e) => setImapEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="space-y-2 col-span-3">
+                    <Label htmlFor="imap_host">Servidor IMAP</Label>
+                    <Input
+                      id="imap_host"
+                      placeholder="imap.gmail.com"
+                      value={imapHost}
+                      onChange={(e) => setImapHost(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-1">
+                    <Label htmlFor="imap_port">Porta</Label>
+                    <Input
+                      id="imap_port"
+                      type="number"
+                      placeholder="993"
+                      value={imapPort}
+                      onChange={(e) => setImapPort(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="imap_password">Senha de aplicativo</Label>
+                  <Input
+                    id="imap_password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={imapPassword}
+                    onChange={(e) => setImapPassword(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter className="flex items-center gap-3">
+                <Button type="button">Salvar</Button>
+                <Button type="button" variant="outline">
+                  Testar conexão
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
