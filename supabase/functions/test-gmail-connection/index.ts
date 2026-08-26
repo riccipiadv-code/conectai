@@ -202,31 +202,120 @@ class ImapSocketClient {
   }
 }
 
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Token de autenticação não encontrado' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: 'Erro interno de configuração de servidor' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+  const token = authHeader.replace(/^Bearer\s+/i, '')
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token)
+
+  if (userError || !user) {
+    return new Response(JSON.stringify({ error: 'Não autorizado.' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('perfil')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || profile?.perfil !== 'administrador') {
+    return new Response(
+      JSON.stringify({
+        error:
+          'Permissão negada: apenas administradores podem testar conexão de e-mail de leitura.',
+      }),
+      {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  }
+
   const client = new ImapSocketClient()
 
   try {
-    const rawUser = Deno.env.get('GMAIL_IMAP_USER')
-    const rawPass = Deno.env.get('GMAIL_IMAP_APP_PASSWORD')
-    const rawHost = Deno.env.get('GMAIL_IMAP_HOST')
-    const rawPort = Deno.env.get('GMAIL_IMAP_PORT')
+    const { data: setting, error: settingError } = await supabase
+      .from('email_reading_settings')
+      .select('*')
+      .eq('active', true)
+      .limit(1)
+      .maybeSingle()
 
-    const imapUser = rawUser ? rawUser.trim() : ''
-    const imapPass = rawPass ? rawPass.trim() : ''
-    const imapHost = (rawHost ? rawHost.trim() : '') || 'imap.gmail.com'
-    const imapPortRaw = (rawPort ? rawPort.trim() : '') || '993'
-    const imapPort = parseInt(imapPortRaw, 10)
-
-    if (!imapUser || !imapPass || !imapHost || isNaN(imapPort)) {
-      console.error('IMAP configuration missing in environment secrets.')
+    if (settingError || !setting) {
+      console.error('Active email reading setting not found:', settingError)
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Não foi possível conectar ao Gmail.',
+          message: 'Não foi possível conectar ao E-mail Leitura.',
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    const { data: secretData, error: secretError } = await supabase
+      .from('email_reading_secrets')
+      .select('secret_value')
+      .eq('setting_id', setting.id)
+      .maybeSingle()
+
+    if (secretError || !secretData?.secret_value) {
+      console.error('Email reading secret not found or empty for active setting')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Não foi possível conectar ao E-mail Leitura.',
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    const imapUser = (setting.email || '').trim()
+    const imapPass = secretData.secret_value.trim()
+    const imapHost = (setting.imap_host || '').trim() || 'imap.gmail.com'
+    const imapPort = Number(setting.imap_port) || 993
+
+    if (!imapUser || !imapPass || !imapHost || isNaN(imapPort)) {
+      console.error('Incomplete IMAP configuration values from database')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Não foi possível conectar ao E-mail Leitura.',
         }),
         {
           status: 200,
@@ -243,7 +332,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Não foi possível conectar ao Gmail.',
+          message: 'Não foi possível conectar ao E-mail Leitura.',
         }),
         {
           status: 200,
@@ -261,7 +350,7 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({
             success: false,
-            message: 'Não foi possível conectar ao Gmail.',
+            message: 'Não foi possível conectar ao E-mail Leitura.',
           }),
           {
             status: 200,
@@ -278,7 +367,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Não foi possível conectar ao Gmail.',
+          message: 'Não foi possível conectar ao E-mail Leitura.',
         }),
         {
           status: 200,
@@ -296,7 +385,7 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({
             success: false,
-            message: 'Não foi possível conectar ao Gmail.',
+            message: 'Não foi possível conectar ao E-mail Leitura.',
           }),
           {
             status: 200,
@@ -310,7 +399,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Não foi possível conectar ao Gmail.',
+          message: 'Não foi possível conectar ao E-mail Leitura.',
         }),
         {
           status: 200,
@@ -328,7 +417,7 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({
             success: false,
-            message: 'Não foi possível conectar ao Gmail.',
+            message: 'Não foi possível conectar ao E-mail Leitura.',
           }),
           {
             status: 200,
@@ -345,7 +434,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Não foi possível conectar ao Gmail.',
+          message: 'Não foi possível conectar ao E-mail Leitura.',
         }),
         {
           status: 200,
@@ -360,7 +449,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Conexão com Gmail realizada com sucesso.',
+        message: 'Conexão com o E-mail Leitura realizada com sucesso.',
       }),
       {
         status: 200,
@@ -376,7 +465,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: false,
-        message: 'Não foi possível conectar ao Gmail.',
+        message: 'Não foi possível conectar ao E-mail Leitura.',
       }),
       {
         status: 200,
