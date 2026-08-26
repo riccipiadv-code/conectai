@@ -179,7 +179,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="antonio.ricci@riccipi.com.br"
+                  placeholder="seuemail@riccipi.com.br"
                   className="pl-9"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
