@@ -113,3 +113,18 @@ export const testGmailConnection = async () => {
   if (data?.error) throw new Error(data.error)
   return data
 }
+
+export const searchConectaiEmail = async (controle: string) => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) throw new Error('Unauthorized')
+
+  const { data, error } = await supabase.functions.invoke('search-conectai-email', {
+    body: { controle },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}

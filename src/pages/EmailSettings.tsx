@@ -27,10 +27,11 @@ import {
   saveEmailReadingSetting,
   sendTestEmail,
   testGmailConnection,
+  searchConectaiEmail,
   EmailSetting,
   EmailReadingSetting,
 } from '@/services/email-settings'
-import { Loader2, Mail, Send } from 'lucide-react'
+import { Loader2, Mail, Search, Send } from 'lucide-react'
 
 export default function EmailSettings() {
   const [settings, setSettings] = useState<EmailSetting | null>(null)
@@ -47,6 +48,8 @@ export default function EmailSettings() {
   const [imapPort, setImapPort] = useState('')
   const [imapPassword, setImapPassword] = useState('')
   const [readingSecretConfigured, setReadingSecretConfigured] = useState(false)
+  const [buscaControle, setBuscaControle] = useState('')
+  const [searchingEmail, setSearchingEmail] = useState(false)
 
   const { toast } = useToast()
 
@@ -220,6 +223,57 @@ export default function EmailSettings() {
       })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleSearchEmail = async () => {
+    const controleLimpo = buscaControle.trim()
+    if (!controleLimpo) {
+      toast({
+        title: 'Controle obrigatório',
+        description: 'Informe o código de controle para buscar.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      setSearchingEmail(true)
+      const data = await searchConectaiEmail(controleLimpo)
+
+      if (data?.success === true) {
+        const qtd = Number(data.quantidade) || 0
+        if (qtd === 1) {
+          toast({
+            title: 'Busca de e-mail',
+            description: `1 e-mail encontrado para o controle ${controleLimpo}.`,
+          })
+        } else if (qtd > 1) {
+          toast({
+            title: 'Busca de e-mail',
+            description: `${qtd} e-mails encontrados para o controle ${controleLimpo}.`,
+          })
+        } else {
+          toast({
+            title: 'Busca de e-mail',
+            description: `Nenhum e-mail encontrado para o controle ${controleLimpo}.`,
+          })
+        }
+      } else {
+        toast({
+          title: 'Erro na busca',
+          description: data?.message || 'Não foi possível buscar e-mails.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro na busca',
+        description: error.message || 'Não foi possível buscar e-mails.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSearchingEmail(false)
     }
   }
 
@@ -461,7 +515,7 @@ export default function EmailSettings() {
         </TabsContent>
 
         <TabsContent value="leitura" className="space-y-6">
-          <div className="max-w-xl">
+          <div className="max-w-xl space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Leitura de E-mails (IMAP)</CardTitle>
@@ -534,6 +588,48 @@ export default function EmailSettings() {
                 >
                   {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Testar conexão
+                </Button>
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Search className="h-5 w-5" />
+                  Teste de busca de e-mail
+                </CardTitle>
+                <CardDescription>
+                  Verifique a busca de e-mails na caixa de entrada pelo identificador de controle.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="busca_controle">Controle</Label>
+                  <Input
+                    id="busca_controle"
+                    placeholder="Ex: 469"
+                    value={buscaControle}
+                    onChange={(e) => setBuscaControle(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  type="button"
+                  onClick={handleSearchEmail}
+                  disabled={searchingEmail || !buscaControle.trim()}
+                >
+                  {searchingEmail ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Buscando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Buscar e-mail
+                    </>
+                  )}
                 </Button>
               </CardFooter>
             </Card>
