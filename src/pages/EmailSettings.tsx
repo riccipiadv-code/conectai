@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast'
 import {
   getEmailSettings,
   saveEmailSetting,
+  saveEmailReadingSetting,
   sendTestEmail,
   EmailSetting,
 } from '@/services/email-settings'
@@ -32,11 +33,12 @@ export default function EmailSettings() {
   const [settings, setSettings] = useState<EmailSetting | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingImap, setSavingImap] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [secret, setSecret] = useState('')
 
-  // Estados da aba E-mail Leitura (somente visual)
+  // Estados da aba E-mail Leitura
   const [imapEmail, setImapEmail] = useState('')
   const [imapHost, setImapHost] = useState('')
   const [imapPort, setImapPort] = useState('')
@@ -100,6 +102,40 @@ export default function EmailSettings() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveImapReading = async () => {
+    if (!imapEmail.trim()) {
+      toast({
+        title: 'E-mail obrigatório',
+        description: 'Informe o e-mail para a leitura.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      setSavingImap(true)
+      await saveEmailReadingSetting(
+        imapEmail.trim(),
+        imapHost.trim() || undefined,
+        imapPort.trim() ? Number(imapPort) || imapPort.trim() : undefined,
+        imapPassword || undefined,
+      )
+      toast({
+        title: 'Configurações salvas',
+        description: 'Configurações do E-mail Leitura salvas com sucesso.',
+      })
+      setImapPassword('')
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message || 'Não foi possível salvar as configurações do E-mail Leitura.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingImap(false)
     }
   }
 
@@ -424,7 +460,10 @@ export default function EmailSettings() {
                 </div>
               </CardContent>
               <CardFooter className="flex items-center gap-3">
-                <Button type="button">Salvar</Button>
+                <Button type="button" onClick={handleSaveImapReading} disabled={savingImap}>
+                  {savingImap && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Salvar
+                </Button>
                 <Button type="button" variant="outline">
                   Testar conexão
                 </Button>

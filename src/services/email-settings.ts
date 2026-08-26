@@ -38,6 +38,31 @@ export const saveEmailSetting = async (setting: EmailSetting, secret?: string) =
   return data.setting
 }
 
+export const saveEmailReadingSetting = async (
+  imapEmail: string,
+  imapHost?: string,
+  imapPort?: string | number | null,
+  secret?: string,
+) => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) throw new Error('Unauthorized')
+
+  const { data, error } = await supabase.functions.invoke('save-email-reading-settings', {
+    body: {
+      email: imapEmail,
+      imap_host: imapHost,
+      imap_port: imapPort,
+      secret,
+    },
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data.setting
+}
+
 export const sendTestEmail = async (toEmail: string) => {
   const {
     data: { session },
