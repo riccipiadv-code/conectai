@@ -50,6 +50,11 @@ export default function EmailSettings() {
   const [readingSecretConfigured, setReadingSecretConfigured] = useState(false)
   const [buscaControle, setBuscaControle] = useState('')
   const [searchingEmail, setSearchingEmail] = useState(false)
+  const [searchResult, setSearchResult] = useState<{
+    controle: string
+    quantidade: number
+    emails: Array<{ date: string; from: string; to: string; subject: string }>
+  } | null>(null)
 
   const { toast } = useToast()
 
@@ -243,6 +248,12 @@ export default function EmailSettings() {
 
       if (data?.success === true) {
         const qtd = Number(data.quantidade) || 0
+        setSearchResult({
+          controle: data.controle || controleLimpo,
+          quantidade: qtd,
+          emails: data.emails || [],
+        })
+
         if (qtd === 1) {
           toast({
             title: 'Busca de e-mail',
@@ -260,6 +271,7 @@ export default function EmailSettings() {
           })
         }
       } else {
+        setSearchResult(null)
         toast({
           title: 'Erro na busca',
           description: data?.message || 'Não foi possível buscar e-mails.',
@@ -267,6 +279,7 @@ export default function EmailSettings() {
         })
       }
     } catch (error: any) {
+      setSearchResult(null)
       toast({
         title: 'Erro na busca',
         description: error.message || 'Não foi possível buscar e-mails.',
@@ -632,6 +645,40 @@ export default function EmailSettings() {
                   )}
                 </Button>
               </CardFooter>
+
+              {searchResult && searchResult.emails.length > 0 && (
+                <div className="px-6 pb-6">
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium mb-3">
+                      Encontrados: {searchResult.quantidade} e-mail
+                      {searchResult.quantidade !== 1 ? 's' : ''} para o controle{' '}
+                      {searchResult.controle}
+                    </p>
+                    <div className="space-y-3">
+                      {searchResult.emails.map((email, idx) => (
+                        <div key={idx} className="rounded-md border bg-muted/30 p-3 space-y-1">
+                          <p className="text-sm">
+                            <span className="font-medium text-muted-foreground">Data:</span>{' '}
+                            {email.date || '-'}
+                          </p>
+                          <p className="text-sm">
+                            <span className="font-medium text-muted-foreground">De:</span>{' '}
+                            {email.from || '-'}
+                          </p>
+                          <p className="text-sm">
+                            <span className="font-medium text-muted-foreground">Para:</span>{' '}
+                            {email.to || '-'}
+                          </p>
+                          <p className="text-sm">
+                            <span className="font-medium text-muted-foreground">Assunto:</span>{' '}
+                            {email.subject || '-'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
         </TabsContent>

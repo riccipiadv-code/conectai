@@ -76,6 +76,43 @@ class ImapSocketClient {
     return await this.withTimeout(readLineInternal(), timeoutMs, 'Timeout waiting for line')
   }
 
+  /**
+   * Reads exactly `n` bytes from the buffer/stream.
+   * Consumes from this.buffer first; if insufficient, reads from stream until n bytes are gathered.
+   */
+  async readBytes(n: number, timeoutMs = 15000): Promise<string> {
+    const readBytesInternal = async (): Promise<string> => {
+      let currentBytes = this.encoder.encode(this.buffer)
+
+      while (currentBytes.length < n) {
+        if (!this.reader) throw new Error('Reader not initialized')
+        const { value, done } = await this.reader.read()
+        if (done) {
+          if (currentBytes.length > 0) {
+            const result = this.decoder.decode(currentBytes)
+            this.buffer = ''
+            return result
+          }
+          throw new Error('Connection closed by remote host while reading bytes')
+        }
+        if (value && value.length > 0) {
+          const merged = new Uint8Array(currentBytes.length + value.length)
+          merged.set(currentBytes)
+          merged.set(value, currentBytes.length)
+          currentBytes = merged
+        }
+      }
+
+      const neededBytes = currentBytes.slice(0, n)
+      const remainingBytes = currentBytes.slice(n)
+
+      this.buffer = this.decoder.decode(remainingBytes, { stream: true })
+      return this.decoder.decode(neededBytes)
+    }
+
+    return await this.withTimeout(readBytesInternal(), timeoutMs, 'Timeout waiting for bytes')
+  }
+
   private async sendRaw(data: string): Promise<void> {
     if (!this.writer) throw new Error('Not connected')
     await this.writer.write(this.encoder.encode(data))
@@ -165,7 +202,7 @@ class ImapSocketClient {
   async searchSubject(
     subjectQuery: string,
     timeoutMs = 15000,
-  ): Promise<{ isOk: boolean; count: number; responseLine: string }> {
+  ): Promise<{ isOk: boolean; count: number; matchingIds: number[]; responseLine: string }> {
     this.tagCounter += 1
     const tag = `A${String(this.tagCounter).padStart(4, '0')}`
 
@@ -202,8 +239,254 @@ class ImapSocketClient {
     return {
       isOk,
       count: matchingIds.length,
+      matchingIds,
       responseLine: finalResponseLine,
     }
+  }
+
+  /**
+   * Decodes MIME encoded-word RFC 2047 strings (e.g. =?UTF-8?B?...?= or =?ISO-8859-1?Q?...?=)
+   */
+  private decodeMimeWords(str: string): string {
+    return str.replace(/=\?([^?]+)\?([BQbq])\?([^?]*)\?=/gi, (_, charset, encoding, text) => {
+      try {
+        const enc = encoding.toUpperCase()
+        if (enc === 'B') {
+          const binaryStr = atob(text.trim())
+          const bytes = new Uint8Array(binaryStr.length)
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i)
+          }
+          const textDecoder = new TextDecoder(charset.toLowerCase() || 'utf-8')
+          return textDecoder.decode(bytes)
+        } else if (enc === 'Q') {
+          const unescaped = text
+            .replace(/_/g, ' ')
+            .replace(/=([0-9A-Fa-f]{2})/g, (__: string, hex: string) => {
+              return String.fromCharCode(parseInt(hex, 16))
+            })
+          const bytes = new Uint8Array(unescaped.length)
+          for (let i = 0; i < unescaped.length; i++) {
+            bytes[i] = unescaped.charCodeAt(i)
+          }
+          const textDecoder = new TextDecoder(charset.toLowerCase() || 'utf-8')
+          return textDecoder.decode(bytes)
+        }
+      } catch {
+        // fallback to original match if decode fails
+      }
+      return text
+    })
+  }
+
+  /**
+   * Extracts clean email address from string (e.g. `"Name" <email@dominio.com>` -> `email@dominio.com`)
+   */
+  private extractEmailAddress(raw: string): string {
+    if (!raw) return ''
+    const match = raw.match(/<([^>]+)>/)
+    if (match && match[1]) {
+      return match[1].trim()
+    }
+    const emailMatch = raw.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)
+    if (emailMatch) {
+      return emailMatch[0].trim()
+    }
+    return raw.trim()
+  }
+
+  /**
+   * Formats a date string (RFC 2822 or IMAP internal date) to DD/MM/AAAA HH:MM
+   */
+  private formatDateBR(rawDate: string): string {
+    if (!rawDate) return ''
+    const cleaned = rawDate.replace(/"/g, '').trim()
+    const parsedDate = new Date(cleaned)
+
+    if (isNaN(parsedDate.getTime())) {
+      // Manual parse for IMAP INTERNALDATE format like "26-Aug-2026 11:30:00 -0300"
+      const imapRegex = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})\s+(\d{1,2}):(\d{2})/
+      const m = cleaned.match(imapRegex)
+      if (m) {
+        const day = m[1].padStart(2, '0')
+        const monthNames: Record<string, string> = {
+          jan: '01',
+          feb: '02',
+          mar: '03',
+          apr: '04',
+          may: '05',
+          jun: '06',
+          jul: '07',
+          aug: '08',
+          sep: '09',
+          oct: '10',
+          nov: '11',
+          dec: '12',
+        }
+        const month = monthNames[m[2].toLowerCase()] || '01'
+        const year = m[3]
+        const hours = m[4].padStart(2, '0')
+        const mins = m[5]
+        return `${day}/${month}/${year} ${hours}:${mins}`
+      }
+      return cleaned
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const day = pad(parsedDate.getDate())
+    const month = pad(parsedDate.getMonth() + 1)
+    const year = parsedDate.getFullYear()
+    const hours = pad(parsedDate.getHours())
+    const minutes = pad(parsedDate.getMinutes())
+
+    return `${day}/${month}/${year} ${hours}:${minutes}`
+  }
+
+  /**
+   * Parses raw header text (handling multiline continuation headers)
+   */
+  private parseHeaders(headerText: string): {
+    from: string
+    to: string
+    subject: string
+    date: string
+  } {
+    const rawLines = headerText.split(/\r?\n/)
+    const unfoldedLines: string[] = []
+
+    for (const line of rawLines) {
+      if (/^\s+/.test(line) && unfoldedLines.length > 0) {
+        unfoldedLines[unfoldedLines.length - 1] += ' ' + line.trim()
+      } else if (line.trim().length > 0) {
+        unfoldedLines.push(line)
+      }
+    }
+
+    let from = ''
+    let to = ''
+    let subject = ''
+    let date = ''
+
+    for (const line of unfoldedLines) {
+      const fromMatch = line.match(/^From:\s*(.*)$/i)
+      if (fromMatch && !from) {
+        from = this.extractEmailAddress(fromMatch[1])
+        continue
+      }
+      const toMatch = line.match(/^To:\s*(.*)$/i)
+      if (toMatch && !to) {
+        to = this.extractEmailAddress(toMatch[1])
+        continue
+      }
+      const subjMatch = line.match(/^Subject:\s*(.*)$/i)
+      if (subjMatch && !subject) {
+        subject = this.decodeMimeWords(subjMatch[1].trim())
+        continue
+      }
+      const dateMatch = line.match(/^Date:\s*(.*)$/i)
+      if (dateMatch && !date) {
+        date = dateMatch[1].trim()
+        continue
+      }
+    }
+
+    return { from, to, subject, date }
+  }
+
+  /**
+   * Fetches headers and date for message IDs
+   * Command: FETCH ids (INTERNALDATE BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])
+   */
+  async fetchEmailHeaders(
+    messageIds: number[],
+    timeoutMs = 20000,
+  ): Promise<Array<{ date: string; from: string; to: string; subject: string }>> {
+    if (messageIds.length === 0) return []
+
+    this.tagCounter += 1
+    const tag = `A${String(this.tagCounter).padStart(4, '0')}`
+    const idsString = messageIds.join(',')
+
+    await this.sendRaw(
+      `${tag} FETCH ${idsString} (INTERNALDATE BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])\r\n`,
+    )
+
+    const startTime = Date.now()
+    const fetchedMap = new Map<
+      number,
+      { date: string; from: string; to: string; subject: string }
+    >()
+
+    while (true) {
+      const remainingTime = Math.max(1000, timeoutMs - (Date.now() - startTime))
+      const line = await this.readLine(remainingTime)
+
+      if (line.startsWith(`${tag} `)) {
+        break
+      }
+
+      // Untagged FETCH line, e.g.:
+      // * 1 FETCH (INTERNALDATE "26-Aug-2026 11:30:00 -0300" BODY[HEADER.FIELDS (FROM TO SUBJECT DATE)] {150}
+      const fetchStartMatch = line.match(/^\*\s+(\d+)\s+FETCH\s+\((.*)$/i)
+      if (fetchStartMatch) {
+        const msgSeq = parseInt(fetchStartMatch[1], 10)
+        let fetchLineRest = fetchStartMatch[2]
+
+        // Extract INTERNALDATE if present
+        let internalDate = ''
+        const internalDateMatch = fetchLineRest.match(/INTERNALDATE\s+"([^"]+)"/i)
+        if (internalDateMatch) {
+          internalDate = internalDateMatch[1]
+        }
+
+        // Check if there is a literal size indicator like {150}
+        let headerText = ''
+        const literalMatch = fetchLineRest.match(/\{(\d+)\}\s*$/)
+        if (literalMatch) {
+          const byteCount = parseInt(literalMatch[1], 10)
+          headerText = await this.readBytes(byteCount, remainingTime)
+          // Also consume the closing ')' or trailing CRLF after the literal
+          // Some servers put ")\r\n" right after the literal
+          // Let's read until we see the closing parenthesis if not yet encountered
+        } else {
+          // If headers were returned in quotes (rare for header fields)
+          const fieldsMatch = fetchLineRest.match(/BODY\[HEADER\.FIELDS[^\]]*\]\s+"([^"]*)"/i)
+          if (fieldsMatch) {
+            headerText = fieldsMatch[1]
+          }
+        }
+
+        const parsed = this.parseHeaders(headerText)
+        const finalDateRaw = parsed.date || internalDate
+        const formattedDate = this.formatDateBR(finalDateRaw)
+
+        fetchedMap.set(msgSeq, {
+          date: formattedDate,
+          from: parsed.from,
+          to: parsed.to,
+          subject: parsed.subject,
+        })
+      }
+    }
+
+    // Return in the order of messageIds
+    const result: Array<{ date: string; from: string; to: string; subject: string }> = []
+    for (const id of messageIds) {
+      const item = fetchedMap.get(id)
+      if (item) {
+        result.push(item)
+      } else {
+        // Fallback placeholder if not matched by seq number directly
+        result.push({
+          date: '',
+          from: '',
+          to: '',
+          subject: '',
+        })
+      }
+    }
+
+    return result
   }
 
   async close(): Promise<void> {
@@ -511,6 +794,7 @@ Deno.serve(async (req: Request) => {
     // 4. Send SEARCH SUBJECT "[CONECTAI:CONTROLE]"
     const searchSubjectPattern = `[CONECTAI:${controle}]`
     let searchCount = 0
+    let matchingIds: number[] = []
 
     try {
       const searchRes = await client.searchSubject(searchSubjectPattern, 15000)
@@ -529,6 +813,7 @@ Deno.serve(async (req: Request) => {
         )
       }
       searchCount = searchRes.count
+      matchingIds = searchRes.matchingIds || []
     } catch (err) {
       console.error('IMAP SEARCH command failed:', err instanceof Error ? err.message : String(err))
       await client.close()
@@ -544,7 +829,20 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 5. Close connection (best-effort LOGOUT inside close)
+    // 5. Fetch email headers if searchCount > 0
+    let emails: Array<{ date: string; from: string; to: string; subject: string }> = []
+    if (searchCount > 0 && matchingIds.length > 0) {
+      try {
+        emails = await client.fetchEmailHeaders(matchingIds, 20000)
+      } catch (err) {
+        console.error(
+          'IMAP FETCH headers failed:',
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    }
+
+    // 6. Close connection (best-effort LOGOUT inside close)
     await client.close()
 
     return new Response(
@@ -552,6 +850,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         controle,
         quantidade: searchCount,
+        emails,
       }),
       {
         status: 200,

@@ -114,7 +114,25 @@ export const testGmailConnection = async () => {
   return data
 }
 
-export const searchConectaiEmail = async (controle: string) => {
+export interface SearchConectaiEmailItem {
+  date: string
+  from: string
+  to: string
+  subject: string
+}
+
+export interface SearchConectaiEmailResponse {
+  success: boolean
+  controle: string
+  quantidade: number
+  emails?: SearchConectaiEmailItem[]
+  message?: string
+  error?: string
+}
+
+export const searchConectaiEmail = async (
+  controle: string,
+): Promise<SearchConectaiEmailResponse> => {
   const {
     data: { session },
   } = await supabase.auth.getSession()
