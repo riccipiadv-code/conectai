@@ -14,6 +14,15 @@ export interface EmailSetting {
   active?: boolean
 }
 
+export interface EmailReadingSetting {
+  id: string
+  email: string
+  imap_host: string
+  imap_port: number
+  secret_configured: boolean
+  active: boolean
+}
+
 export const getEmailSettings = async () => {
   const { data, error } = await supabase
     .from('email_settings' as any)
@@ -21,6 +30,18 @@ export const getEmailSettings = async () => {
     .order('created_at', { ascending: false })
   if (error) throw error
   return data as unknown as EmailSetting[]
+}
+
+export const getEmailReadingSettings = async (): Promise<EmailReadingSetting | null> => {
+  const { data, error } = await supabase
+    .from('email_reading_settings')
+    .select('id, email, imap_host, imap_port, secret_configured, active')
+    .eq('active', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as EmailReadingSetting | null
 }
 
 export const saveEmailSetting = async (setting: EmailSetting, secret?: string) => {

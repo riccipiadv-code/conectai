@@ -22,10 +22,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import {
   getEmailSettings,
+  getEmailReadingSettings,
   saveEmailSetting,
   saveEmailReadingSetting,
   sendTestEmail,
   EmailSetting,
+  EmailReadingSetting,
 } from '@/services/email-settings'
 import { Loader2, Mail, Send } from 'lucide-react'
 
@@ -43,12 +45,36 @@ export default function EmailSettings() {
   const [imapHost, setImapHost] = useState('')
   const [imapPort, setImapPort] = useState('')
   const [imapPassword, setImapPassword] = useState('')
+  const [readingSecretConfigured, setReadingSecretConfigured] = useState(false)
 
   const { toast } = useToast()
 
   useEffect(() => {
     loadSettings()
+    loadReadingSettings()
   }, [])
+
+  const loadReadingSettings = async () => {
+    try {
+      const data = await getEmailReadingSettings()
+      if (data) {
+        setImapEmail(data.email || '')
+        setImapHost(data.imap_host || '')
+        setImapPort(String(data.imap_port || ''))
+        setReadingSecretConfigured(data.secret_configured || false)
+      } else {
+        setImapHost('imap.gmail.com')
+        setImapPort('993')
+        setReadingSecretConfigured(false)
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao carregar configurações de leitura',
+        description: error.message,
+        variant: 'destructive',
+      })
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -128,6 +154,7 @@ export default function EmailSettings() {
         description: 'Configurações do E-mail Leitura salvas com sucesso.',
       })
       setImapPassword('')
+      await loadReadingSettings()
     } catch (error: any) {
       toast({
         title: 'Erro ao salvar',
@@ -453,10 +480,17 @@ export default function EmailSettings() {
                   <Input
                     id="imap_password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder={
+                      readingSecretConfigured ? 'Preencher somente para alterar' : '••••••••'
+                    }
                     value={imapPassword}
                     onChange={(e) => setImapPassword(e.target.value)}
                   />
+                  {readingSecretConfigured && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Credencial já configurada. Preencha somente se quiser alterar.
+                    </p>
+                  )}
                 </div>
               </CardContent>
               <CardFooter className="flex items-center gap-3">
