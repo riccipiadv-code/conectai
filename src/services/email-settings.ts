@@ -98,3 +98,18 @@ export const sendTestEmail = async (toEmail: string) => {
   if (data?.error) throw new Error(data.error)
   return data
 }
+
+export const testGmailConnection = async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  if (!session) throw new Error('Unauthorized')
+
+  const { data, error } = await supabase.functions.invoke('test-gmail-connection', {
+    body: {},
+  })
+
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}

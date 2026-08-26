@@ -26,6 +26,7 @@ import {
   saveEmailSetting,
   saveEmailReadingSetting,
   sendTestEmail,
+  testGmailConnection,
   EmailSetting,
   EmailReadingSetting,
 } from '@/services/email-settings'
@@ -188,6 +189,33 @@ export default function EmailSettings() {
       toast({
         title: 'Falha no envio',
         description: error.message || 'Ocorreu um erro ao enviar o e-mail de teste.',
+        variant: 'destructive',
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const handleTestImapConnection = async () => {
+    try {
+      setTesting(true)
+      const data = await testGmailConnection()
+      if (data?.success === true) {
+        toast({
+          title: 'Conexão realizada',
+          description: 'Conexão com o E-mail Leitura realizada com sucesso.',
+        })
+      } else {
+        toast({
+          title: 'Falha na conexão',
+          description: 'Não foi possível conectar ao E-mail Leitura.',
+          variant: 'destructive',
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Falha na conexão',
+        description: 'Não foi possível conectar ao E-mail Leitura.',
         variant: 'destructive',
       })
     } finally {
@@ -498,7 +526,13 @@ export default function EmailSettings() {
                   {savingImap && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Salvar
                 </Button>
-                <Button type="button" variant="outline">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleTestImapConnection}
+                  disabled={testing}
+                >
+                  {testing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Testar conexão
                 </Button>
               </CardFooter>
