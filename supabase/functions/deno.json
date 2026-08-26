@@ -1,10 +1,11 @@
 {
   "_versions": {
-    "sync-manychat": 68,
-    "manychat-webhook": 68,
-    "send-test-email": 8,
-    "save-email-settings": 6,
-    "admin-user-access": 19,
-    "test-gmail-connection": 5
+    "sync-manychat": 70,
+    "manychat-webhook": 70,
+    "send-test-email": 9,
+    "save-email-settings": 7,
+    "admin-user-access": 20,
+    "test-gmail-connection": 6,
+    "save-email-reading-settings": 1
   }
 }

@@ -184,6 +184,71 @@ export type Database = {
         }
         Relationships: []
       }
+      email_reading_secrets: {
+        Row: {
+          created_at: string
+          secret_value: string
+          setting_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          secret_value: string
+          setting_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          secret_value?: string
+          setting_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'email_reading_secrets_setting_id_fkey'
+            columns: ['setting_id']
+            isOneToOne: true
+            referencedRelation: 'email_reading_settings'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      email_reading_settings: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string
+          id: string
+          imap_host: string
+          imap_port: number
+          secret_configured: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          secret_configured?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          secret_configured?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       email_secrets: {
         Row: {
           created_at: string | null
