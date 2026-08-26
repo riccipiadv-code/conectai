@@ -394,27 +394,25 @@ class ImapSocketClient {
   }
 
   /**
-   * Fetches headers and date for message IDs
-   * Command: FETCH ids (INTERNALDATE BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])
+   * Fetches headers, date and raw RFC 822 content for message IDs without marking as seen
+   * Command: FETCH ids (INTERNALDATE BODY.PEEK[])
    */
-  async fetchEmailHeaders(
+  async fetchEmailMessages(
     messageIds: number[],
-    timeoutMs = 20000,
-  ): Promise<Array<{ date: string; from: string; to: string; subject: string }>> {
+    timeoutMs = 30000,
+  ): Promise<Array<{ date: string; from: string; to: string; subject: string; raw: string }>> {
     if (messageIds.length === 0) return []
 
     this.tagCounter += 1
     const tag = `A${String(this.tagCounter).padStart(4, '0')}`
     const idsString = messageIds.join(',')
 
-    await this.sendRaw(
-      `${tag} FETCH ${idsString} (INTERNALDATE BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)])\r\n`,
-    )
+    await this.sendRaw(`${tag} FETCH ${idsString} (INTERNALDATE BODY.PEEK[])\r\n`)
 
     const startTime = Date.now()
     const fetchedMap = new Map<
       number,
-      { date: string; from: string; to: string; subject: string }
+      { date: string; from: string; to: string; subject: string; raw: string }
     >()
 
     while (true) {
@@ -426,11 +424,11 @@ class ImapSocketClient {
       }
 
       // Untagged FETCH line, e.g.:
-      // * 1 FETCH (INTERNALDATE "26-Aug-2026 11:30:00 -0300" BODY[HEADER.FIELDS (FROM TO SUBJECT DATE)] {150}
+      // * 1 FETCH (INTERNALDATE "26-Aug-2026 11:30:00 -0300" BODY[] {12345}
       const fetchStartMatch = line.match(/^\*\s+(\d+)\s+FETCH\s+\((.*)$/i)
       if (fetchStartMatch) {
         const msgSeq = parseInt(fetchStartMatch[1], 10)
-        let fetchLineRest = fetchStartMatch[2]
+        const fetchLineRest = fetchStartMatch[2]
 
         // Extract INTERNALDATE if present
         let internalDate = ''
@@ -439,22 +437,24 @@ class ImapSocketClient {
           internalDate = internalDateMatch[1]
         }
 
-        // Check if there is a literal size indicator like {150}
-        let headerText = ''
+        // Check if there is a literal size indicator like {12345}
+        let rawMessage = ''
         const literalMatch = fetchLineRest.match(/\{(\d+)\}\s*$/)
         if (literalMatch) {
           const byteCount = parseInt(literalMatch[1], 10)
-          headerText = await this.readBytes(byteCount, remainingTime)
-          // Also consume the closing ')' or trailing CRLF after the literal
-          // Some servers put ")\r\n" right after the literal
-          // Let's read until we see the closing parenthesis if not yet encountered
+          rawMessage = await this.readBytes(byteCount, remainingTime)
         } else {
-          // If headers were returned in quotes (rare for header fields)
-          const fieldsMatch = fetchLineRest.match(/BODY\[HEADER\.FIELDS[^\]]*\]\s+"([^"]*)"/i)
-          if (fieldsMatch) {
-            headerText = fieldsMatch[1]
+          // If body was returned in quotes (rare for entire BODY)
+          const bodyMatch = fetchLineRest.match(/BODY(?:\[\])?\s+"([^"]*)"/i)
+          if (bodyMatch) {
+            rawMessage = bodyMatch[1]
           }
         }
+
+        // Extract headers from the beginning of the raw RFC 822 message (headers and body are separated by \r\n\r\n or \n\n)
+        const headerEndIndex = rawMessage.search(/\r?\n\r?\n/)
+        const headerText =
+          headerEndIndex !== -1 ? rawMessage.substring(0, headerEndIndex) : rawMessage
 
         const parsed = this.parseHeaders(headerText)
         const finalDateRaw = parsed.date || internalDate
@@ -465,12 +465,14 @@ class ImapSocketClient {
           from: parsed.from,
           to: parsed.to,
           subject: parsed.subject,
+          raw: rawMessage,
         })
       }
     }
 
     // Return in the order of messageIds
-    const result: Array<{ date: string; from: string; to: string; subject: string }> = []
+    const result: Array<{ date: string; from: string; to: string; subject: string; raw: string }> =
+      []
     for (const id of messageIds) {
       const item = fetchedMap.get(id)
       if (item) {
@@ -482,11 +484,22 @@ class ImapSocketClient {
           from: '',
           to: '',
           subject: '',
+          raw: '',
         })
       }
     }
 
     return result
+  }
+
+  /**
+   * Compatibility wrapper for fetchEmailHeaders
+   */
+  async fetchEmailHeaders(
+    messageIds: number[],
+    timeoutMs = 20000,
+  ): Promise<Array<{ date: string; from: string; to: string; subject: string; raw?: string }>> {
+    return await this.fetchEmailMessages(messageIds, timeoutMs)
   }
 
   async close(): Promise<void> {
@@ -829,14 +842,14 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // 5. Fetch email headers if searchCount > 0
-    let emails: Array<{ date: string; from: string; to: string; subject: string }> = []
+    // 5. Fetch email messages (headers + raw RFC 822) if searchCount > 0
+    let emails: Array<{ date: string; from: string; to: string; subject: string; raw: string }> = []
     if (searchCount > 0 && matchingIds.length > 0) {
       try {
-        emails = await client.fetchEmailHeaders(matchingIds, 20000)
+        emails = await client.fetchEmailMessages(matchingIds, 30000)
       } catch (err) {
         console.error(
-          'IMAP FETCH headers failed:',
+          'IMAP FETCH messages failed:',
           err instanceof Error ? err.message : String(err),
         )
       }

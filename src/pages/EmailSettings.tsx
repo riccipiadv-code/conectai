@@ -31,7 +31,7 @@ import {
   EmailSetting,
   EmailReadingSetting,
 } from '@/services/email-settings'
-import { Loader2, Mail, Search, Send } from 'lucide-react'
+import { Download, Loader2, Mail, Search, Send } from 'lucide-react'
 
 export default function EmailSettings() {
   const [settings, setSettings] = useState<EmailSetting | null>(null)
@@ -53,7 +53,7 @@ export default function EmailSettings() {
   const [searchResult, setSearchResult] = useState<{
     controle: string
     quantidade: number
-    emails: Array<{ date: string; from: string; to: string; subject: string }>
+    emails: Array<{ date: string; from: string; to: string; subject: string; raw?: string }>
   } | null>(null)
 
   const { toast } = useToast()
@@ -228,6 +228,35 @@ export default function EmailSettings() {
       })
     } finally {
       setTesting(false)
+    }
+  }
+
+  const handleDownloadEml = (raw: string | undefined, controle: string) => {
+    if (!raw) {
+      toast({
+        title: 'Conteúdo não disponível',
+        description: 'O conteúdo bruto do e-mail não foi encontrado para download.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      const blob = new Blob([raw], { type: 'message/rfc822' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `CONECTAI-${controle || 'email'}.eml`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao baixar',
+        description: error.message || 'Não foi possível gerar o arquivo .eml.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -656,23 +685,39 @@ export default function EmailSettings() {
                     </p>
                     <div className="space-y-3">
                       {searchResult.emails.map((email, idx) => (
-                        <div key={idx} className="rounded-md border bg-muted/30 p-3 space-y-1">
-                          <p className="text-sm">
-                            <span className="font-medium text-muted-foreground">Data:</span>{' '}
-                            {email.date || '-'}
-                          </p>
-                          <p className="text-sm">
-                            <span className="font-medium text-muted-foreground">De:</span>{' '}
-                            {email.from || '-'}
-                          </p>
-                          <p className="text-sm">
-                            <span className="font-medium text-muted-foreground">Para:</span>{' '}
-                            {email.to || '-'}
-                          </p>
-                          <p className="text-sm">
-                            <span className="font-medium text-muted-foreground">Assunto:</span>{' '}
-                            {email.subject || '-'}
-                          </p>
+                        <div key={idx} className="rounded-md border bg-muted/30 p-3 space-y-2">
+                          <div className="space-y-1">
+                            <p className="text-sm">
+                              <span className="font-medium text-muted-foreground">Data:</span>{' '}
+                              {email.date || '-'}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium text-muted-foreground">De:</span>{' '}
+                              {email.from || '-'}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium text-muted-foreground">Para:</span>{' '}
+                              {email.to || '-'}
+                            </p>
+                            <p className="text-sm">
+                              <span className="font-medium text-muted-foreground">Assunto:</span>{' '}
+                              {email.subject || '-'}
+                            </p>
+                          </div>
+                          {email.raw && (
+                            <div className="pt-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDownloadEml(email.raw, searchResult.controle)}
+                                className="flex items-center gap-1.5"
+                              >
+                                <Download className="h-4 w-4" />
+                                Baixar e-mail (.eml)
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

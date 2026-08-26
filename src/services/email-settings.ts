@@ -119,6 +119,7 @@ export interface SearchConectaiEmailItem {
   from: string
   to: string
   subject: string
+  raw?: string
 }
 
 export interface SearchConectaiEmailResponse {
