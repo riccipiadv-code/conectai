@@ -171,21 +171,18 @@ export default function Contacts() {
       return
     }
 
-    initialFiltersApplied.current = true
-
     let responsavel_ids: string[] = []
     if (profile.perfil === 'administrador') {
       responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+      initialFiltersApplied.current = true
     } else {
       const userEmail = user.email.toLowerCase().trim()
       const foundResp = meta.responsaveis.find(
         (r: any) => r.email && r.email.toLowerCase().trim() === userEmail,
       )
-      if (foundResp) {
-        responsavel_ids = [String(foundResp.id)]
-      } else {
-        responsavel_ids = []
-      }
+      if (!foundResp) return
+      responsavel_ids = [String(foundResp.id)]
+      initialFiltersApplied.current = true
     }
 
     setFilters((prev) => ({
@@ -548,7 +545,10 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Estágios ({filters.stages?.length || 0})
+                    Estágio
+                    {(filters.stages?.length ?? 0) < OFFICIAL_STAGES.length && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -628,6 +628,9 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     Responsável
+                    {(filters.responsavel_ids?.length ?? 0) !== meta.responsaveis.length && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -705,6 +708,9 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     Serviço
+                    {(filters.servico_ids?.length ?? 0) !== meta.servicos.length && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -779,6 +785,9 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     Departamento
+                    {(filters.depto_ids?.length ?? 0) !== meta.deptos.length && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -854,6 +863,9 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     SLA
+                    {(filters.slas?.length ?? 0) !== 5 && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -930,6 +942,9 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     Follow Up
+                    {(filters.follow_ups?.length ?? 0) !== 4 && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -1005,6 +1020,9 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     Origem
+                    {(filters.origem_ids?.length ?? 0) !== meta.origens.length && (
+                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
