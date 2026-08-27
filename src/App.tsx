@@ -24,7 +24,8 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/resetar-senha" element={<ResetPassword />} />
           <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
+            <Route path="/" element={<Contacts />} />
+            <Route path="/kanban" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/contatos" element={<Contacts />} />
             <Route path="/logs" element={<Logs />} />

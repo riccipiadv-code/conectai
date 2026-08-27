@@ -80,7 +80,7 @@ export default function Layout() {
           '/configuracoes/email',
         ]
         if (restricted.some((p) => location.pathname.startsWith(p))) {
-          navigate('/contatos')
+          navigate('/')
         }
       }
     }
@@ -121,7 +121,12 @@ export default function Layout() {
             <div className="h-9 w-9 bg-primary/10 rounded-xl flex items-center justify-center text-primary shadow-sm border border-primary/20">
               <Blocks className="h-5 w-5" />
             </div>
-            Conectaí
+            <div className="flex flex-col">
+              <span>Conectaí</span>
+              <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">
+                v.1.0.1
+              </span>
+            </div>
           </div>
         </SidebarHeader>
         <SidebarContent className="px-3 py-4">
@@ -152,20 +157,20 @@ export default function Layout() {
                     className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
                   >
                     <Link to="/">
-                      <Kanban className="h-5 w-5 opacity-70" />
-                      <span className="text-[15px]">Kanban</span>
+                      <Users className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Atendimentos</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
-                    isActive={location.pathname === '/contatos'}
+                    isActive={location.pathname === '/kanban'}
                     className="rounded-lg transition-all duration-200 hover:bg-slate-100 dark:hover:bg-zinc-800 data-[active=true]:bg-primary/5 data-[active=true]:text-primary data-[active=true]:font-medium px-3 py-2.5 h-auto"
                   >
-                    <Link to="/contatos">
-                      <Users className="h-5 w-5 opacity-70" />
-                      <span className="text-[15px]">Atendimentos</span>
+                    <Link to="/kanban">
+                      <Kanban className="h-5 w-5 opacity-70" />
+                      <span className="text-[15px]">Kanban</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -253,12 +258,12 @@ export default function Layout() {
           <SidebarTrigger className="text-slate-500 hover:text-slate-900" />
           <div className="flex-1">
             <h1 className="font-semibold text-lg tracking-tight text-slate-800 dark:text-slate-100">
-              {location.pathname === '/'
-                ? 'Kanban'
-                : location.pathname === '/dashboard'
-                  ? 'Dashboard Analítico'
-                  : location.pathname === '/contatos'
-                    ? 'Gestão de Atendimentos'
+              {location.pathname === '/' || location.pathname === '/contatos'
+                ? 'Gestão de Atendimentos'
+                : location.pathname === '/kanban'
+                  ? 'Kanban'
+                  : location.pathname === '/dashboard'
+                    ? 'Dashboard Analítico'
                     : location.pathname === '/logs'
                       ? 'Monitoramento de Logs'
                       : location.pathname === '/configuracoes/email'
@@ -272,9 +277,11 @@ export default function Layout() {
         <main className="flex-1 overflow-hidden flex flex-col min-w-0">
           <div
             className={
-              location.pathname === '/'
+              location.pathname === '/kanban'
                 ? 'w-full flex-1 flex flex-col min-w-0 h-full overflow-hidden'
-                : location.pathname === '/contatos' || location.pathname === '/dashboard'
+                : location.pathname === '/' ||
+                    location.pathname === '/contatos' ||
+                    location.pathname === '/dashboard'
                   ? 'w-full mx-auto p-6 md:p-8 overflow-y-auto h-full'
                   : 'max-w-7xl mx-auto p-6 md:p-8 overflow-y-auto h-full'
             }
