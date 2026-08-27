@@ -4,12 +4,12 @@ import { OFFICIAL_STAGES } from '@/constants/stages'
 
 export interface ContactsFilters {
   stages?: string[]
-  responsavel_id?: string
-  servico_id?: string
-  depto_id?: string | number
-  sla?: string
-  follow_up?: string
-  origem_id?: string | number
+  responsavel_ids?: string[]
+  servico_ids?: string[]
+  depto_ids?: (string | number)[]
+  slas?: string[]
+  follow_ups?: string[]
+  origem_ids?: (string | number)[]
   search?: string
   limit?: number
   offset?: number
@@ -298,32 +298,48 @@ export async function getContacts(
     }
   }
 
-  if (filters.responsavel_id && filters.responsavel_id !== 'all')
-    query = query.eq('responsavel_id', filters.responsavel_id)
-  if (filters.servico_id && filters.servico_id !== 'all')
-    query = query.eq('servico_id', filters.servico_id)
-  if (filters.depto_id && filters.depto_id !== 'all')
-    query = query.eq('depto_id', Number(filters.depto_id))
-  if (filters.origem_id && filters.origem_id !== 'all')
-    query = query.eq('origem_id', Number(filters.origem_id))
-
-  if (filters.sla && filters.sla !== 'all') {
-    query = query.eq('sla_status', filters.sla)
+  if (filters.responsavel_ids && filters.responsavel_ids.length > 0) {
+    query = query.in('responsavel_id', filters.responsavel_ids)
   }
 
-  if (filters.follow_up && filters.follow_up !== 'all') {
+  if (filters.servico_ids && filters.servico_ids.length > 0) {
+    query = query.in('servico_id', filters.servico_ids)
+  }
+
+  if (filters.depto_ids && filters.depto_ids.length > 0) {
+    query = query.in('depto_id', filters.depto_ids.map(Number))
+  }
+
+  if (filters.slas && filters.slas.length > 0) {
+    query = query.in('sla_status', filters.slas)
+  }
+
+  if (filters.origem_ids && filters.origem_ids.length > 0) {
+    query = query.in('origem_id', filters.origem_ids.map(Number))
+  }
+
+  if (filters.follow_ups && filters.follow_ups.length > 0) {
     const todayStart = startOfDay(new Date()).toISOString()
     const todayEnd = endOfDay(new Date()).toISOString()
+    const next7Days = endOfDay(addDays(new Date(), 7)).toISOString()
 
-    if (filters.follow_up === 'today') {
-      query = query.gte('data_follow_up', todayStart).lte('data_follow_up', todayEnd)
-    } else if (filters.follow_up === 'next_7_days') {
-      const next7Days = endOfDay(addDays(new Date(), 7)).toISOString()
-      query = query.gt('data_follow_up', todayEnd).lte('data_follow_up', next7Days)
-    } else if (filters.follow_up === 'overdue') {
-      query = query.lt('data_follow_up', todayStart)
-    } else if (filters.follow_up === 'none') {
-      query = query.is('data_follow_up', null)
+    const orConditions: string[] = []
+    for (const fup of filters.follow_ups) {
+      if (fup === 'today') {
+        orConditions.push(
+          `and(data_follow_up.gte."${todayStart}",data_follow_up.lte."${todayEnd}")`,
+        )
+      } else if (fup === 'next_7_days') {
+        orConditions.push(`and(data_follow_up.gt."${todayEnd}",data_follow_up.lte."${next7Days}")`)
+      } else if (fup === 'overdue') {
+        orConditions.push(`data_follow_up.lt."${todayStart}"`)
+      } else if (fup === 'none') {
+        orConditions.push('data_follow_up.is.null')
+      }
+    }
+
+    if (orConditions.length > 0) {
+      query = query.or(orConditions.join(','))
     }
   }
 
