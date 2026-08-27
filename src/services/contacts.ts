@@ -298,23 +298,35 @@ export async function getContacts(
     }
   }
 
-  if (filters.responsavel_ids && filters.responsavel_ids.length > 0) {
+  // Se qualquer filtro de array estiver explicitamente vazio (nenhuma opção selecionada), retornar vazio
+  if (
+    (filters.responsavel_ids && filters.responsavel_ids.length === 0) ||
+    (filters.servico_ids && filters.servico_ids.length === 0) ||
+    (filters.depto_ids && filters.depto_ids.length === 0) ||
+    (filters.slas && filters.slas.length === 0) ||
+    (filters.follow_ups && filters.follow_ups.length === 0) ||
+    (filters.origem_ids && filters.origem_ids.length === 0)
+  ) {
+    return []
+  }
+
+  if (filters.responsavel_ids) {
     query = query.in('responsavel_id', filters.responsavel_ids)
   }
 
-  if (filters.servico_ids && filters.servico_ids.length > 0) {
+  if (filters.servico_ids) {
     query = query.in('servico_id', filters.servico_ids)
   }
 
-  if (filters.depto_ids && filters.depto_ids.length > 0) {
+  if (filters.depto_ids) {
     query = query.in('depto_id', filters.depto_ids.map(Number))
   }
 
-  if (filters.slas && filters.slas.length > 0) {
+  if (filters.slas) {
     query = query.in('sla_status', filters.slas)
   }
 
-  if (filters.origem_ids && filters.origem_ids.length > 0) {
+  if (filters.origem_ids) {
     query = query.in('origem_id', filters.origem_ids.map(Number))
   }
 

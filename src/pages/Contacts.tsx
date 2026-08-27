@@ -80,7 +80,7 @@ import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 
 export default function Contacts() {
   const { user, profile } = useAuth()
-  const initialResponsavelFilterApplied = useRef(false)
+  const initialFiltersApplied = useRef(false)
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [meta, setMeta] = useState<{
@@ -104,12 +104,12 @@ export default function Contacts() {
 
   const [filters, setFilters] = useState<ContactsFilters>({
     stages: DEFAULT_STAGES,
-    responsavel_ids: [],
-    servico_ids: [],
-    depto_ids: [],
-    slas: [],
-    follow_ups: [],
-    origem_ids: [],
+    responsavel_ids: undefined,
+    servico_ids: undefined,
+    depto_ids: undefined,
+    slas: undefined,
+    follow_ups: undefined,
+    origem_ids: undefined,
   })
 
   const [sort, setSort] = useState<{ column: string; ascending: boolean }>({
@@ -156,28 +156,48 @@ export default function Contacts() {
   }, [])
 
   useEffect(() => {
-    if (initialResponsavelFilterApplied.current) return
+    if (initialFiltersApplied.current) return
     if (!profile || !user?.email) return
-    if (!meta.responsaveis || meta.responsaveis.length === 0) return
+    if (
+      !meta.responsaveis ||
+      meta.responsaveis.length === 0 ||
+      !meta.servicos ||
+      meta.servicos.length === 0 ||
+      !meta.deptos ||
+      meta.deptos.length === 0 ||
+      !meta.origens ||
+      meta.origens.length === 0
+    ) {
+      return
+    }
 
-    if (profile.perfil !== 'administrador') {
+    initialFiltersApplied.current = true
+
+    let responsavel_ids: string[] = []
+    if (profile.perfil === 'administrador') {
+      responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+    } else {
       const userEmail = user.email.toLowerCase().trim()
       const foundResp = meta.responsaveis.find(
         (r: any) => r.email && r.email.toLowerCase().trim() === userEmail,
       )
-
       if (foundResp) {
-        initialResponsavelFilterApplied.current = true
-        setFilters((prev) => ({ ...prev, responsavel_ids: [String(foundResp.id)] }))
+        responsavel_ids = [String(foundResp.id)]
       } else {
-        // Responsável não encontrado na lista — marcar como aplicado mesmo assim
-        initialResponsavelFilterApplied.current = true
+        responsavel_ids = []
       }
-    } else {
-      // Administrador: já está em "todos" (array vazio = sem filtro)
-      initialResponsavelFilterApplied.current = true
     }
-  }, [meta.responsaveis, profile, user])
+
+    setFilters((prev) => ({
+      ...prev,
+      servico_ids: meta.servicos.map((s: any) => String(s.id)),
+      depto_ids: meta.deptos.map((d: any) => d.id),
+      slas: ['green', 'yellow', 'red', 'paused', 'done'],
+      follow_ups: ['today', 'next_7_days', 'overdue', 'none'],
+      origem_ids: meta.origens.map((o: any) => o.id),
+      responsavel_ids,
+    }))
+  }, [meta.responsaveis, meta.servicos, meta.deptos, meta.origens, profile, user])
 
   const fetchData = useCallback(() => {
     setLoading(true)
@@ -607,7 +627,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Responsável ({filters.responsavel_ids?.length || 0})
+                    Responsável
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -642,30 +662,23 @@ export default function Contacts() {
                   <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
                     {meta.responsaveis?.map((r: any) => {
                       const idStr = String(r.id)
-                      const isChecked =
-                        filters.responsavel_ids?.length === 0 ||
-                        filters.responsavel_ids?.includes(idStr)
+                      const isChecked = filters.responsavel_ids?.includes(idStr)
                       return (
                         <div key={r.id} className="flex items-center space-x-3 px-1">
                           <Checkbox
                             id={`resp-${r.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
-                              const allIds = meta.responsaveis.map((item: any) => String(item.id))
-                              const currentSelected =
-                                filters.responsavel_ids && filters.responsavel_ids.length > 0
-                                  ? filters.responsavel_ids
-                                  : allIds
-
                               if (checked) {
-                                const next = Array.from(new Set([...currentSelected, idStr]))
+                                updateFilter('responsavel_ids', [
+                                  ...(filters.responsavel_ids || []),
+                                  idStr,
+                                ])
+                              } else {
                                 updateFilter(
                                   'responsavel_ids',
-                                  next.length === allIds.length ? [] : next,
+                                  (filters.responsavel_ids || []).filter((id) => id !== idStr),
                                 )
-                              } else {
-                                const next = currentSelected.filter((id) => id !== idStr)
-                                updateFilter('responsavel_ids', next)
                               }
                             }}
                           />
@@ -691,7 +704,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Serviço ({filters.servico_ids?.length || 0})
+                    Serviço
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -726,29 +739,20 @@ export default function Contacts() {
                   <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
                     {meta.servicos?.map((s: any) => {
                       const idStr = String(s.id)
-                      const isChecked =
-                        filters.servico_ids?.length === 0 || filters.servico_ids?.includes(idStr)
+                      const isChecked = filters.servico_ids?.includes(idStr)
                       return (
                         <div key={s.id} className="flex items-center space-x-3 px-1">
                           <Checkbox
                             id={`serv-${s.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
-                              const allIds = meta.servicos.map((item: any) => String(item.id))
-                              const currentSelected =
-                                filters.servico_ids && filters.servico_ids.length > 0
-                                  ? filters.servico_ids
-                                  : allIds
-
                               if (checked) {
-                                const next = Array.from(new Set([...currentSelected, idStr]))
+                                updateFilter('servico_ids', [...(filters.servico_ids || []), idStr])
+                              } else {
                                 updateFilter(
                                   'servico_ids',
-                                  next.length === allIds.length ? [] : next,
+                                  (filters.servico_ids || []).filter((id) => id !== idStr),
                                 )
-                              } else {
-                                const next = currentSelected.filter((id) => id !== idStr)
-                                updateFilter('servico_ids', next)
                               }
                             }}
                           />
@@ -774,7 +778,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Departamento ({filters.depto_ids?.length || 0})
+                    Departamento
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -808,29 +812,22 @@ export default function Contacts() {
                   </div>
                   <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
                     {meta.deptos?.map((d: any) => {
-                      const isChecked =
-                        filters.depto_ids?.length === 0 ||
-                        filters.depto_ids?.some((id) => String(id) === String(d.id))
+                      const isChecked = filters.depto_ids?.some((id) => String(id) === String(d.id))
                       return (
                         <div key={d.id} className="flex items-center space-x-3 px-1">
                           <Checkbox
                             id={`depto-${d.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
-                              const allIds = meta.deptos.map((item: any) => item.id)
-                              const currentSelected =
-                                filters.depto_ids && filters.depto_ids.length > 0
-                                  ? filters.depto_ids
-                                  : allIds
-
                               if (checked) {
-                                const next = Array.from(new Set([...currentSelected, d.id]))
-                                updateFilter('depto_ids', next.length === allIds.length ? [] : next)
+                                updateFilter('depto_ids', [...(filters.depto_ids || []), d.id])
                               } else {
-                                const next = currentSelected.filter(
-                                  (id) => String(id) !== String(d.id),
+                                updateFilter(
+                                  'depto_ids',
+                                  (filters.depto_ids || []).filter(
+                                    (id) => String(id) !== String(d.id),
+                                  ),
                                 )
-                                updateFilter('depto_ids', next)
                               }
                             }}
                           />
@@ -856,7 +853,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    SLA ({filters.slas?.length || 0})
+                    SLA
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -893,23 +890,20 @@ export default function Contacts() {
                       { id: 'paused', label: 'Pausado' },
                       { id: 'done', label: 'Finalizado' },
                     ].map((sla) => {
-                      const isChecked = filters.slas?.length === 0 || filters.slas?.includes(sla.id)
+                      const isChecked = filters.slas?.includes(sla.id)
                       return (
                         <div key={sla.id} className="flex items-center space-x-3 px-1">
                           <Checkbox
                             id={`sla-${sla.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
-                              const allIds = ['green', 'yellow', 'red', 'paused', 'done']
-                              const currentSelected =
-                                filters.slas && filters.slas.length > 0 ? filters.slas : allIds
-
                               if (checked) {
-                                const next = Array.from(new Set([...currentSelected, sla.id]))
-                                updateFilter('slas', next.length === allIds.length ? [] : next)
+                                updateFilter('slas', [...(filters.slas || []), sla.id])
                               } else {
-                                const next = currentSelected.filter((id) => id !== sla.id)
-                                updateFilter('slas', next)
+                                updateFilter(
+                                  'slas',
+                                  (filters.slas || []).filter((id) => id !== sla.id),
+                                )
                               }
                             }}
                           />
@@ -935,7 +929,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Follow Up ({filters.follow_ups?.length || 0})
+                    Follow Up
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -971,29 +965,20 @@ export default function Contacts() {
                       { id: 'overdue', label: 'Atrasados' },
                       { id: 'none', label: 'Sem Follow Up' },
                     ].map((fup) => {
-                      const isChecked =
-                        filters.follow_ups?.length === 0 || filters.follow_ups?.includes(fup.id)
+                      const isChecked = filters.follow_ups?.includes(fup.id)
                       return (
                         <div key={fup.id} className="flex items-center space-x-3 px-1">
                           <Checkbox
                             id={`fup-${fup.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
-                              const allIds = ['today', 'next_7_days', 'overdue', 'none']
-                              const currentSelected =
-                                filters.follow_ups && filters.follow_ups.length > 0
-                                  ? filters.follow_ups
-                                  : allIds
-
                               if (checked) {
-                                const next = Array.from(new Set([...currentSelected, fup.id]))
+                                updateFilter('follow_ups', [...(filters.follow_ups || []), fup.id])
+                              } else {
                                 updateFilter(
                                   'follow_ups',
-                                  next.length === allIds.length ? [] : next,
+                                  (filters.follow_ups || []).filter((id) => id !== fup.id),
                                 )
-                              } else {
-                                const next = currentSelected.filter((id) => id !== fup.id)
-                                updateFilter('follow_ups', next)
                               }
                             }}
                           />
@@ -1019,7 +1004,7 @@ export default function Contacts() {
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Origem ({filters.origem_ids?.length || 0})
+                    Origem
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -1053,32 +1038,24 @@ export default function Contacts() {
                   </div>
                   <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
                     {meta.origens?.map((o: any) => {
-                      const isChecked =
-                        filters.origem_ids?.length === 0 ||
-                        filters.origem_ids?.some((id) => String(id) === String(o.id))
+                      const isChecked = filters.origem_ids?.some(
+                        (id) => String(id) === String(o.id),
+                      )
                       return (
                         <div key={o.id} className="flex items-center space-x-3 px-1">
                           <Checkbox
                             id={`orig-${o.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
-                              const allIds = meta.origens.map((item: any) => item.id)
-                              const currentSelected =
-                                filters.origem_ids && filters.origem_ids.length > 0
-                                  ? filters.origem_ids
-                                  : allIds
-
                               if (checked) {
-                                const next = Array.from(new Set([...currentSelected, o.id]))
+                                updateFilter('origem_ids', [...(filters.origem_ids || []), o.id])
+                              } else {
                                 updateFilter(
                                   'origem_ids',
-                                  next.length === allIds.length ? [] : next,
+                                  (filters.origem_ids || []).filter(
+                                    (id) => String(id) !== String(o.id),
+                                  ),
                                 )
-                              } else {
-                                const next = currentSelected.filter(
-                                  (id) => String(id) !== String(o.id),
-                                )
-                                updateFilter('origem_ids', next)
                               }
                             }}
                           />
