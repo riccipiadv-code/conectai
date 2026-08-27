@@ -43,16 +43,6 @@ Deno.serve(async (req: Request) => {
 
     if (userError || !user) throw new Error('Não autorizado.')
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('perfil')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.perfil !== 'administrador') {
-      throw new Error('Permissão negada: apenas administradores podem executar esta ação.')
-    }
-
     const { contato_id, previous_responsavel_id, new_responsavel_id } = await req.json()
 
     // 1. Se previous_responsavel_id !== Ana Edith -> não dispara
