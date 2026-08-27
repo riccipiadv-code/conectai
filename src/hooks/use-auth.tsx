@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 export interface UserProfile {
   perfil: string
   ativo: boolean
+  legaldesk_usuario_id?: string | null
 }
 
 interface AuthContextType {
@@ -44,7 +45,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('perfil, ativo')
+        .select('perfil, ativo, legaldesk_usuario_id')
         .eq('id', currentSession.user.id)
         .maybeSingle()
 
@@ -61,6 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: false,
+          legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
         })
         setUser(null)
         setSession(null)
@@ -69,6 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: Boolean(profileData.ativo),
+          legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
         })
         setSession(currentSession)
         setUser(currentSession.user)
@@ -144,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.user) {
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('perfil, ativo')
+        .select('perfil, ativo, legaldesk_usuario_id')
         .eq('id', data.user.id)
         .maybeSingle()
 
@@ -155,6 +158,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: false,
+          legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
         })
         return { error: null, disabled: true }
       }

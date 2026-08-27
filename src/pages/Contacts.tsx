@@ -157,7 +157,7 @@ export default function Contacts() {
 
   useEffect(() => {
     if (initialFiltersApplied.current) return
-    if (!profile || !user?.email) return
+    if (!profile) return
     if (
       !meta.responsaveis ||
       meta.responsaveis.length === 0 ||
@@ -176,12 +176,19 @@ export default function Contacts() {
       responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
       initialFiltersApplied.current = true
     } else {
-      const userEmail = user.email.toLowerCase().trim()
-      const foundResp = meta.responsaveis.find(
-        (r: any) => r.email && r.email.toLowerCase().trim() === userEmail,
-      )
-      if (!foundResp) return
-      responsavel_ids = [String(foundResp.id)]
+      const legaldeskId = profile.legaldesk_usuario_id
+      if (!legaldeskId) {
+        // sem vínculo com legaldesk_usuarios, inicializa com todos como fallback seguro
+        responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+      } else {
+        const foundResp = meta.responsaveis.find((r: any) => String(r.id) === String(legaldeskId))
+        if (!foundResp) {
+          // responsável não encontrado na lista, inicializa com todos como fallback
+          responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+        } else {
+          responsavel_ids = [String(foundResp.id)]
+        }
+      }
       initialFiltersApplied.current = true
     }
 
@@ -194,7 +201,7 @@ export default function Contacts() {
       origem_ids: meta.origens.map((o: any) => o.id),
       responsavel_ids,
     }))
-  }, [meta.responsaveis, meta.servicos, meta.deptos, meta.origens, profile, user])
+  }, [meta.responsaveis, meta.servicos, meta.deptos, meta.origens, profile])
 
   const fetchData = useCallback(() => {
     setLoading(true)
