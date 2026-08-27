@@ -93,7 +93,9 @@ Deno.serve(async (req: Request) => {
     // 5. Buscar o contato em manychat_contatos
     const { data: contato, error: contatoError } = await supabase
       .from('manychat_contatos')
-      .select('controle, lead_nome, lead_empresa_pf, lead_servico, manychat_servicos(descricao)')
+      .select(
+        'controle, lead_nome, lead_empresa_pf, lead_servico, manychat_live_chat_url, manychat_servicos(descricao)',
+      )
       .eq('id', contato_id)
       .maybeSingle()
 
@@ -147,6 +149,7 @@ Deno.serve(async (req: Request) => {
 
     const empresaStr = (contato.lead_empresa_pf || '').trim()
     const contatoNome = (contato.lead_nome || '').trim()
+    const liveChatUrl = (contato.manychat_live_chat_url || '').trim()
 
     // Montar corpo (texto simples)
     const bodyLines: string[] = [
@@ -168,6 +171,12 @@ Deno.serve(async (req: Request) => {
 
     bodyLines.push('')
     bodyLines.push('Acesse o Conectaí para consultar o atendimento.')
+    bodyLines.push('https://conectai.goskip.app/')
+
+    if (liveChatUrl) {
+      bodyLines.push('')
+      bodyLines.push(`Link direto ManyChat: ${liveChatUrl}`)
+    }
 
     const emailText = bodyLines.join('\n')
 

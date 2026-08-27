@@ -1,13 +1,13 @@
 {
   "_versions": {
-    "sync-manychat": 86,
-    "manychat-webhook": 86,
+    "sync-manychat": 87,
+    "manychat-webhook": 87,
     "send-test-email": 9,
     "save-email-settings": 7,
     "admin-user-access": 20,
     "test-gmail-connection": 7,
     "save-email-reading-settings": 1,
     "search-conectai-email": 3,
-    "notify-responsavel-transfer": 2
+    "notify-responsavel-transfer": 3
   }
 }
