@@ -126,6 +126,22 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
   return sanitized
 }
 
+export async function notifyResponsavelTransfer(
+  contatoId: string,
+  previousResponsavelId: string | null,
+  newResponsavelId: string,
+) {
+  const { data, error } = await supabase.functions.invoke('notify-responsavel-transfer', {
+    body: {
+      contato_id: contatoId,
+      previous_responsavel_id: previousResponsavelId,
+      new_responsavel_id: newResponsavelId,
+    },
+  })
+  if (error) throw error
+  return data
+}
+
 export async function createContact(payload: Partial<Contact>) {
   const sanitized = sanitizeContactPayload(payload)
   if (!sanitized.manychat_id) {

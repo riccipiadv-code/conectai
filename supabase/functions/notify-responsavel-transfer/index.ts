@@ -1,0 +1,268 @@
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
+import { createClient } from 'npm:@supabase/supabase-js@2'
+import nodemailer from 'npm:nodemailer'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+}
+
+const ANA_EDITH_ID = 'f7678df1-1051-49b1-8a4e-6efe80874dfa'
+
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    return new Response(JSON.stringify({ error: 'Token de autenticação não encontrado' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return new Response(JSON.stringify({ error: 'Erro interno de configuração de servidor' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+  try {
+    const token = authHeader.replace('Bearer ', '')
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token)
+
+    if (userError || !user) throw new Error('Não autorizado.')
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('perfil')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.perfil !== 'administrador') {
+      throw new Error('Permissão negada: apenas administradores podem executar esta ação.')
+    }
+
+    const { contato_id, previous_responsavel_id, new_responsavel_id } = await req.json()
+
+    // 1. Se previous_responsavel_id !== Ana Edith -> não dispara
+    if (previous_responsavel_id !== ANA_EDITH_ID) {
+      return new Response(JSON.stringify({ triggered: false, reason: 'not_from_ana_edith' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2. Se new_responsavel_id === Ana Edith -> não dispara
+    if (new_responsavel_id === ANA_EDITH_ID) {
+      return new Response(JSON.stringify({ triggered: false, reason: 'still_ana_edith' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!new_responsavel_id) {
+      return new Response(JSON.stringify({ triggered: false, reason: 'no_new_responsavel' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 3. Buscar o novo responsável em legaldesk_usuarios
+    const { data: responsavel, error: respError } = await supabase
+      .from('legaldesk_usuarios')
+      .select('id, nome, email')
+      .eq('id', new_responsavel_id)
+      .maybeSingle()
+
+    if (respError) throw respError
+
+    // 4. Se não encontrar responsável ou email for nulo/vazio
+    const destEmail = responsavel?.email?.trim()
+    if (!responsavel || !destEmail) {
+      console.error('Responsável não encontrado ou sem e-mail cadastrado:', {
+        new_responsavel_id,
+        responsavel,
+      })
+      return new Response(JSON.stringify({ triggered: false, reason: 'no_email' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 5. Buscar o contato em manychat_contatos
+    const { data: contato, error: contatoError } = await supabase
+      .from('manychat_contatos')
+      .select('controle, lead_nome, lead_empresa_pf, lead_servico, manychat_servicos(descricao)')
+      .eq('id', contato_id)
+      .maybeSingle()
+
+    if (contatoError) throw contatoError
+    if (!contato) throw new Error('Contato não encontrado.')
+
+    // 6. Buscar configuração ativa do E-mail Geral
+    const { data: setting, error: settingError } = await supabase
+      .from('email_settings')
+      .select('*')
+      .eq('active', true)
+      .limit(1)
+      .maybeSingle()
+
+    if (settingError) throw settingError
+    if (!setting) throw new Error('Nenhuma configuração de e-mail ativa encontrada.')
+
+    const { data: secretData } = await supabase
+      .from('email_secrets')
+      .select('secret_value')
+      .eq('setting_id', setting.id)
+      .limit(1)
+      .maybeSingle()
+
+    const secret = secretData?.secret_value
+    if (!secret && setting.secret_configured) {
+      throw new Error('Configuração de e-mail possui senha, mas não foi possível carregá-la.')
+    }
+    if (!secret) {
+      throw new Error('A senha do e-mail não foi configurada.')
+    }
+
+    // 7. Montar o e-mail
+    // Extrair o primeiro nome: split por espaço, pegar o primeiro token
+    const fullName = (responsavel.nome || '').trim()
+    const firstName = fullName ? fullName.split(/\s+/)[0] : 'Responsável'
+
+    const controleStr = contato.controle != null ? String(contato.controle) : ''
+    const subject = `Nova atribuição Conectaí [${controleStr}]`
+
+    // Determinar Serviço: lead_servico ou manychat_servicos.descricao
+    let servicoNome = (contato.lead_servico || '').trim()
+    if (!servicoNome) {
+      const ms = contato.manychat_servicos as any
+      if (Array.isArray(ms) && ms.length > 0) {
+        servicoNome = (ms[0]?.descricao || '').trim()
+      } else if (ms?.descricao) {
+        servicoNome = (ms.descricao || '').trim()
+      }
+    }
+
+    const empresaStr = (contato.lead_empresa_pf || '').trim()
+    const contatoNome = (contato.lead_nome || '').trim()
+
+    // Montar corpo (texto simples)
+    const bodyLines: string[] = [
+      `Olá, ${firstName}.`,
+      '',
+      'Um novo atendimento foi atribuído a você no Conectaí.',
+      '',
+      `Controle: ${controleStr}`,
+      `Contato: ${contatoNome}`,
+    ]
+
+    if (empresaStr) {
+      bodyLines.push(`Empresa: ${empresaStr}`)
+    }
+
+    if (servicoNome) {
+      bodyLines.push(`Serviço: ${servicoNome}`)
+    }
+
+    bodyLines.push('')
+    bodyLines.push('Acesse o Conectaí para consultar o atendimento.')
+
+    const emailText = bodyLines.join('\n')
+
+    // 8. Configurar transporte SMTP
+    const transporterOptions: any = {
+      host: setting.smtp_host,
+      port: setting.smtp_port,
+      secure: setting.smtp_secure,
+      auth: {
+        user: setting.smtp_user,
+        pass: secret,
+      },
+    }
+
+    if (setting.smtp_host === 'smtp.office365.com') {
+      transporterOptions.port = 587
+      transporterOptions.secure = false
+      transporterOptions.requireTLS = true
+      transporterOptions.tls = { ciphers: 'SSLv3' }
+    }
+
+    const transporter = nodemailer.createTransport(transporterOptions)
+
+    const mailOptions = {
+      from: `"${setting.sender_name}" <${setting.sender_email}>`,
+      to: destEmail,
+      replyTo: setting.reply_to || undefined,
+      subject,
+      text: emailText,
+    }
+
+    // 9. Enviar e logar
+    try {
+      await transporter.sendMail(mailOptions)
+    } catch (sendError: any) {
+      await supabase.from('email_send_logs').insert({
+        type: 'notification',
+        to_email: destEmail,
+        subject: mailOptions.subject,
+        status: 'error',
+        error_message: sendError.message || String(sendError),
+        created_by: user.id,
+        created_at: new Date().toISOString(),
+      })
+      return new Response(
+        JSON.stringify({
+          success: false,
+          triggered: true,
+          error: `Erro ao enviar e-mail pelo provedor: ${sendError.message}`,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    const { error: logError } = await supabase.from('email_send_logs').insert({
+      type: 'notification',
+      to_email: destEmail,
+      subject: mailOptions.subject,
+      status: 'success',
+      created_by: user.id,
+      created_at: new Date().toISOString(),
+    })
+
+    if (logError) {
+      console.error('Erro ao logar envio de notificação:', logError)
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        triggered: true,
+        message: 'Notificação enviada com sucesso.',
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+})

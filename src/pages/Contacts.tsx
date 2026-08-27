@@ -12,6 +12,7 @@ import {
   createContact,
   deleteContact,
   getPortesEmpresa,
+  notifyResponsavelTransfer,
   ContactsFilters,
 } from '@/services/contacts'
 import { Card, CardContent } from '@/components/ui/card'
@@ -407,11 +408,30 @@ export default function Contacts() {
         }
         toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
       } else if (modalMode === 'edit' && id) {
+        const previousResponsavelId = updatingContact?.responsavel_id || null
+        const newResponsavelId = payload.responsavel_id || null
+
         await updateContact(id, payload, prevStage)
         if (subservicoIds) {
           await saveContatoSubservicos(id, subservicoIds)
         }
         toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
+
+        if (previousResponsavelId !== newResponsavelId && newResponsavelId) {
+          notifyResponsavelTransfer(id, previousResponsavelId, newResponsavelId).catch(
+            (notifyError) => {
+              console.error(
+                'Erro ao enviar notificação de transferência de responsável:',
+                notifyError,
+              )
+              toast({
+                title: 'Aviso',
+                description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
+                variant: 'default',
+              })
+            },
+          )
+        }
       }
 
       fetchData()
