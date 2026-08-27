@@ -158,6 +158,25 @@ export async function createContact(payload: Partial<Contact>) {
 }
 
 export async function deleteContact(id: string) {
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError || !authData?.user) {
+    throw new Error('Usuário não autenticado.')
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('perfil')
+    .eq('id', authData.user.id)
+    .single()
+
+  if (profileError || !profile) {
+    throw new Error('Perfil de usuário não encontrado.')
+  }
+
+  if (profile.perfil !== 'administrador') {
+    throw new Error('Apenas administradores podem excluir atendimentos.')
+  }
+
   const { error } = await supabase.rpc('hard_delete_manychat_contato', { p_contato_id: id })
   if (error) throw error
 }
@@ -425,7 +444,40 @@ export async function getAllContactsForExport() {
   return allData
 }
 
-export async function updateContact(id: string, updates: any, previousStage?: string) {
+export async function updateContact(
+  id: string,
+  updates: any,
+  previousStage?: string,
+  userId?: string,
+) {
+  if (userId) {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('perfil, legaldesk_usuario_id')
+      .eq('id', userId)
+      .single()
+
+    if (profileError) {
+      throw new Error('Erro ao validar permissões de usuário.')
+    }
+
+    if (profile?.perfil === 'operacional' && profile.legaldesk_usuario_id) {
+      const { data: currentContact, error: contactError } = await supabase
+        .from('manychat_contatos')
+        .select('responsavel_id')
+        .eq('id', id)
+        .single()
+
+      if (
+        contactError ||
+        !currentContact ||
+        String(currentContact.responsavel_id) !== String(profile.legaldesk_usuario_id)
+      ) {
+        throw new Error('Operacional só pode editar seus próprios atendimentos.')
+      }
+    }
+  }
+
   const rawPayload = { ...updates }
 
   if (rawPayload.current_stage) {

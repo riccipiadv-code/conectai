@@ -419,14 +419,29 @@ export default function Contacts() {
   }
 
   const confirmDelete = async () => {
+    if (profile?.perfil !== 'administrador') {
+      toast({
+        title: 'Aviso',
+        description: 'Apenas administradores podem excluir atendimentos.',
+        variant: 'destructive',
+      })
+      setIsDeleteDialogOpen(false)
+      setDeletingContact(null)
+      return
+    }
+
     if (deletingContact) {
       try {
         await deleteContact(deletingContact.id)
         toast({ title: 'Sucesso', description: 'Contato excluído.' })
         fetchData()
-      } catch (error) {
+      } catch (error: any) {
         console.error(error)
-        toast({ title: 'Erro', description: 'Erro ao excluir contato.', variant: 'destructive' })
+        toast({
+          title: 'Erro',
+          description: error?.message || 'Erro ao excluir contato.',
+          variant: 'destructive',
+        })
       }
     }
     setIsDeleteDialogOpen(false)
@@ -451,10 +466,23 @@ export default function Contacts() {
         }
         toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
       } else if (modalMode === 'edit' && id) {
+        if (profile?.perfil === 'operacional') {
+          const currentResp = updatingContact?.responsavel_id
+          const userLdId = profile?.legaldesk_usuario_id
+          if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
+            toast({
+              title: 'Aviso',
+              description: 'Operacional só pode editar seus próprios atendimentos.',
+              variant: 'destructive',
+            })
+            return
+          }
+        }
+
         const previousResponsavelId = updatingContact?.responsavel_id || null
         const newResponsavelId = payload.responsavel_id || null
 
-        await updateContact(id, payload, prevStage)
+        await updateContact(id, payload, prevStage, user?.id)
         if (subservicoIds) {
           await saveContatoSubservicos(id, subservicoIds)
         }
@@ -1299,32 +1327,46 @@ export default function Contacts() {
                             </TooltipTrigger>
                             <TooltipContent>Visualizar</TooltipContent>
                           </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
-                                onClick={() => handleEdit(c)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
-                                onClick={() => handleDelete(c)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Excluir</TooltipContent>
-                          </Tooltip>
+                          {(() => {
+                            const canEdit =
+                              profile?.perfil !== 'operacional' ||
+                              (Boolean(profile?.legaldesk_usuario_id) &&
+                                Boolean(c.responsavel_id) &&
+                                String(c.responsavel_id) === String(profile?.legaldesk_usuario_id))
+
+                            if (!canEdit) return null
+
+                            return (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/50"
+                                    onClick={() => handleEdit(c)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Editar</TooltipContent>
+                              </Tooltip>
+                            )
+                          })()}
+                          {profile?.perfil === 'administrador' && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/50"
+                                  onClick={() => handleDelete(c)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Excluir</TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                       </TableCell>
 
