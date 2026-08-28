@@ -330,7 +330,16 @@ export async function getContacts(
   }
 
   if (filters.responsavel_ids) {
-    query = query.in('responsavel_id', filters.responsavel_ids)
+    if (filters.responsavel_ids.includes('__NULL__')) {
+      const validIds = filters.responsavel_ids.filter((id) => id !== '__NULL__')
+      if (validIds.length > 0) {
+        query = query.or(`responsavel_id.in.(${validIds.join(',')}),responsavel_id.is.null`)
+      } else {
+        query = query.is('responsavel_id', null)
+      }
+    } else {
+      query = query.in('responsavel_id', filters.responsavel_ids)
+    }
   }
 
   if (filters.servico_ids) {

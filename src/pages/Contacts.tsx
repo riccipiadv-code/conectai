@@ -172,19 +172,19 @@ export default function Contacts() {
     }
 
     let responsavel_ids: string[] = []
-    if (profile.perfil === 'administrador') {
-      responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+    if (profile.perfil === 'administrador' || profile.perfil === 'gestor') {
+      responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
       initialFiltersApplied.current = true
     } else {
       const legaldeskId = profile.legaldesk_usuario_id
       if (!legaldeskId) {
         // sem vínculo com legaldesk_usuarios, inicializa com todos como fallback seguro
-        responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+        responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
       } else {
         const foundResp = meta.responsaveis.find((r: any) => String(r.id) === String(legaldeskId))
         if (!foundResp) {
           // responsável não encontrado na lista, inicializa com todos como fallback
-          responsavel_ids = meta.responsaveis.map((r: any) => String(r.id))
+          responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
         } else {
           responsavel_ids = [String(foundResp.id)]
         }
@@ -663,9 +663,15 @@ export default function Contacts() {
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
                     Responsável
-                    {(filters.responsavel_ids?.length ?? 0) !== meta.responsaveis.length && (
-                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
-                    )}
+                    {(() => {
+                      const allIds = meta.responsaveis.map((r: any) => String(r.id))
+                      const hasAll =
+                        allIds.length > 0 &&
+                        allIds.every((id) => filters.responsavel_ids?.includes(id))
+                      return !hasAll ? (
+                        <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
+                      ) : null
+                    })()}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -680,10 +686,10 @@ export default function Contacts() {
                       size="sm"
                       className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
                       onClick={() =>
-                        updateFilter(
-                          'responsavel_ids',
-                          meta.responsaveis.map((r: any) => String(r.id)),
-                        )
+                        updateFilter('responsavel_ids', [
+                          ...meta.responsaveis.map((r: any) => String(r.id)),
+                          '__NULL__',
+                        ])
                       }
                     >
                       Selecionar todos
@@ -707,16 +713,25 @@ export default function Contacts() {
                             id={`resp-${r.id}`}
                             checked={isChecked}
                             onCheckedChange={(checked) => {
+                              const allIds = meta.responsaveis.map((x: any) => String(x.id))
                               if (checked) {
-                                updateFilter('responsavel_ids', [
-                                  ...(filters.responsavel_ids || []),
+                                const next = [
+                                  ...(filters.responsavel_ids || []).filter(
+                                    (id) => id !== '__NULL__',
+                                  ),
                                   idStr,
-                                ])
+                                ]
+                                const isAllSelected = allIds.every((id) => next.includes(id))
+                                if (isAllSelected) {
+                                  updateFilter('responsavel_ids', [...allIds, '__NULL__'])
+                                } else {
+                                  updateFilter('responsavel_ids', next)
+                                }
                               } else {
-                                updateFilter(
-                                  'responsavel_ids',
-                                  (filters.responsavel_ids || []).filter((id) => id !== idStr),
+                                const next = (filters.responsavel_ids || []).filter(
+                                  (id) => id !== idStr && id !== '__NULL__',
                                 )
+                                updateFilter('responsavel_ids', next)
                               }
                             }}
                           />
