@@ -9,8 +9,6 @@ const corsHeaders = {
     'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
-const ANA_EDITH_ID = 'f7678df1-1051-49b1-8a4e-6efe80874dfa'
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
@@ -45,24 +43,19 @@ Deno.serve(async (req: Request) => {
 
     const { contato_id, previous_responsavel_id, new_responsavel_id } = await req.json()
 
-    // 1. Se previous_responsavel_id !== Ana Edith -> não dispara
-    if (previous_responsavel_id !== ANA_EDITH_ID) {
-      return new Response(JSON.stringify({ triggered: false, reason: 'not_from_ana_edith' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // 2. Se new_responsavel_id === Ana Edith -> não dispara
-    if (new_responsavel_id === ANA_EDITH_ID) {
-      return new Response(JSON.stringify({ triggered: false, reason: 'still_ana_edith' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
+    // 1. Validar se novo responsável foi informado
     if (!new_responsavel_id) {
       return new Response(JSON.stringify({ triggered: false, reason: 'no_new_responsavel' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // 2. Validar se houve mudança de responsável (anterior diferente do novo)
+    const prevIdNorm = previous_responsavel_id ? String(previous_responsavel_id) : null
+    const newIdNorm = String(new_responsavel_id)
+    if (prevIdNorm === newIdNorm) {
+      return new Response(JSON.stringify({ triggered: false, reason: 'responsavel_not_changed' }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

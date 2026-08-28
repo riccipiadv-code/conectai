@@ -488,12 +488,7 @@ export default function Contacts() {
         }
         toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
 
-        const ANA_EDITH_ID = 'f7678df1-1051-49b1-8a4e-6efe80874dfa'
-        if (
-          previousResponsavelId === ANA_EDITH_ID &&
-          previousResponsavelId !== newResponsavelId &&
-          newResponsavelId
-        ) {
+        if (newResponsavelId && newResponsavelId !== previousResponsavelId) {
           notifyResponsavelTransfer(id, previousResponsavelId, newResponsavelId).catch(
             (notifyError) => {
               console.error(
