@@ -172,7 +172,7 @@ export default function Contacts() {
     }
 
     let responsavel_ids: string[] = []
-    if (profile.perfil === 'administrador' || profile.perfil === 'gestor') {
+    if (profile.perfil === 'administrador') {
       responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
       initialFiltersApplied.current = true
     } else {
