@@ -422,11 +422,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'grant_access') {
-      // 1. Validar que o executor é Administrador
-      if (profile.perfil !== 'administrador') {
-        throw new Error('Permissão negada. Apenas administradores podem conceder acesso.')
-      }
-
       const targetLegaldeskId = body.legaldesk_usuario_id || legaldesk_id
       const targetPerfil = String(perfil || '').trim()
 
