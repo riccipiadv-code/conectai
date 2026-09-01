@@ -113,8 +113,11 @@ export default function UserManagement() {
   const [creatingUser, setCreatingUser] = useState(false)
 
   // Diálogos modais de linha
+  const [grantAccessModalUser, setGrantAccessModalUser] = useState<UserRow | null>(null)
+  const [grantAccessPerfil, setGrantAccessPerfil] = useState<string>('')
+  const [grantingAccess, setGrantingAccess] = useState(false)
+
   const [activateModalUser, setActivateModalUser] = useState<UserRow | null>(null)
-  const [activatePerfil, setActivatePerfil] = useState<string>('')
 
   const [revokeModalUser, setRevokeModalUser] = useState<UserRow | null>(null)
 
@@ -256,15 +259,15 @@ export default function UserManagement() {
     }
   }
 
-  // 2. Ativar Acesso (unificado para sem_acesso, bloqueado e inconsistente)
-  const handleOpenActivateModal = (user: UserRow) => {
-    setActivateModalUser(user)
-    setActivatePerfil('')
+  // 2. Modal Conceder Acesso (para colaboradores com tem_acesso === false)
+  const handleOpenGrantAccessModal = (user: UserRow) => {
+    setGrantAccessModalUser(user)
+    setGrantAccessPerfil('')
   }
 
-  const handleConfirmActivate = async () => {
-    if (!activateModalUser) return
-    if (!activatePerfil) {
+  const handleConfirmGrantAccess = async () => {
+    if (!grantAccessModalUser) return
+    if (!grantAccessPerfil) {
       toast({
         title: 'Perfil obrigatório',
         description: 'Selecione um perfil de acesso.',
@@ -272,33 +275,75 @@ export default function UserManagement() {
       })
       return
     }
-    const user = activateModalUser
+    const user = grantAccessModalUser
+    setGrantingAccess(true)
     setActionLoadingId(user.legaldesk_id)
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
         body: {
           action: 'grant_access',
-          legaldesk_id: user.legaldesk_id,
-          email: user.email,
-          name: user.nome,
-          perfil: activatePerfil,
+          legaldesk_usuario_id: user.legaldesk_id,
+          perfil: grantAccessPerfil,
         },
       })
 
       if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(error, data, 'Erro ao ativar acesso.')
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Falha ao conceder acesso.',
+        )
         throw new Error(finalErrorMessage)
       }
 
       toast({
-        title: 'Acesso ativado!',
-        description: `O acesso para ${user.nome} como "${getPerfilLabel(activatePerfil) || activatePerfil}" foi ativado com sucesso.`,
+        title: 'Acesso concedido!',
+        description: `Acesso concedido com sucesso para ${user.nome} com perfil "${getPerfilLabel(grantAccessPerfil) || grantAccessPerfil}".`,
+      })
+      setGrantAccessModalUser(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao conceder acesso',
+        description: err.message || 'Falha ao conceder acesso.',
+        variant: 'destructive',
+      })
+    } finally {
+      setGrantingAccess(false)
+      setActionLoadingId(null)
+    }
+  }
+
+  // 3. Reativar Acesso Bloqueado (usuário com profile existente desativado)
+  const handleOpenActivateModal = (user: UserRow) => {
+    if (!user.tem_acesso) {
+      handleOpenGrantAccessModal(user)
+      return
+    }
+    setActivateModalUser(user)
+  }
+
+  const handleConfirmActivateBlocked = async () => {
+    if (!activateModalUser) return
+    const user = activateModalUser
+    setActionLoadingId(user.legaldesk_id)
+    try {
+      const { error: activateErr } = await supabase
+        .from('profiles')
+        .update({ ativo: true })
+        .eq('id', user.profile_id!)
+
+      if (activateErr) throw activateErr
+
+      toast({
+        title: 'Acesso reativado',
+        description: `O acesso de ${user.nome} foi reativado com sucesso.`,
       })
       setActivateModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao ativar acesso',
+        title: 'Falha ao reativar acesso',
         description: err.message,
         variant: 'destructive',
       })
@@ -441,8 +486,8 @@ export default function UserManagement() {
         u.sigla.toLowerCase().includes(search.toLowerCase())
       if (!matchesSearch) return false
 
-      if (filter === 'with_access') return u.status === 'ativo'
-      if (filter === 'without_access') return u.status !== 'ativo'
+      if (filter === 'with_access') return u.tem_acesso === true
+      if (filter === 'without_access') return u.tem_acesso === false
       return true
     })
   }, [users, search, filter])
@@ -471,10 +516,10 @@ export default function UserManagement() {
           <TabsList className="w-full sm:w-auto overflow-x-auto">
             <TabsTrigger value="all">Todos ({users.length})</TabsTrigger>
             <TabsTrigger value="with_access">
-              Com Acesso ({users.filter((u) => u.status === 'ativo').length})
+              Com Acesso ({users.filter((u) => u.tem_acesso === true).length})
             </TabsTrigger>
             <TabsTrigger value="without_access">
-              Sem Acesso ({users.filter((u) => u.status !== 'ativo').length})
+              Sem Acesso ({users.filter((u) => u.tem_acesso === false).length})
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -591,8 +636,30 @@ export default function UserManagement() {
                           <div className="flex items-center justify-end">
                             <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           </div>
+                        ) : !u.tem_acesso ? (
+                          /* Sem acesso: mostrar Conceder acesso + Remover */
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-8 text-xs gap-1.5"
+                              onClick={() => handleOpenGrantAccessModal(u)}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5" />
+                              Conceder acesso
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-900/50"
+                              onClick={() => handleOpenInactivateModal(u)}
+                            >
+                              <UserX className="h-3.5 w-3.5" />
+                              Remover
+                            </Button>
+                          </div>
                         ) : u.status === 'ativo' ? (
-                          /* Ativo = Sim: mostrar Editar + Remover */
+                          /* Com acesso e Ativo = Sim: mostrar Editar + Remover */
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
@@ -614,8 +681,17 @@ export default function UserManagement() {
                             </Button>
                           </div>
                         ) : (
-                          /* Ativo = Não (sem_acesso, bloqueado, inconsistente): mostrar apenas Remover */
-                          <div className="flex items-center justify-end">
+                          /* Com acesso mas Bloqueado/Inconsistente: mostrar Editar + Remover */
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1.5"
+                              onClick={() => handleOpenEditModal(u)}
+                            >
+                              <UserCog className="h-3.5 w-3.5" />
+                              Editar
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -754,28 +830,47 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO: Ativar Acesso (Único) */}
+      {/* DIÁLOGO: Conceder Acesso */}
       <Dialog
-        open={!!activateModalUser}
-        onOpenChange={(open) => !open && setActivateModalUser(null)}
+        open={!!grantAccessModalUser}
+        onOpenChange={(open) => {
+          if (!open && !grantingAccess) {
+            setGrantAccessModalUser(null)
+          }
+        }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5 text-primary" />
-              Ativar Acesso
+              Conceder Acesso
             </DialogTitle>
             <DialogDescription>
-              Configure o acesso ao sistema para este colaborador.
+              Conceda acesso ao sistema reutilizando o colaborador existente.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleConfirmGrantAccess()
+            }}
+            className="py-4 space-y-4"
+          >
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Nome</label>
+              <Input
+                value={grantAccessModalUser?.nome || ''}
+                readOnly
+                className="bg-muted/50 cursor-not-allowed h-9"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Nome</label>
+                <label className="text-xs font-medium text-muted-foreground">E-mail</label>
                 <Input
-                  value={activateModalUser?.nome || ''}
+                  value={grantAccessModalUser?.email || '-'}
                   readOnly
                   className="bg-muted/50 cursor-not-allowed h-9"
                 />
@@ -783,27 +878,18 @@ export default function UserManagement() {
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Sigla</label>
                 <Input
-                  value={activateModalUser?.sigla || '-'}
+                  value={grantAccessModalUser?.sigla || '-'}
                   readOnly
                   className="bg-muted/50 cursor-not-allowed h-9"
                 />
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">E-mail</label>
-              <Input
-                value={activateModalUser?.email || '-'}
-                readOnly
-                className="bg-muted/50 cursor-not-allowed h-9"
-              />
-            </div>
-
             <div className="space-y-1.5 pt-2 border-t">
               <label className="text-sm font-medium text-foreground">
-                Perfil de Acesso: <span className="text-rose-500">*</span>
+                Perfil de Acesso <span className="text-rose-500">*</span>
               </label>
-              <Select value={activatePerfil} onValueChange={setActivatePerfil}>
+              <Select value={grantAccessPerfil} onValueChange={setGrantAccessPerfil}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione um perfil..." />
                 </SelectTrigger>
@@ -816,7 +902,42 @@ export default function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setGrantAccessModalUser(null)}
+                disabled={grantingAccess}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={!grantAccessPerfil || grantingAccess}>
+                {grantingAccess && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Conceder acesso
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO: Reativar Acesso Bloqueado */}
+      <Dialog
+        open={!!activateModalUser}
+        onOpenChange={(open) => !open && setActivateModalUser(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600">
+              <ShieldCheck className="h-5 w-5" />
+              Reativar Acesso
+            </DialogTitle>
+            <DialogDescription>
+              Deseja reativar o acesso de{' '}
+              <strong className="text-foreground">{activateModalUser?.nome}</strong>? O usuário
+              voltará a ter acesso ao sistema.
+            </DialogDescription>
+          </DialogHeader>
 
           <DialogFooter>
             <Button
@@ -827,13 +948,13 @@ export default function UserManagement() {
               Cancelar
             </Button>
             <Button
-              onClick={handleConfirmActivate}
-              disabled={!activatePerfil || actionLoadingId === activateModalUser?.legaldesk_id}
+              onClick={handleConfirmActivateBlocked}
+              disabled={actionLoadingId === activateModalUser?.legaldesk_id}
             >
               {actionLoadingId === activateModalUser?.legaldesk_id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
-              Ativar Acesso
+              Confirmar Reativação
             </Button>
           </DialogFooter>
         </DialogContent>

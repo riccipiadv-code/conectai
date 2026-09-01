@@ -421,100 +421,152 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'grant_access') {
-      if (!perfil) {
-        throw new Error('Perfil é obrigatório para conceder acesso.')
+      // 1. Validar que o executor é Administrador
+      if (profile.perfil !== 'administrador') {
+        throw new Error('Permissão negada. Apenas administradores podem conceder acesso.')
       }
-      const targetPerfil = perfil
 
-      // Consultar perfis válidos ativos no banco
-      const { data: validPerfisData, error: perfisError } = await supabase
+      const targetLegaldeskId = body.legaldesk_usuario_id || legaldesk_id
+      const targetPerfil = String(perfil || '').trim()
+
+      if (!targetLegaldeskId) {
+        throw new Error('Parâmetro obrigatório ausente: legaldesk_usuario_id.')
+      }
+
+      if (!targetPerfil) {
+        throw new Error('Perfil de acesso é obrigatório.')
+      }
+
+      // 2. Validar que o perfil desejado existe e está ativo em perfis_acesso
+      const { data: validPerfil, error: perfilError } = await supabase
         .from('perfis_acesso')
         .select('codigo')
+        .eq('codigo', targetPerfil)
         .eq('ativo', true)
+        .maybeSingle()
 
-      if (perfisError) throw perfisError
-
-      const validPerfis = (validPerfisData || []).map((p: { codigo: string }) => p.codigo)
-      if (!validPerfis.includes(targetPerfil)) {
-        throw new Error(`Perfil inválido: ${targetPerfil}`)
+      if (perfilError || !validPerfil) {
+        throw new Error('Perfil de acesso inválido ou inativo.')
       }
 
-      let profileId = existingProfile?.id
+      // 3. Buscar novamente o registro em legaldesk_usuarios pelo ID (não confiar em nome/email do frontend)
+      const { data: ldUser, error: ldUserErr } = await supabase
+        .from('legaldesk_usuarios')
+        .select('id, nome, email, ativo')
+        .eq('id', targetLegaldeskId)
+        .maybeSingle()
 
-      if (!profileId) {
-        if (!email) {
-          throw new Error('E-mail é obrigatório para conceder acesso a um novo usuário.')
-        }
+      if (ldUserErr) throw ldUserErr
+      if (!ldUser) {
+        throw new Error('Colaborador não encontrado no cadastro de usuários.')
+      }
 
-        // Tentar convidar usuário pelo Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(
-          email,
-          {
-            data: { name: name || '' },
-          },
+      if (!ldUser.ativo) {
+        throw new Error('Colaborador está inativo no cadastro.')
+      }
+
+      const ldEmail = String(ldUser.email || '')
+        .trim()
+        .toLowerCase()
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!ldEmail || !emailRegex.test(ldEmail)) {
+        throw new Error('Colaborador não possui um e-mail válido cadastrado.')
+      }
+
+      // 4. Verificar se já existe profiles vinculado pelo legaldesk_usuario_id
+      const { data: profByLdId, error: profByLdErr } = await supabase
+        .from('profiles')
+        .select('id, email, legaldesk_usuario_id')
+        .eq('legaldesk_usuario_id', targetLegaldeskId)
+        .maybeSingle()
+
+      if (profByLdErr) throw profByLdErr
+      if (profByLdId) {
+        throw new Error('Este colaborador já possui acesso configurado no sistema.')
+      }
+
+      // 5. Verificar se já existe profile com o mesmo e-mail
+      const { data: profByEmail, error: profByEmailErr } = await supabase
+        .from('profiles')
+        .select('id, email, legaldesk_usuario_id')
+        .ilike('email', ldEmail)
+        .maybeSingle()
+
+      if (profByEmailErr) throw profByEmailErr
+      if (profByEmail) {
+        throw new Error('Já existe um perfil com este e-mail cadastrado no sistema.')
+      }
+
+      // 6. Verificar se já existe usuário no Supabase Auth com o mesmo e-mail
+      const {
+        data: { users: authUsersList },
+        error: authListErr,
+      } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+
+      if (authListErr) throw authListErr
+      const authUserExists = (authUsersList || []).some((u) => u.email?.toLowerCase() === ldEmail)
+
+      if (authUserExists) {
+        throw new Error(
+          'Já existe um usuário no Supabase Auth com este e-mail. Não é possível duplicar.',
         )
-
-        if (authError) {
-          if (
-            authError.message.includes('already exists') ||
-            authError.message.includes('already registered')
-          ) {
-            // Localizar usuário existente no Auth
-            const {
-              data: { users },
-            } = await supabase.auth.admin.listUsers()
-            const u = users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
-            if (u) {
-              profileId = u.id
-            } else {
-              throw new Error(
-                `Usuário já existe no Auth mas não foi localizado: ${authError.message}`,
-              )
-            }
-          } else {
-            throw authError
-          }
-        } else {
-          profileId = authData.user?.id
-        }
       }
 
-      if (!profileId) {
-        throw new Error('Não foi possível obter o ID do usuário Auth.')
-      }
-
-      // Upsert no profile vinculando legaldesk_usuario_id, perfil e ativo=true
-      const { error: upsertError } = await supabase.from('profiles').upsert(
+      // 7. Criar/convidar no Supabase Auth usando o mesmo mecanismo seguro de create_user
+      const { data: authData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(
+        ldEmail,
         {
-          id: profileId,
-          email: email || existingProfile?.email,
-          name: name || existingProfile?.name || email,
-          legaldesk_usuario_id: legaldesk_id,
+          data: { name: ldUser.nome },
+        },
+      )
+
+      if (inviteErr) {
+        if (
+          inviteErr.message.includes('already exists') ||
+          inviteErr.message.includes('already registered')
+        ) {
+          throw new Error('Já existe um usuário cadastrado no Auth com este e-mail.')
+        }
+        throw new Error(`Erro ao convidar usuário por e-mail: ${inviteErr.message}`)
+      }
+
+      const authUserId = authData.user?.id
+      if (!authUserId) {
+        throw new Error('Não foi possível obter o ID do usuário criado no Auth.')
+      }
+
+      // 8. Criar/completar o profile correspondente
+      // Nota: trigger handle_new_user pode ter inserido esqueleto de profile no insert do auth.users,
+      // então utilizamos upsert por id.
+      const { error: profileUpsertErr } = await supabase.from('profiles').upsert(
+        {
+          id: authUserId,
+          name: ldUser.nome,
+          email: ldEmail,
+          legaldesk_usuario_id: targetLegaldeskId,
           perfil: targetPerfil,
           ativo: true,
         },
         { onConflict: 'id' },
       )
 
-      if (upsertError) throw upsertError
-
-      // Após criar/upsertar o profile com sucesso, atualizar legaldesk_usuarios
-      // Se a atualização do legaldesk_usuarios falhar, NÃO reverter o profile — apenas logar e continuar
-      const { error: ldUpdateError } = await supabase
-        .from('legaldesk_usuarios')
-        .update({ exibir_gestao_usuarios: true })
-        .eq('id', legaldesk_id)
-
-      if (ldUpdateError) {
-        console.error(
-          'Erro ao atualizar exibir_gestao_usuarios em legaldesk_usuarios:',
-          ldUpdateError,
+      if (profileUpsertErr) {
+        console.error('Falha ao criar/atualizar profile após criação no Auth:', profileUpsertErr)
+        throw new Error(
+          'O usuário foi criado no Auth, mas o perfil não foi concluído corretamente. Contate o suporte técnico.',
         )
       }
 
-      return new Response(JSON.stringify({ success: true, profile_id: profileId }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({
+          success: true,
+          legaldesk_usuario_id: targetLegaldeskId,
+          profile_id: authUserId,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     if (action === 'revoke_access') {
