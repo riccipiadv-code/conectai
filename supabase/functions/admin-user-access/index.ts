@@ -702,7 +702,6 @@ Deno.serve(async (req: Request) => {
           currentProfile.id,
           {
             email: normNewEmail,
-            email_confirm: true,
           },
         )
 
@@ -726,7 +725,6 @@ Deno.serve(async (req: Request) => {
             if (previousProfEmail) {
               await supabase.auth.admin.updateUserById(currentProfile.id, {
                 email: previousProfEmail,
-                email_confirm: true,
               })
             }
           } catch (compErr) {
@@ -763,7 +761,6 @@ Deno.serve(async (req: Request) => {
             if (previousProfEmail) {
               await supabase.auth.admin.updateUserById(currentProfile.id, {
                 email: previousProfEmail,
-                email_confirm: true,
               })
             }
           } catch (compErr) {
