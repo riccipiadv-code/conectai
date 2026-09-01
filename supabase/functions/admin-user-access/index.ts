@@ -82,9 +82,13 @@ Deno.serve(async (req: Request) => {
 
       // 4. Cruzar dados para cada legaldesk_usuario
       const usersList = (ldUsers || []).map((ld) => {
-        // Vínculo principal: legaldesk_usuario_id; Fallback: e-mail
+        // Vínculo exato de acesso Conectaí: profiles.legaldesk_usuario_id = legaldesk_usuarios.id
+        const exactProf = profiles?.find((p) => p.legaldesk_usuario_id === ld.id)
+        const temAcesso = Boolean(exactProf)
+
+        // Vínculo principal: legaldesk_usuario_id; Fallback: e-mail (para compatibilidade das outras props)
         const prof =
-          profiles?.find((p) => p.legaldesk_usuario_id === ld.id) ||
+          exactProf ||
           (ld.email
             ? profiles?.find((p) => p.email?.toLowerCase() === ld.email?.toLowerCase())
             : undefined)
@@ -120,6 +124,7 @@ Deno.serve(async (req: Request) => {
           ativo_sys: ativoSys,
           auth_user_exists: authUserExists,
           status,
+          tem_acesso: temAcesso,
         }
       })
 

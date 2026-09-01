@@ -49,6 +49,7 @@ export type UserRow = {
   ativo_sys: boolean
   auth_user_exists: boolean
   status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
+  tem_acesso?: boolean
 }
 
 type PerfilOption = {
@@ -486,6 +487,7 @@ export default function UserManagement() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Sigla / E-mail</TableHead>
+                <TableHead className="text-center">Acesso</TableHead>
                 <TableHead className="text-center">Ativo</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -494,13 +496,13 @@ export default function UserManagement() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
+                  <TableCell colSpan={6} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                     Nenhum colaborador encontrado.
                   </TableCell>
                 </TableRow>
@@ -527,7 +529,21 @@ export default function UserManagement() {
                         </div>
                       </TableCell>
 
-                      {/* 3. Ativo (Botão Toggle) */}
+                      {/* 3. Indicador de Acesso Conectaí */}
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={u.tem_acesso ? 'default' : 'secondary'}
+                          className={
+                            u.tem_acesso
+                              ? 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/15 border-blue-200 dark:border-blue-900/50'
+                              : 'text-muted-foreground hover:bg-secondary'
+                          }
+                        >
+                          {u.tem_acesso ? 'Com acesso' : 'Sem acesso'}
+                        </Badge>
+                      </TableCell>
+
+                      {/* 4. Ativo (Botão Toggle) */}
                       <TableCell className="text-center">
                         <button
                           type="button"
@@ -553,7 +569,7 @@ export default function UserManagement() {
                         </button>
                       </TableCell>
 
-                      {/* 4. Perfil */}
+                      {/* 5. Perfil */}
                       <TableCell>
                         {u.status === 'ativo' || u.status === 'bloqueado' ? (
                           <Badge
@@ -569,7 +585,7 @@ export default function UserManagement() {
                         )}
                       </TableCell>
 
-                      {/* 5. Ações */}
+                      {/* 6. Ações */}
                       <TableCell className="text-right">
                         {isOperating ? (
                           <div className="flex items-center justify-end">
