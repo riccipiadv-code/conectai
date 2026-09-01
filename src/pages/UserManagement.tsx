@@ -123,6 +123,9 @@ export default function UserManagement() {
 
   const [editModalUser, setEditModalUser] = useState<UserRow | null>(null)
   const [editPerfil, setEditPerfil] = useState<string>('administrador')
+  const [editEmail, setEditEmail] = useState<string>('')
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({})
+  const [editingUser, setEditingUser] = useState(false)
 
   const [deleteModalUser, setDeleteModalUser] = useState<UserRow | null>(null)
 
@@ -397,41 +400,71 @@ export default function UserManagement() {
   const handleOpenEditModal = (user: UserRow) => {
     setEditModalUser(user)
     setEditPerfil(user.perfil || 'administrador')
+    setEditEmail(user.email || '')
+    setEditErrors({})
   }
 
   const handleConfirmEdit = async () => {
     if (!editModalUser) return
+
+    const errors: Record<string, string> = {}
+    const trimmedEmail = editEmail.trim().toLowerCase()
+
+    if (!trimmedEmail) {
+      errors.email = 'E-mail é obrigatório.'
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(trimmedEmail)) {
+        errors.email = 'Formato de e-mail inválido.'
+      }
+    }
+
+    if (!editPerfil) {
+      errors.perfil = 'Selecione um perfil de acesso.'
+    }
+
+    setEditErrors(errors)
+    if (Object.keys(errors).length > 0) {
+      return
+    }
+
     const user = editModalUser
+    setEditingUser(true)
     setActionLoadingId(user.legaldesk_id)
     try {
       const { data, error } = await supabase.functions.invoke('admin-user-access', {
         body: {
           action: 'change_perfil',
           legaldesk_id: user.legaldesk_id,
-          email: user.email,
+          email: trimmedEmail,
           name: user.nome,
           perfil: editPerfil,
         },
       })
 
       if (error || data?.error) {
-        const finalErrorMessage = await extractErrorMessage(error, data, 'Falha ao alterar perfil.')
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Falha ao atualizar dados do usuário.',
+        )
         throw new Error(finalErrorMessage)
       }
 
       toast({
-        title: 'Perfil alterado',
-        description: `O perfil de ${user.nome} foi atualizado para "${getPerfilLabel(editPerfil) || editPerfil}".`,
+        title: 'Usuário atualizado com sucesso!',
+        description: `Os dados de ${user.nome} foram salvos com sucesso.`,
       })
       setEditModalUser(null)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao alterar perfil',
+        title: 'Falha ao atualizar usuário',
         description: err.message,
         variant: 'destructive',
       })
     } finally {
+      setEditingUser(false)
       setActionLoadingId(null)
     }
   }
@@ -997,20 +1030,33 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* DIÁLOGO: Editar Acesso (Completamente reformulado) */}
-      <Dialog open={!!editModalUser} onOpenChange={(open) => !open && setEditModalUser(null)}>
-        <DialogContent>
+      {/* DIÁLOGO: Editar Acesso */}
+      <Dialog
+        open={!!editModalUser}
+        onOpenChange={(open) => {
+          if (!open && !editingUser) {
+            setEditModalUser(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-md sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="h-5 w-5 text-primary" />
-              Editar Acesso
+              Editar Usuário
             </DialogTitle>
             <DialogDescription>
-              Atualize as configurações de perfil e permissões de acesso do colaborador.
+              Atualize as configurações de e-mail e perfil de acesso do usuário.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              handleConfirmEdit()
+            }}
+            className="py-4 space-y-4"
+          >
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Nome</label>
@@ -1030,35 +1076,40 @@ export default function UserManagement() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 items-center">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">E-mail</label>
-                <Input
-                  value={editModalUser?.email || '-'}
-                  readOnly
-                  className="bg-muted/50 cursor-not-allowed h-9"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Status Ativo</label>
-                <div className="h-9 flex items-center">
-                  <Badge
-                    variant={editModalUser?.status === 'ativo' ? 'default' : 'secondary'}
-                    className={
-                      editModalUser?.status === 'ativo'
-                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-900/50'
-                        : 'text-muted-foreground'
-                    }
-                  >
-                    {editModalUser?.status === 'ativo' ? 'Sim' : 'Não'}
-                  </Badge>
-                </div>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                E-mail <span className="text-rose-500">*</span>
+              </label>
+              <Input
+                type="email"
+                placeholder="email@exemplo.com"
+                value={editEmail}
+                onChange={(e) => {
+                  setEditEmail(e.target.value)
+                  if (editErrors.email) {
+                    setEditErrors((prev) => ({ ...prev, email: '' }))
+                  }
+                }}
+                disabled={editingUser}
+                className="h-9"
+              />
+              {editErrors.email && <p className="text-xs text-red-500">{editErrors.email}</p>}
             </div>
 
             <div className="space-y-1.5 pt-2 border-t">
-              <label className="text-sm font-medium text-foreground">Perfil de Acesso:</label>
-              <Select value={editPerfil} onValueChange={setEditPerfil}>
+              <label className="text-sm font-medium text-foreground">
+                Perfil de Acesso <span className="text-rose-500">*</span>
+              </label>
+              <Select
+                value={editPerfil}
+                onValueChange={(val) => {
+                  setEditPerfil(val)
+                  if (editErrors.perfil) {
+                    setEditErrors((prev) => ({ ...prev, perfil: '' }))
+                  }
+                }}
+                disabled={editingUser}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Selecione o perfil..." />
                 </SelectTrigger>
@@ -1070,27 +1121,24 @@ export default function UserManagement() {
                   ))}
                 </SelectContent>
               </Select>
+              {editErrors.perfil && <p className="text-xs text-red-500">{editErrors.perfil}</p>}
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditModalUser(null)}
-              disabled={actionLoadingId === editModalUser?.legaldesk_id}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmEdit}
-              disabled={actionLoadingId === editModalUser?.legaldesk_id}
-            >
-              {actionLoadingId === editModalUser?.legaldesk_id && (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              )}
-              Salvar Alteração
-            </Button>
-          </DialogFooter>
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditModalUser(null)}
+                disabled={editingUser}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={editingUser}>
+                {editingUser && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Salvar Alterações
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

@@ -603,12 +603,185 @@ Deno.serve(async (req: Request) => {
         throw new Error(`Perfil inválido: ${perfil}`)
       }
 
-      const { error: updateError } = await supabase
+      // 1. Reler os dados atuais completos para garantir consistência e ter dados de backup para compensação
+      const { data: currentProfile, error: currProfErr } = await supabase
         .from('profiles')
-        .update({ perfil })
+        .select('id, email, legaldesk_usuario_id, perfil, name')
         .eq('id', existingProfile.id)
+        .single()
 
-      if (updateError) throw updateError
+      if (currProfErr || !currentProfile) {
+        throw new Error('Não foi possível carregar os dados atuais do perfil.')
+      }
+
+      const currentLdId = currentProfile.legaldesk_usuario_id || legaldesk_id
+      const { data: currentLdUser, error: currLdErr } = await supabase
+        .from('legaldesk_usuarios')
+        .select('id, email, nome, sigla, origem, source_id')
+        .eq('id', currentLdId)
+        .single()
+
+      if (currLdErr || !currentLdUser) {
+        throw new Error('Não foi possível carregar os dados atuais do colaborador.')
+      }
+
+      // 2. Verificar se o e-mail foi enviado e se houve alteração
+      let isEmailChanged = false
+      let normNewEmail = ''
+      const previousEmail = currentProfile.email || currentLdUser.email || ''
+
+      if (email !== undefined && email !== null) {
+        const rawEmail = String(email).trim().toLowerCase()
+        if (!rawEmail) {
+          throw new Error('E-mail é obrigatório.')
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(rawEmail)) {
+          throw new Error('Formato de e-mail inválido.')
+        }
+
+        normNewEmail = rawEmail
+        if (normNewEmail !== String(previousEmail).trim().toLowerCase()) {
+          isEmailChanged = true
+        }
+      }
+
+      // 3. Se o e-mail mudou, validar duplicidade em: legaldesk_usuarios, profiles e Supabase Auth
+      if (isEmailChanged) {
+        // 3a. legaldesk_usuarios (excluindo o próprio currentLdId)
+        const { data: ldMatch, error: ldCheckErr } = await supabase
+          .from('legaldesk_usuarios')
+          .select('id')
+          .ilike('email', normNewEmail)
+          .neq('id', currentLdId)
+          .limit(1)
+
+        if (ldCheckErr) throw ldCheckErr
+        if (ldMatch && ldMatch.length > 0) {
+          throw new Error('Este e-mail já está vinculado a outro usuário.')
+        }
+
+        // 3b. profiles (excluindo o próprio currentProfile.id)
+        const { data: profMatch, error: profCheckErr } = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('email', normNewEmail)
+          .neq('id', currentProfile.id)
+          .limit(1)
+
+        if (profCheckErr) throw profCheckErr
+        if (profMatch && profMatch.length > 0) {
+          throw new Error('Este e-mail já está vinculado a outro usuário.')
+        }
+
+        // 3c. Supabase Auth (listUsers, excluindo o próprio currentProfile.id)
+        const {
+          data: { users: authUsersList },
+          error: authListErr,
+        } = await supabase.auth.admin.listUsers({ perPage: 1000 })
+
+        if (authListErr) throw authListErr
+        const otherAuthUserExists = (authUsersList || []).some(
+          (u) => u.id !== currentProfile.id && u.email?.toLowerCase() === normNewEmail,
+        )
+
+        if (otherAuthUserExists) {
+          throw new Error('Este e-mail já está vinculado a outro usuário.')
+        }
+      }
+
+      // 4. Executar atualizações com tratamento de compensação/rollback em caso de falha parcial
+      const previousPerfil = currentProfile.perfil
+      const previousLdEmail = currentLdUser.email
+      const previousProfEmail = currentProfile.email
+
+      if (isEmailChanged) {
+        // Etapa 1: Atualizar Auth via API administrativa
+        const { error: authUpdateErr } = await supabase.auth.admin.updateUserById(
+          currentProfile.id,
+          {
+            email: normNewEmail,
+            email_confirm: true,
+          },
+        )
+
+        if (authUpdateErr) {
+          throw new Error(`Falha ao atualizar e-mail no Auth: ${authUpdateErr.message}`)
+        }
+
+        // Etapa 2: Atualizar profiles (email e perfil)
+        const { error: profUpdateErr } = await supabase
+          .from('profiles')
+          .update({
+            email: normNewEmail,
+            perfil,
+          })
+          .eq('id', currentProfile.id)
+
+        if (profUpdateErr) {
+          // Compensação: reverter Auth para o email anterior
+          console.error('Falha ao atualizar profiles. Revertendo Auth...', profUpdateErr)
+          try {
+            if (previousProfEmail) {
+              await supabase.auth.admin.updateUserById(currentProfile.id, {
+                email: previousProfEmail,
+                email_confirm: true,
+              })
+            }
+          } catch (compErr) {
+            console.error('Falha na compensação do Auth:', compErr)
+          }
+          throw new Error(
+            `Falha ao sincronizar e-mail no perfil do usuário: ${profUpdateErr.message}`,
+          )
+        }
+
+        // Etapa 3: Atualizar legaldesk_usuarios (somente email)
+        const { error: ldUpdateErr } = await supabase
+          .from('legaldesk_usuarios')
+          .update({
+            email: normNewEmail,
+          })
+          .eq('id', currentLdId)
+
+        if (ldUpdateErr) {
+          // Compensação: reverter profiles e Auth
+          console.error(
+            'Falha ao atualizar legaldesk_usuarios. Revertendo profiles e Auth...',
+            ldUpdateErr,
+          )
+          try {
+            await supabase
+              .from('profiles')
+              .update({
+                email: previousProfEmail,
+                perfil: previousPerfil,
+              })
+              .eq('id', currentProfile.id)
+
+            if (previousProfEmail) {
+              await supabase.auth.admin.updateUserById(currentProfile.id, {
+                email: previousProfEmail,
+                email_confirm: true,
+              })
+            }
+          } catch (compErr) {
+            console.error('Falha na compensação de profiles/Auth:', compErr)
+          }
+          throw new Error(
+            `Falha ao sincronizar e-mail no cadastro de colaboradores: ${ldUpdateErr.message}`,
+          )
+        }
+      } else {
+        // Se o e-mail não foi alterado, atualizar apenas o perfil em profiles
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ perfil })
+          .eq('id', currentProfile.id)
+
+        if (updateError) throw updateError
+      }
 
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
