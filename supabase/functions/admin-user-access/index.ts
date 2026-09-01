@@ -51,10 +51,24 @@ Deno.serve(async (req: Request) => {
       .eq('id', user.id)
       .single()
 
-    if (action === 'list_users') {
-      if (!profile || !profile.ativo) {
-        throw new Error('Permissão negada. Usuário sem perfil ativo.')
+    const adminActions = [
+      'list_users',
+      'list_perfis',
+      'list_hidden_users',
+      'create_user',
+      'grant_access',
+      'revoke_access',
+      'change_perfil',
+      'hide_from_management',
+    ]
+
+    if (adminActions.includes(action)) {
+      if (!profile || !profile.ativo || profile.perfil !== 'administrador') {
+        throw new Error('Permissão negada. Apenas administradores podem gerenciar usuários.')
       }
+    }
+
+    if (action === 'list_users') {
       // 1. Consultar todos os legaldesk_usuarios onde exibir_gestao_usuarios = true ordenados por nome
       const { data: ldUsers, error: ldError } = await supabase
         .from('legaldesk_usuarios')
@@ -134,10 +148,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'list_perfis') {
-      if (!profile || !profile.ativo) {
-        throw new Error('Permissão negada. Usuário sem perfil ativo.')
-      }
-
       const { data: perfis, error: perfisError } = await supabase
         .from('perfis_acesso')
         .select('codigo, nome')
@@ -211,10 +221,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'list_hidden_users') {
-      if (!profile || !profile.ativo) {
-        throw new Error('Permissão negada. Usuário sem perfil ativo.')
-      }
-
       const { data: hiddenUsers, error: hiddenError } = await supabase
         .from('legaldesk_usuarios')
         .select('id, nome, sigla, email')
@@ -226,11 +232,6 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ users: hiddenUsers || [] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-    }
-
-    // Para as demais ações administrativas (grant_access, revoke_access, change_perfil, hide_from_management):
-    if (!profile || !profile.ativo) {
-      throw new Error('Permissão negada. Usuário sem perfil ativo.')
     }
 
     if (action === 'create_user') {
