@@ -3,7 +3,13 @@ import { useKanbanData } from '@/hooks/use-kanban-data'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { KanbanFilters } from '@/components/kanban/kanban-filters'
 import { ContactModal } from '@/components/shared/contact-modal'
-import { Contact, updateContact, createContact } from '@/services/contacts'
+import {
+  Contact,
+  updateContact,
+  createContact,
+  notifyResponsavelTransfer,
+  notifyReabertura,
+} from '@/services/contacts'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Index() {
@@ -43,9 +49,52 @@ export default function Index() {
   const handleSaveContact = async (payload: Partial<Contact>, id?: string, prevStage?: string) => {
     try {
       if (id) {
+        const previousContact = contacts.find((c) => c.id === id)
+        const previousResponsavelId = previousContact?.responsavel_id || null
+        const newResponsavelId =
+          payload.responsavel_id !== undefined ? payload.responsavel_id : previousResponsavelId
+        const previousStage = prevStage || previousContact?.current_stage || null
+        const newStage = payload.current_stage !== undefined ? payload.current_stage : previousStage
+
         const updated = await updateContact(id, payload, prevStage)
         setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)))
         toast({ title: 'Sucesso', description: 'Contato atualizado.' })
+
+        // 1. Notificação de Nova atribuição (se responsável mudou)
+        if (newResponsavelId && newResponsavelId !== previousResponsavelId) {
+          notifyResponsavelTransfer(id, previousResponsavelId, newResponsavelId).catch(
+            (notifyError) => {
+              console.error(
+                'Erro ao enviar notificação de transferência de responsável:',
+                notifyError,
+              )
+              toast({
+                title: 'Aviso',
+                description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
+                variant: 'default',
+              })
+            },
+          )
+        }
+
+        // 2. Notificação de Reabertura (se cancelado -> outro estágio permitido)
+        if (
+          previousStage === 'cancelado' &&
+          newStage &&
+          newStage !== 'cancelado' &&
+          newStage !== 'orcamento_aprovado' &&
+          newResponsavelId
+        ) {
+          notifyReabertura(id, previousStage, newStage, newResponsavelId).catch((notifyError) => {
+            console.error('Erro ao enviar notificação de reabertura de atendimento:', notifyError)
+            toast({
+              title: 'Aviso',
+              description:
+                'O atendimento foi reaberto, mas a notificação por e-mail não pôde ser enviada.',
+              variant: 'default',
+            })
+          })
+        }
       } else {
         const created = await createContact(payload)
         setContacts((prev) => [created, ...prev])

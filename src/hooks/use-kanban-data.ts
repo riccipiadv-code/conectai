@@ -6,6 +6,7 @@ import {
   getCancelReasons,
   getResponsaveis,
   updateContactStage,
+  notifyReabertura,
   Contact,
   Servico,
   Depto,
@@ -92,6 +93,25 @@ export function useKanbanData() {
       try {
         await updateContactStage(id, newStage)
         toast({ title: 'Sucesso', description: 'Estágio atualizado.' })
+
+        if (
+          previousStage === 'cancelado' &&
+          newStage !== 'cancelado' &&
+          newStage !== 'orcamento_aprovado' &&
+          contact.responsavel_id
+        ) {
+          notifyReabertura(id, previousStage, newStage, contact.responsavel_id).catch(
+            (notifyError) => {
+              console.error('Erro ao enviar notificação de reabertura de atendimento:', notifyError)
+              toast({
+                title: 'Aviso',
+                description:
+                  'O atendimento foi reaberto, mas a notificação por e-mail não pôde ser enviada.',
+                variant: 'default',
+              })
+            },
+          )
+        }
       } catch (error: any) {
         setContacts((prev) =>
           prev.map((c) => {

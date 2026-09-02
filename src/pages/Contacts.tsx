@@ -13,6 +13,7 @@ import {
   deleteContact,
   getPortesEmpresa,
   notifyResponsavelTransfer,
+  notifyReabertura,
   ContactsFilters,
 } from '@/services/contacts'
 import { Card, CardContent } from '@/components/ui/card'
@@ -481,6 +482,9 @@ export default function Contacts() {
 
         const previousResponsavelId = updatingContact?.responsavel_id || null
         const newResponsavelId = payload.responsavel_id || null
+        const previousStage = prevStage || updatingContact?.current_stage || null
+        const newStage = payload.current_stage !== undefined ? payload.current_stage : previousStage
+        const effectiveResponsavelId = newResponsavelId || previousResponsavelId
 
         await updateContact(id, payload, prevStage, user?.id)
         if (subservicoIds) {
@@ -498,6 +502,26 @@ export default function Contacts() {
               toast({
                 title: 'Aviso',
                 description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
+                variant: 'default',
+              })
+            },
+          )
+        }
+
+        if (
+          previousStage === 'cancelado' &&
+          newStage &&
+          newStage !== 'cancelado' &&
+          newStage !== 'orcamento_aprovado' &&
+          effectiveResponsavelId
+        ) {
+          notifyReabertura(id, previousStage, newStage, effectiveResponsavelId).catch(
+            (notifyError) => {
+              console.error('Erro ao enviar notificação de reabertura de atendimento:', notifyError)
+              toast({
+                title: 'Aviso',
+                description:
+                  'O atendimento foi reaberto, mas a notificação por e-mail não pôde ser enviada.',
                 variant: 'default',
               })
             },

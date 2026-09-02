@@ -41,31 +41,104 @@ Deno.serve(async (req: Request) => {
 
     if (userError || !user) throw new Error('Não autorizado.')
 
-    const { contato_id, previous_responsavel_id, new_responsavel_id } = await req.json()
+    const body = await req.json()
+    const {
+      type, // 'reabertura' | undefined/null/'transfer'
+      contato_id,
+      previous_responsavel_id,
+      new_responsavel_id,
+      responsavel_id,
+      previous_stage,
+      new_stage,
+    } = body
 
-    // 1. Validar se novo responsável foi informado
-    if (!new_responsavel_id) {
-      return new Response(JSON.stringify({ triggered: false, reason: 'no_new_responsavel' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const isReabertura = type === 'reabertura'
+
+    let targetResponsavelId: string | null = null
+
+    if (isReabertura) {
+      // Regra de reabertura:
+      // previous_stage = cancelado E new_stage != cancelado E new_stage != orcamento_aprovado
+      const prevStageNorm = (previous_stage || '').trim().toLowerCase()
+      const newStageNorm = (new_stage || '').trim().toLowerCase()
+
+      if (prevStageNorm !== 'cancelado') {
+        return new Response(
+          JSON.stringify({ triggered: false, reason: 'previous_stage_not_cancelado' }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      if (newStageNorm === 'cancelado' || newStageNorm === 'orcamento_aprovado') {
+        return new Response(
+          JSON.stringify({ triggered: false, reason: 'excluded_stage_transition' }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      targetResponsavelId = responsavel_id ? String(responsavel_id) : null
+
+      // Se responsavel_id não foi passado no body, buscar do contato no banco
+      if (!targetResponsavelId && contato_id) {
+        const { data: cData } = await supabase
+          .from('manychat_contatos')
+          .select('responsavel_id')
+          .eq('id', contato_id)
+          .maybeSingle()
+        if (cData?.responsavel_id) {
+          targetResponsavelId = String(cData.responsavel_id)
+        }
+      }
+
+      if (!targetResponsavelId) {
+        console.error('Reabertura Conectaí: Atendimento sem responsável atribuído.', {
+          contato_id,
+          responsavel_id,
+        })
+        return new Response(
+          JSON.stringify({ triggered: false, reason: 'no_responsavel_for_reabertura' }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+    } else {
+      // 1. Validar se novo responsável foi informado (Nova atribuição)
+      if (!new_responsavel_id) {
+        return new Response(JSON.stringify({ triggered: false, reason: 'no_new_responsavel' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // 2. Validar se houve mudança de responsável (anterior diferente do novo)
+      const prevIdNorm = previous_responsavel_id ? String(previous_responsavel_id) : null
+      const newIdNorm = String(new_responsavel_id)
+      if (prevIdNorm === newIdNorm) {
+        return new Response(
+          JSON.stringify({ triggered: false, reason: 'responsavel_not_changed' }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      targetResponsavelId = newIdNorm
     }
 
-    // 2. Validar se houve mudança de responsável (anterior diferente do novo)
-    const prevIdNorm = previous_responsavel_id ? String(previous_responsavel_id) : null
-    const newIdNorm = String(new_responsavel_id)
-    if (prevIdNorm === newIdNorm) {
-      return new Response(JSON.stringify({ triggered: false, reason: 'responsavel_not_changed' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // 3. Buscar o novo responsável em legaldesk_usuarios
+    // 3. Buscar o responsável em legaldesk_usuarios
     const { data: responsavel, error: respError } = await supabase
       .from('legaldesk_usuarios')
       .select('id, nome, email')
-      .eq('id', new_responsavel_id)
+      .eq('id', targetResponsavelId)
       .maybeSingle()
 
     if (respError) throw respError
@@ -74,8 +147,9 @@ Deno.serve(async (req: Request) => {
     const destEmail = responsavel?.email?.trim()
     if (!responsavel || !destEmail) {
       console.error('Responsável não encontrado ou sem e-mail cadastrado:', {
-        new_responsavel_id,
+        targetResponsavelId,
         responsavel,
+        isReabertura,
       })
       return new Response(JSON.stringify({ triggered: false, reason: 'no_email' }), {
         status: 200,
@@ -127,7 +201,9 @@ Deno.serve(async (req: Request) => {
     const firstName = fullName ? fullName.split(/\s+/)[0] : 'Responsável'
 
     const controleStr = contato.controle != null ? String(contato.controle) : ''
-    const subject = `Nova atribuição Conectaí [${controleStr}]`
+    const subject = isReabertura
+      ? `Reabertura Conectaí [${controleStr}]`
+      : `Nova atribuição Conectaí [${controleStr}]`
 
     // Determinar Serviço: lead_servico ou manychat_servicos.descricao
     let servicoNome = (contato.lead_servico || '').trim()

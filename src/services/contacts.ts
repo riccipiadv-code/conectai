@@ -143,6 +143,25 @@ export async function notifyResponsavelTransfer(
   return data
 }
 
+export async function notifyReabertura(
+  contatoId: string,
+  previousStage: string | null,
+  newStage: string,
+  responsavelId?: string | null,
+) {
+  const { data, error } = await supabase.functions.invoke('notify-responsavel-transfer', {
+    body: {
+      type: 'reabertura',
+      contato_id: contatoId,
+      previous_stage: previousStage,
+      new_stage: newStage,
+      responsavel_id: responsavelId,
+    },
+  })
+  if (error) throw error
+  return data
+}
+
 export async function createContact(payload: Partial<Contact>) {
   const sanitized = sanitizeContactPayload(payload)
   if (!sanitized.manychat_id) {
