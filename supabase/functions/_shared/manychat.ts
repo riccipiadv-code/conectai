@@ -180,14 +180,10 @@ export function mapServicoLegado(val: string): string {
     case '2':
       return 'Proteção de Patentes'
     case '3':
-      return 'Proteção de Desenho Industrial'
+      return 'Desenho Industrial'
     case '4':
       return 'Ações Judiciais'
     case '5':
-      return 'Outros Assuntos'
-    case '6':
-      return 'Assessoria em Ações Judiciais'
-    case '7':
       return 'Outros Assuntos'
     default:
       return val
