@@ -377,7 +377,11 @@ export async function getContacts(
     query = query.in('origem_id', filters.origem_ids.map(Number))
   }
 
-  if (filters.follow_ups && filters.follow_ups.length > 0) {
+  const allFollowUpOptions = ['today', 'next_7_days', 'overdue', 'none']
+  const isAllFollowUpsSelected =
+    filters.follow_ups && allFollowUpOptions.every((opt) => filters.follow_ups?.includes(opt))
+
+  if (filters.follow_ups && filters.follow_ups.length > 0 && !isAllFollowUpsSelected) {
     const todayStart = startOfDay(new Date()).toISOString()
     const todayEnd = endOfDay(new Date()).toISOString()
     const next7Days = endOfDay(addDays(new Date(), 7)).toISOString()
