@@ -1,6 +1,10 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { normalizeManyChatPayload, enrichManyChatRecord } from '../_shared/manychat.ts'
+import {
+  normalizeManyChatPayload,
+  enrichManyChatRecord,
+  resolveManyChatService,
+} from '../_shared/manychat.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,27 +94,15 @@ Deno.serve(async (req: Request) => {
         depto_id: extracted.depto_id,
       }
 
-      if (extracted.lead_servico) {
-        let { data: servico } = await supabase
-          .from('manychat_servicos')
-          .select('id')
-          .ilike('descricao', extracted.lead_servico.trim())
-          .maybeSingle()
+      const resolvedService = await resolveManyChatService(
+        supabase,
+        extracted.nome_servico,
+        extracted.user_servico,
+      )
 
-        if (!servico) {
-          const { data: servicoLike } = await supabase
-            .from('manychat_servicos')
-            .select('id')
-            .ilike('descricao', `%${extracted.lead_servico.trim()}%`)
-            .limit(1)
-            .maybeSingle()
-          servico = servicoLike
-        }
-
-        if (servico) {
-          record.servico_id = servico.id
-        }
-      }
+      record.lead_servico = resolvedService.lead_servico
+      record.servico_id = resolvedService.servico_id
+      record.depto_id = resolvedService.depto_id
 
       const { data: existingContact } = await supabase
         .from('manychat_contatos')

@@ -48,38 +48,25 @@ export function normalizeManyChatPayload(payload: any) {
     cfMap = customFields
   }
 
-  const mapServicoLegado = (val: string) => {
-    switch (String(val).trim()) {
-      case '1':
-        return 'Registro de Marcas'
-      case '2':
-        return 'Proteção de Patentes'
-      case '3':
-        return 'Proteção de Desenho Industrial'
-      case '4':
-        return 'Direitos Autorais ou Programas de Computador'
-      case '5':
-        return 'Consultoria em Propriedade Intelectual'
-      case '6':
-        return 'Assessoria em Ações Judiciais'
-      case '7':
-        return 'Outros Assuntos'
-      default:
-        return val
-    }
-  }
+  const nome_servico =
+    cfMap['nome_servico'] !== undefined && cfMap['nome_servico'] !== null
+      ? String(cfMap['nome_servico']).trim()
+      : null
+  const user_servico =
+    cfMap['user_servico'] !== undefined && cfMap['user_servico'] !== null
+      ? String(cfMap['user_servico']).trim()
+      : null
 
   let lead_nome = cfMap['user_nome'] || sub?.name || sub?.first_name || null
   let lead_email = cfMap['user_email'] || sub?.email || null
   let lead_empresa_pf = cfMap['user_empresa'] || cfMap['user_tipo'] || null
   let lead_resumo = cfMap['user_resumo'] || null
 
-  let depto_id_raw = cfMap['user_servico']
-  let depto_id = depto_id_raw && !isNaN(Number(depto_id_raw)) ? Number(depto_id_raw) : null
+  const depto_id = null
 
-  let lead_servico = cfMap['nome_servico'] || null
-  if (!lead_servico && cfMap['user_servico']) {
-    lead_servico = mapServicoLegado(cfMap['user_servico'])
+  let lead_servico = nome_servico && nome_servico.length > 0 ? nome_servico : null
+  if (!lead_servico && user_servico && user_servico.length > 0) {
+    lead_servico = mapServicoLegado(user_servico)
   }
 
   const chatgpt_resposta = cfMap['chatgpt_resposta_anterior'] || null
@@ -179,8 +166,94 @@ export function normalizeManyChatPayload(payload: any) {
       lead_empresa_pf,
       lead_resumo,
       depto_id,
+      nome_servico: nome_servico && nome_servico.length > 0 ? nome_servico : null,
+      user_servico: user_servico && user_servico.length > 0 ? user_servico : null,
       attributes,
     },
+  }
+}
+
+export function mapServicoLegado(val: string): string {
+  switch (String(val).trim()) {
+    case '1':
+      return 'Registro de Marcas'
+    case '2':
+      return 'Proteção de Patentes'
+    case '3':
+      return 'Proteção de Desenho Industrial'
+    case '4':
+      return 'Ações Judiciais'
+    case '5':
+      return 'Consultoria em Propriedade Intelectual'
+    case '6':
+      return 'Assessoria em Ações Judiciais'
+    case '7':
+      return 'Outros Assuntos'
+    default:
+      return val
+  }
+}
+
+export interface ResolvedService {
+  servico_id: string | null
+  lead_servico: string | null
+  depto_id: number | null
+}
+
+export async function resolveManyChatService(
+  supabase: any,
+  nomeServico?: string | null,
+  userServico?: string | null,
+): Promise<ResolvedService> {
+  const nomeTrim = nomeServico && typeof nomeServico === 'string' ? nomeServico.trim() : ''
+  const userTrim = userServico && typeof userServico === 'string' ? userServico.trim() : ''
+
+  let targetName: string | null = null
+
+  if (nomeTrim) {
+    targetName = nomeTrim
+  } else if (userTrim) {
+    targetName = mapServicoLegado(userTrim)
+  }
+
+  if (!targetName) {
+    return { servico_id: null, lead_servico: null, depto_id: null }
+  }
+
+  // 1. Busca exata por descricao (case-insensitive)
+  let { data: servico } = await supabase
+    .from('manychat_servicos')
+    .select('id, descricao, depto_id')
+    .ilike('descricao', targetName)
+    .maybeSingle()
+
+  // 2. Se não encontrar, busca parcial
+  if (!servico) {
+    const { data: servicoLike } = await supabase
+      .from('manychat_servicos')
+      .select('id, descricao, depto_id')
+      .ilike('descricao', `%${targetName}%`)
+      .limit(1)
+      .maybeSingle()
+    servico = servicoLike
+  }
+
+  if (servico) {
+    return {
+      servico_id: servico.id,
+      lead_servico: servico.descricao,
+      depto_id:
+        servico.depto_id !== undefined && servico.depto_id !== null
+          ? Number(servico.depto_id)
+          : null,
+    }
+  }
+
+  // Se não encontrar cadastro no banco, preserva o nome como lead_servico e deixa depto_id nulo
+  return {
+    servico_id: null,
+    lead_servico: targetName,
+    depto_id: null,
   }
 }
 
