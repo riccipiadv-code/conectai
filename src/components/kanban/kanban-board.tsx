@@ -13,7 +13,7 @@ const UI_STAGES = [
   {
     id: 'nivel_1_novo',
     dropStageId: 'nivel_1_novo',
-    label: 'Nível 1 - Novo',
+    label: 'Nível 1 - 1º Atendimento',
     matches: (stage: string | null | undefined) => !stage || stage === 'nivel_1_novo',
   },
   {

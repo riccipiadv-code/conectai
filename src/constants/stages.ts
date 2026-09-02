@@ -1,5 +1,5 @@
 export const OFFICIAL_STAGES = [
-  { id: 'nivel_1_novo', label: 'Nível 1 - Novo' },
+  { id: 'nivel_1_novo', label: 'Nível 1 - 1º Atendimento' },
   { id: 'nivel_2_especialista', label: 'Nível 2 - Especialista' },
   { id: 'nivel_3_especial', label: 'Nível 3 - Especial' },
   { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },

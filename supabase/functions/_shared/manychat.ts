@@ -184,7 +184,7 @@ export function mapServicoLegado(val: string): string {
     case '4':
       return 'Ações Judiciais'
     case '5':
-      return 'Consultoria em Propriedade Intelectual'
+      return 'Outros Assuntos'
     case '6':
       return 'Assessoria em Ações Judiciais'
     case '7':
