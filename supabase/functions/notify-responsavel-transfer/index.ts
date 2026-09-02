@@ -221,10 +221,14 @@ Deno.serve(async (req: Request) => {
     const liveChatUrl = (contato.manychat_live_chat_url || '').trim()
 
     // Montar corpo (texto simples)
+    const openingLine = isReabertura
+      ? 'Um atendimento sob sua responsabilidade foi reaberto no Conectaí.'
+      : 'Um novo atendimento foi atribuído a você no Conectaí.'
+
     const bodyLines: string[] = [
       `Olá, ${firstName}.`,
       '',
-      'Um novo atendimento foi atribuído a você no Conectaí.',
+      openingLine,
       '',
       `Controle: ${controleStr}`,
       `Contato: ${contatoNome}`,
