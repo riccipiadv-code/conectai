@@ -63,6 +63,7 @@ import {
   CheckCircle,
   Paperclip,
   Mail,
+  RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
@@ -133,9 +134,10 @@ export default function Contacts() {
 
   const [exporting, setExporting] = useState<null | 'visible' | 'all'>(null)
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    Promise.all([
+  const fetchAuxiliaryData = useCallback(() => {
+    return Promise.all([
       getResponsaveis(),
       getServicos(),
       getDeptos(),
@@ -155,6 +157,10 @@ export default function Contacts() {
       })
     })
   }, [])
+
+  useEffect(() => {
+    fetchAuxiliaryData()
+  }, [fetchAuxiliaryData])
 
   useEffect(() => {
     if (initialFiltersApplied.current) return
@@ -206,7 +212,7 @@ export default function Contacts() {
 
   const fetchData = useCallback(() => {
     setLoading(true)
-    getContacts(filters, sort)
+    return getContacts(filters, sort)
       .then((res) => {
         setData(res)
         setLoading(false)
@@ -216,6 +222,32 @@ export default function Contacts() {
         setLoading(false)
       })
   }, [filters, sort])
+
+  const handleRefresh = async () => {
+    if (refreshing || loading) return
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        fetchData(),
+        fetchAuxiliaryData().catch((err) => {
+          console.error('Erro ao atualizar dados auxiliares:', err)
+        }),
+      ])
+      toast({
+        title: 'Atualizado',
+        description: 'Os dados foram atualizados com sucesso.',
+      })
+    } catch (err: any) {
+      console.error(err)
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível atualizar os dados.',
+        variant: 'destructive',
+      })
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     fetchData()
@@ -559,6 +591,15 @@ export default function Contacts() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            aria-label="Atualizar dados"
+          >
+            <RefreshCw className={cn('mr-2 h-4 w-4', (refreshing || loading) && 'animate-spin')} />
+            {refreshing ? 'Atualizando...' : 'Atualizar'}
+          </Button>
           <Button variant="outline" onClick={handleExportClick} disabled={exporting !== null}>
             {exporting !== null ? (
               <>
