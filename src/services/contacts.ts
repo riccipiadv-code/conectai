@@ -327,12 +327,10 @@ export async function getContacts(
     const numericSearch = filters.search.replace(/[^0-9]/g, '')
     if (numericSearch) {
       query = query.or(
-        `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}",numero_cliente.eq.${numericSearch}`,
+        `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",numero_cliente.eq.${numericSearch}`,
       )
     } else {
-      query = query.or(
-        `lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}",telefone.ilike."${s}",whatsapp_phone.ilike."${s}"`,
-      )
+      query = query.or(`lead_nome.ilike."${s}",nome.ilike."${s}",lead_email.ilike."${s}"`)
     }
   }
 

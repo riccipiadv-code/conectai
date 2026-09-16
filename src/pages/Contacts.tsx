@@ -271,8 +271,6 @@ export default function Contacts() {
       c.lead_nome?.toLowerCase().includes(term) ||
       c.nome?.toLowerCase().includes(term) ||
       c.first_name?.toLowerCase().includes(term) ||
-      c.whatsapp_phone?.toLowerCase().includes(term) ||
-      c.telefone?.toLowerCase().includes(term) ||
       c.lead_empresa_pf?.toLowerCase().includes(term) ||
       (c.controle != null && String(c.controle).toLowerCase().includes(term)) ||
       (c.numero_cliente != null && String(c.numero_cliente).includes(term))
@@ -625,7 +623,7 @@ export default function Contacts() {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Buscar</Label>
               <Input
-                placeholder="Nome, telefone..."
+                placeholder="Nome..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="h-9"

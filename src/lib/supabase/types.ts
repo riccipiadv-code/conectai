@@ -1811,6 +1811,393 @@ export type Database = {
           },
         ]
       }
+      task_executores: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          id: string
+          nome: string
+          nome_normalizado: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          nome: string
+          nome_normalizado?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          nome?: string
+          nome_normalizado?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_nomes_controle: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          id: string
+          nome: string
+          nome_normalizado: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          nome: string
+          nome_normalizado?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          nome?: string
+          nome_normalizado?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_providencias: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          id: string
+          ordem: number
+          prazo_conclusao: string
+          providencia: string
+          status_id: string
+          tarefa_id: string
+          tipo_prazo_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          ordem?: number
+          prazo_conclusao: string
+          providencia: string
+          status_id?: string
+          tarefa_id: string
+          tipo_prazo_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          ordem?: number
+          prazo_conclusao?: string
+          providencia?: string
+          status_id?: string
+          tarefa_id?: string
+          tipo_prazo_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_providencias_status_id_fkey'
+            columns: ['status_id']
+            isOneToOne: false
+            referencedRelation: 'task_status_providencia'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_providencias_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'task_tarefas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_providencias_tipo_prazo_id_fkey'
+            columns: ['tipo_prazo_id']
+            isOneToOne: false
+            referencedRelation: 'task_tipos_prazo'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      task_responsaveis_controle: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          id: string
+          nome: string
+          nome_normalizado: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          nome: string
+          nome_normalizado?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          id?: string
+          nome?: string
+          nome_normalizado?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_status: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          created_by: string | null
+          finaliza: boolean
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          created_by?: string | null
+          finaliza?: boolean
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          created_by?: string | null
+          finaliza?: boolean
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_status_providencia: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          created_by: string | null
+          finaliza: boolean
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          created_by?: string | null
+          finaliza?: boolean
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          created_by?: string | null
+          finaliza?: boolean
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      task_tarefas: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_autorizacao: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          executor_id: string | null
+          id: string
+          identificacao_caso: string
+          nome_controle_id: string
+          pasta_cliente: string | null
+          pasta_ricci: string | null
+          prazo_conclusao: string | null
+          responsavel_controle_id: string
+          status_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_autorizacao?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          executor_id?: string | null
+          id?: string
+          identificacao_caso: string
+          nome_controle_id: string
+          pasta_cliente?: string | null
+          pasta_ricci?: string | null
+          prazo_conclusao?: string | null
+          responsavel_controle_id: string
+          status_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_autorizacao?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
+          executor_id?: string | null
+          id?: string
+          identificacao_caso?: string
+          nome_controle_id?: string
+          pasta_cliente?: string | null
+          pasta_ricci?: string | null
+          prazo_conclusao?: string | null
+          responsavel_controle_id?: string
+          status_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_tarefas_executor_id_fkey'
+            columns: ['executor_id']
+            isOneToOne: false
+            referencedRelation: 'task_executores'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_tarefas_nome_controle_id_fkey'
+            columns: ['nome_controle_id']
+            isOneToOne: false
+            referencedRelation: 'task_nomes_controle'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_tarefas_responsavel_controle_id_fkey'
+            columns: ['responsavel_controle_id']
+            isOneToOne: false
+            referencedRelation: 'task_responsaveis_controle'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_tarefas_status_id_fkey'
+            columns: ['status_id']
+            isOneToOne: false
+            referencedRelation: 'task_status'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      task_tipos_prazo: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          created_by: string | null
+          id: string
+          nome: string
+          ordem: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome: string
+          ordem?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome?: string
+          ordem?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1825,6 +2212,9 @@ export type Database = {
         Args: { p_contato_id: string }
         Returns: undefined
       }
+      task_normalizar_nome: { Args: { p_valor: string }; Returns: string }
+      task_status_padrao_id: { Args: never; Returns: string }
+      task_status_providencia_padrao_id: { Args: never; Returns: string }
     }
     Enums: {
       perfil_type: 'socio_gestor' | 'gestor_area' | 'advogado' | 'estagiario' | 'administrativo'
