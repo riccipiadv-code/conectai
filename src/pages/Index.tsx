@@ -19,6 +19,7 @@ export default function Index() {
     deptos,
     cancelReasons,
     responsaveis,
+    origens,
     loading,
     moveContact,
     setContacts,
@@ -170,6 +171,7 @@ export default function Index() {
         servicos={servicos}
         deptos={deptos}
         cancelReasons={cancelReasons}
+        origens={origens}
         responsaveis={responsaveis}
       />
     </div>

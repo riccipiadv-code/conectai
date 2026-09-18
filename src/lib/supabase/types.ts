@@ -1811,44 +1811,67 @@ export type Database = {
           },
         ]
       }
-      task_executores: {
+      task_importacao_natura_pendencias: {
         Row: {
-          ativo: boolean
+          andamentos_origem: string | null
+          controle_importado_at: string | null
           created_at: string
-          created_by: string | null
-          deleted_at: string | null
-          deleted_by: string | null
-          id: string
-          nome: string
-          nome_normalizado: string | null
+          identificacao_caso: string
+          linha_origem: number
+          pasta_cliente: string | null
+          pasta_ricci: string | null
+          prazo_conclusao: string | null
+          providencia_importada_at: string | null
+          proxima_providencia: string
+          status_origem: string | null
+          status_providencia_codigo: string
+          tarefa_id: string | null
+          tipo_prazo_codigo: string | null
           updated_at: string
-          updated_by: string | null
         }
         Insert: {
-          ativo?: boolean
+          andamentos_origem?: string | null
+          controle_importado_at?: string | null
           created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          deleted_by?: string | null
-          id?: string
-          nome: string
-          nome_normalizado?: string | null
+          identificacao_caso: string
+          linha_origem: number
+          pasta_cliente?: string | null
+          pasta_ricci?: string | null
+          prazo_conclusao?: string | null
+          providencia_importada_at?: string | null
+          proxima_providencia: string
+          status_origem?: string | null
+          status_providencia_codigo: string
+          tarefa_id?: string | null
+          tipo_prazo_codigo?: string | null
           updated_at?: string
-          updated_by?: string | null
         }
         Update: {
-          ativo?: boolean
+          andamentos_origem?: string | null
+          controle_importado_at?: string | null
           created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          deleted_by?: string | null
-          id?: string
-          nome?: string
-          nome_normalizado?: string | null
+          identificacao_caso?: string
+          linha_origem?: number
+          pasta_cliente?: string | null
+          pasta_ricci?: string | null
+          prazo_conclusao?: string | null
+          providencia_importada_at?: string | null
+          proxima_providencia?: string
+          status_origem?: string | null
+          status_providencia_codigo?: string
+          tarefa_id?: string | null
+          tipo_prazo_codigo?: string | null
           updated_at?: string
-          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'task_importacao_natura_pendencias_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'task_tarefas'
+            referencedColumns: ['id']
+          },
+        ]
       }
       task_nomes_controle: {
         Row: {
@@ -1893,6 +1916,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
+          data_conclusao: string | null
           deleted_at: string | null
           deleted_by: string | null
           id: string
@@ -1908,6 +1932,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
+          data_conclusao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           id?: string
@@ -1923,6 +1948,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
+          data_conclusao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
           id?: string
@@ -1958,45 +1984,6 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
-      }
-      task_responsaveis_controle: {
-        Row: {
-          ativo: boolean
-          created_at: string
-          created_by: string | null
-          deleted_at: string | null
-          deleted_by: string | null
-          id: string
-          nome: string
-          nome_normalizado: string | null
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          ativo?: boolean
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          deleted_by?: string | null
-          id?: string
-          nome: string
-          nome_normalizado?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          ativo?: boolean
-          created_at?: string
-          created_by?: string | null
-          deleted_at?: string | null
-          deleted_by?: string | null
-          id?: string
-          nome?: string
-          nome_normalizado?: string | null
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
       }
       task_status: {
         Row: {
@@ -2078,65 +2065,68 @@ export type Database = {
       }
       task_tarefas: {
         Row: {
+          arquivado_at: string | null
           created_at: string
           created_by: string | null
           data_autorizacao: string | null
           deleted_at: string | null
           deleted_by: string | null
-          executor_id: string | null
+          executor_usuario_id: string
           id: string
           identificacao_caso: string
           nome_controle_id: string
           pasta_cliente: string | null
           pasta_ricci: string | null
           prazo_conclusao: string | null
-          responsavel_controle_id: string
+          responsavel_usuario_id: string
           status_id: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          arquivado_at?: string | null
           created_at?: string
           created_by?: string | null
           data_autorizacao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
-          executor_id?: string | null
+          executor_usuario_id: string
           id?: string
           identificacao_caso: string
           nome_controle_id: string
           pasta_cliente?: string | null
           pasta_ricci?: string | null
           prazo_conclusao?: string | null
-          responsavel_controle_id: string
+          responsavel_usuario_id: string
           status_id?: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          arquivado_at?: string | null
           created_at?: string
           created_by?: string | null
           data_autorizacao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
-          executor_id?: string | null
+          executor_usuario_id?: string
           id?: string
           identificacao_caso?: string
           nome_controle_id?: string
           pasta_cliente?: string | null
           pasta_ricci?: string | null
           prazo_conclusao?: string | null
-          responsavel_controle_id?: string
+          responsavel_usuario_id?: string
           status_id?: string
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: 'task_tarefas_executor_id_fkey'
-            columns: ['executor_id']
+            foreignKeyName: 'task_tarefas_executor_task_usuario_fkey'
+            columns: ['executor_usuario_id']
             isOneToOne: false
-            referencedRelation: 'task_executores'
+            referencedRelation: 'task_usuarios'
             referencedColumns: ['id']
           },
           {
@@ -2147,10 +2137,10 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
-            foreignKeyName: 'task_tarefas_responsavel_controle_id_fkey'
-            columns: ['responsavel_controle_id']
+            foreignKeyName: 'task_tarefas_responsavel_task_usuario_fkey'
+            columns: ['responsavel_usuario_id']
             isOneToOne: false
-            referencedRelation: 'task_responsaveis_controle'
+            referencedRelation: 'task_usuarios'
             referencedColumns: ['id']
           },
           {
@@ -2198,6 +2188,33 @@ export type Database = {
         }
         Relationships: []
       }
+      task_usuarios: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          email: string
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          email: string
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          email?: string
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -2211,6 +2228,13 @@ export type Database = {
       soft_delete_manychat_contato: {
         Args: { p_contato_id: string }
         Returns: undefined
+      }
+      task_listar_usuarios_ativos: {
+        Args: never
+        Returns: {
+          id: string
+          nome: string
+        }[]
       }
       task_normalizar_nome: { Args: { p_valor: string }; Returns: string }
       task_status_padrao_id: { Args: never; Returns: string }
