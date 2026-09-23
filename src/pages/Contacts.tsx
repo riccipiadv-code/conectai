@@ -102,7 +102,6 @@ export default function Contacts() {
     responsavel_ids: undefined,
     servico_ids: undefined,
     depto_ids: undefined,
-    slas: undefined,
     follow_ups: undefined,
     origem_ids: undefined,
   })

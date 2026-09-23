@@ -32,7 +32,7 @@ export async function getDashboardData(filters: DashboardFilters) {
     let query = supabase
       .from('manychat_contatos')
       .select(`
-        id, created_at, origem, origem_id, current_stage, valor, data_follow_up, sla_status, 
+        id, created_at, origem, origem_id, current_stage, valor, data_follow_up, 
         orcamento, servico_id, depto_id, responsavel_id, cancel_reason_id, lead_nome, nome, first_name,
         telefone, lead_email, lead_empresa_pf, porte_empresa, controle, lead_resumo, numero_cliente,
         manychat_origens(nome),

@@ -26,7 +26,6 @@ export interface DashboardContact {
   current_stage: string | null
   valor: number | null
   data_follow_up: string | null
-  sla_status: string | null
   orcamento: string | null
   servico_id: string | null
   depto_id: number | null

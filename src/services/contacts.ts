@@ -7,7 +7,6 @@ export interface ContactsFilters {
   responsavel_ids?: string[]
   servico_ids?: string[]
   depto_ids?: (string | number)[]
-  slas?: string[]
   follow_ups?: string[]
   origem_ids?: (string | number)[]
   search?: string
@@ -339,7 +338,6 @@ export async function getContacts(
     (filters.responsavel_ids && filters.responsavel_ids.length === 0) ||
     (filters.servico_ids && filters.servico_ids.length === 0) ||
     (filters.depto_ids && filters.depto_ids.length === 0) ||
-    (filters.slas && filters.slas.length === 0) ||
     (filters.follow_ups && filters.follow_ups.length === 0) ||
     (filters.origem_ids && filters.origem_ids.length === 0)
   ) {
@@ -365,10 +363,6 @@ export async function getContacts(
 
   if (filters.depto_ids) {
     query = query.in('depto_id', filters.depto_ids.map(Number))
-  }
-
-  if (filters.slas) {
-    query = query.in('sla_status', filters.slas)
   }
 
   if (filters.origem_ids) {

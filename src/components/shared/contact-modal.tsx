@@ -169,6 +169,7 @@ export function ContactModal({
       if ((payload.depto_id as any) === '') payload.depto_id = null
       if ((payload.depto_id as any) === 'none') payload.depto_id = null
       if (!payload.created_at) delete payload.created_at
+      delete payload.sla_status
       await onSave(
         payload,
         mode === 'create' ? undefined : contact?.id,
