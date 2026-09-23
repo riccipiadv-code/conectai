@@ -1,7 +1,7 @@
 export const OFFICIAL_STAGES = [
-  { id: 'nivel_1_novo', label: 'Nível 1 — Análise: Ana Edith' },
-  { id: 'nivel_2_especialista', label: 'Nível 2 — Análise: Especialista' },
-  { id: 'nivel_3_especial', label: 'Nível 3 — Análise: Sócio' },
+  { id: 'nivel_1_novo', label: 'Nível 1 - Análise: Ana Edith' },
+  { id: 'nivel_2_especialista', label: 'Nível 2 - Análise: Especialista' },
+  { id: 'nivel_3_especial', label: 'Nível 3 - Análise: Sócio' },
   { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
   { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },

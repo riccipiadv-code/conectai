@@ -13,19 +13,19 @@ const UI_STAGES = [
   {
     id: 'nivel_1_novo',
     dropStageId: 'nivel_1_novo',
-    label: 'Nível 1 — Análise: Ana Edith',
+    label: 'Nível 1 - Análise: Ana Edith',
     matches: (stage: string | null | undefined) => !stage || stage === 'nivel_1_novo',
   },
   {
     id: 'nivel_2_especialista',
     dropStageId: 'nivel_2_especialista',
-    label: 'Nível 2 — Análise: Especialista',
+    label: 'Nível 2 - Análise: Especialista',
     matches: (stage: string | null | undefined) => stage === 'nivel_2_especialista',
   },
   {
     id: 'nivel_3_especial',
     dropStageId: 'nivel_3_especial',
-    label: 'Nível 3 — Análise: Sócio',
+    label: 'Nível 3 - Análise: Sócio',
     matches: (stage: string | null | undefined) => stage === 'nivel_3_especial',
   },
   {
