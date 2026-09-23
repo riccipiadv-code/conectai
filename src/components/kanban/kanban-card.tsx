@@ -127,7 +127,10 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
         {!responsavel && !followUpDate && (
           <div className="flex items-center justify-between text-[11px] text-slate-400">
             <div className="truncate">{contact.whatsapp_phone || contact.telefone || '-'}</div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div
+              className="flex items-center gap-1 shrink-0"
+              title={`Tempo no Status: ${timeInStage}`}
+            >
               <Clock className="w-3 h-3" /> {timeInStage}
             </div>
           </div>

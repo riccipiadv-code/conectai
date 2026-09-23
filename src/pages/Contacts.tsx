@@ -554,14 +554,14 @@ export default function Contacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase text-slate-500">Estágio</Label>
+              <Label className="text-xs font-semibold uppercase text-slate-500">Status</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
                   >
-                    Estágio
+                    Status
                     {(filters.stages?.length ?? 0) < OFFICIAL_STAGES.length && (
                       <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
                     )}
@@ -570,7 +570,7 @@ export default function Contacts() {
                 <PopoverContent className="w-80 p-0" align="start">
                   <div className="p-3 border-b border-slate-100 dark:border-zinc-800">
                     <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
-                      Estágios
+                      Status
                     </h4>
                   </div>
                   <div className="flex gap-2 p-2 bg-slate-50 dark:bg-zinc-900/50 border-b border-slate-100 dark:border-zinc-800">
@@ -1063,7 +1063,7 @@ export default function Contacts() {
                   Serviço / Empresa
                 </TableHead>
                 <TableHead className="w-[320px] max-w-[320px] font-semibold">Consulta</TableHead>
-                <TableHead className="font-semibold">Estágio</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="min-w-[140px] font-semibold">Responsável</TableHead>
                 <TableHead
                   className="w-[110px] cursor-pointer font-semibold select-none hover:text-primary transition-colors"

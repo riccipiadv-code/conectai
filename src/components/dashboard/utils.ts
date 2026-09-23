@@ -9,9 +9,9 @@ export const DASHBOARD_ALLOWED_STAGES = [
 ]
 
 export const DASHBOARD_STAGE_LABELS: Record<string, string> = {
-  nivel_1_novo: 'Nível 1 - 1º Atendimento',
-  nivel_2_especialista: 'Nível 2 - Especialista',
-  nivel_3_especial: 'Nível 3 - Especial',
+  nivel_1_novo: 'Nível 1 — Análise: Ana Edith',
+  nivel_2_especialista: 'Nível 2 — Análise: Especialista',
+  nivel_3_especial: 'Nível 3 — Análise: Sócio',
   reuniao_consulta_agendada: 'Reunião/Consulta Agendada',
   enviado_orcamento_ag_retorno: 'Enviado Orçamento / Aguardando Retorno',
   orcamento_aprovado: 'Orçamento Aprovado',
@@ -65,7 +65,7 @@ export interface AggregatedRow {
 }
 
 export const getDashboardStageLabel = (stageId: string | null | undefined): string => {
-  if (!stageId) return 'Sem Estágio'
+  if (!stageId) return 'Sem Status'
   return DASHBOARD_STAGE_LABELS[stageId] || stageId
 }
 

@@ -97,7 +97,7 @@ export function useKanbanData() {
 
       try {
         await updateContactStage(id, newStage)
-        toast({ title: 'Sucesso', description: 'Estágio atualizado.' })
+        toast({ title: 'Sucesso', description: 'Status atualizado.' })
 
         if (
           previousStage === 'cancelado' &&
