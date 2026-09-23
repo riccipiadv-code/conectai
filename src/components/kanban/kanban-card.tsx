@@ -29,20 +29,6 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
 
   const deptoName = deptos.find((d) => d.id === contact.depto_id)?.nome
 
-  const slaColors: Record<string, string> = {
-    green: 'border-l-emerald-500',
-    yellow: 'border-l-amber-500',
-    red: 'border-l-rose-500',
-    paused: 'border-l-slate-400',
-    done: 'border-l-blue-500',
-  }
-
-  const getSlaVariant = (sla: string | null) => {
-    if (sla === 'red') return 'destructive'
-    if (sla === 'yellow') return 'default'
-    return 'secondary'
-  }
-
   const timeInStage = contact.last_stage_change_at
     ? formatDistanceToNow(new Date(contact.last_stage_change_at), {
         addSuffix: false,
@@ -63,8 +49,7 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
       {...listeners}
       {...attributes}
       className={cn(
-        'bg-white dark:bg-zinc-950 p-3.5 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-800 border-l-4 hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2.5 relative',
-        slaColors[contact.sla_status || 'green'] || slaColors.green,
+        'bg-white dark:bg-zinc-950 p-3.5 rounded-lg shadow-sm border border-slate-200 dark:border-zinc-800 hover:shadow-md transition-all cursor-grab active:cursor-grabbing flex flex-col gap-2.5 relative',
         isDragging && 'opacity-80 z-50 shadow-xl',
       )}
     >
@@ -120,12 +105,6 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
             {deptoName}
           </Badge>
         )}
-        <Badge
-          variant={getSlaVariant(contact.sla_status)}
-          className="text-[10px] px-1.5 py-0 font-semibold tracking-wide"
-        >
-          SLA: {contact.sla_status?.toUpperCase() || 'OK'}
-        </Badge>
       </div>
 
       {contact.lead_resumo && (

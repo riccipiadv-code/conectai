@@ -29,7 +29,6 @@ export default function Index() {
   const [search, setSearch] = useState('')
   const [deptoId, setDeptoId] = useState('all')
   const [servicoId, setServicoId] = useState('all')
-  const [slaStatus, setSlaStatus] = useState('all')
 
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('view')
@@ -121,10 +120,9 @@ export default function Index() {
         return false
       if (deptoId !== 'all' && String(c.depto_id) !== deptoId) return false
       if (servicoId !== 'all' && c.servico_id !== servicoId) return false
-      if (slaStatus !== 'all' && c.sla_status !== slaStatus) return false
       return true
     })
-  }, [contacts, search, deptoId, servicoId, slaStatus])
+  }, [contacts, search, deptoId, servicoId])
 
   return (
     <div className="p-6 w-full max-w-[100vw] overflow-hidden flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50 dark:bg-zinc-950/50">
@@ -139,8 +137,6 @@ export default function Index() {
         onDeptoChange={setDeptoId}
         servicoId={servicoId}
         onServicoChange={setServicoId}
-        slaStatus={slaStatus}
-        onSlaChange={setSlaStatus}
         deptos={deptos}
         servicos={servicos}
         totalContacts={filteredContacts.length}

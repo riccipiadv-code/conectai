@@ -29,8 +29,6 @@ export function KanbanColumn({
     id: stage.id,
   })
 
-  const expiredCount = contacts.filter((c) => c.sla_status === 'red').length
-
   return (
     <div
       ref={setNodeRef}
@@ -41,11 +39,6 @@ export function KanbanColumn({
           {stage.label}
         </h3>
         <div className="flex items-center gap-1.5 text-xs">
-          {expiredCount > 0 && (
-            <span className="bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400 px-2 py-0.5 rounded-full font-semibold border border-rose-200 dark:border-rose-500/30">
-              {expiredCount} exp
-            </span>
-          )}
           <span className="bg-slate-200 text-slate-600 dark:bg-zinc-800 dark:text-slate-400 px-2 py-0.5 rounded-full font-semibold">
             {contacts.length}
           </span>

@@ -1,4 +1,4 @@
-import { Search, Filter } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -16,8 +16,6 @@ interface KanbanFiltersProps {
   onDeptoChange: (v: string) => void
   servicoId: string
   onServicoChange: (v: string) => void
-  slaStatus: string
-  onSlaChange: (v: string) => void
   deptos: Depto[]
   servicos: Servico[]
   totalContacts: number
@@ -30,8 +28,6 @@ export function KanbanFilters({
   onDeptoChange,
   servicoId,
   onServicoChange,
-  slaStatus,
-  onSlaChange,
   deptos,
   servicos,
   totalContacts,
@@ -75,20 +71,6 @@ export function KanbanFilters({
                 {s.descricao}
               </SelectItem>
             ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={slaStatus} onValueChange={onSlaChange}>
-          <SelectTrigger className="h-10 w-full sm:w-[150px] bg-white dark:bg-zinc-950 border-slate-200/60 dark:border-zinc-800 shadow-sm">
-            <SelectValue placeholder="Status SLA" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos SLAs</SelectItem>
-            <SelectItem value="green">No prazo</SelectItem>
-            <SelectItem value="yellow">Atenção</SelectItem>
-            <SelectItem value="red">Atrasado</SelectItem>
-            <SelectItem value="paused">Pausado</SelectItem>
-            <SelectItem value="done">Finalizado</SelectItem>
           </SelectContent>
         </Select>
       </div>
