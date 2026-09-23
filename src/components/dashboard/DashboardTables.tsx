@@ -53,7 +53,7 @@ export function DashboardTables({ data }: { data: DashboardContact[] }) {
               <TableHead className="pl-6">{colName}</TableHead>
               <TableHead className="text-right">Total</TableHead>
               <TableHead className="text-right">Aprovados</TableHead>
-              <TableHead className="text-right">Cancelados</TableHead>
+              <TableHead className="text-right">Encerrados</TableHead>
               <TableHead className="text-right pr-6">Valor</TableHead>
             </TableRow>
           </TableHeader>

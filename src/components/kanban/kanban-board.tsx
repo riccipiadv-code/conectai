@@ -49,7 +49,7 @@ const UI_STAGES = [
   {
     id: 'cancelado',
     dropStageId: 'cancelado',
-    label: 'Cancelado',
+    label: 'Encerrado',
     matches: (stage: string | null | undefined) => stage === 'cancelado',
   },
 ]

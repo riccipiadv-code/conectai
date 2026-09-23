@@ -5,7 +5,7 @@ export const OFFICIAL_STAGES = [
   { id: 'reuniao_consulta_agendada', label: 'Reunião/Consulta Agendada' },
   { id: 'enviado_orcamento_ag_retorno', label: 'Enviado Orçamento / Aguardando Retorno' },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
-  { id: 'cancelado', label: 'Cancelado' },
+  { id: 'cancelado', label: 'Encerrado' },
 ]
 
 export const DEFAULT_STAGES = [

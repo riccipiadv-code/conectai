@@ -31,13 +31,13 @@ export function DashboardKPIs({ data }: { data: DashboardContact[] }) {
         valueClass="text-green-600 dark:text-green-500"
       />
       <KPICard
-        title="Cancelados"
+        title="Encerrados"
         value={cancelled}
         icon={XCircle}
         valueClass="text-red-600 dark:text-red-500"
       />
       <KPICard title="Taxa Aprovação" value={`${approvalRate.toFixed(1)}%`} icon={Percent} />
-      <KPICard title="Taxa Cancelamento" value={`${declineRate.toFixed(1)}%`} icon={TrendingDown} />
+      <KPICard title="Taxa Encerramento" value={`${declineRate.toFixed(1)}%`} icon={TrendingDown} />
       <KPICard title="Valor Total (Todos)" value={formatCurrency(totalValue)} icon={DollarSign} />
       <KPICard
         title="Valor Faturado"

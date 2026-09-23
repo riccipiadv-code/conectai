@@ -15,7 +15,7 @@ export const DASHBOARD_STAGE_LABELS: Record<string, string> = {
   reuniao_consulta_agendada: 'Reunião/Consulta Agendada',
   enviado_orcamento_ag_retorno: 'Enviado Orçamento / Aguardando Retorno',
   orcamento_aprovado: 'Orçamento Aprovado',
-  cancelado: 'Cancelado',
+  cancelado: 'Encerrado',
 }
 
 export interface DashboardContact {

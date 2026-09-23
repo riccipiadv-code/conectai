@@ -41,7 +41,7 @@ export function exportDashboardExcel(
       ['Métrica', 'Valor'],
       ['Total de Solicitações', total],
       ['Aprovados', approved],
-      ['Cancelados', cancelled],
+      ['Encerrados', cancelled],
       ['Taxa de Aprovação', percent(approvalRate)],
       ['Valor Total', currency(totalValue)],
     ],
@@ -60,7 +60,7 @@ export function exportDashboardExcel(
     name: 'Por mês',
     colWidths: [12, 14, 12, 14, 14],
     data: [
-      ['Mês', 'Solicitações', 'Aprovados', 'Cancelados', '% Aprovação'],
+      ['Mês', 'Solicitações', 'Aprovados', 'Encerrados', '% Aprovação'],
       ...Array.from(monthMap.entries()).map(([m, v]): CellValue[] => [
         m,
         v.requested,
@@ -84,7 +84,7 @@ export function exportDashboardExcel(
     name: 'Por origem',
     colWidths: [25, 14, 12, 14, 14],
     data: [
-      ['Origem', 'Solicitações', 'Aprovados', 'Cancelados', '% Aprovação'],
+      ['Origem', 'Solicitações', 'Aprovados', 'Encerrados', '% Aprovação'],
       ...Array.from(originMap.entries()).map(([o, v]): CellValue[] => [
         o,
         v.requested,
@@ -141,7 +141,7 @@ export function exportDashboardExcel(
       cancelMap.set(r, (cancelMap.get(r) || 0) + 1)
     })
   const cancelSheet: ExcelSheet = {
-    name: 'Motivos de cancelamento',
+    name: 'Motivos de encerramento',
     colWidths: [40, 14],
     data: [
       ['Motivo', 'Quantidade'],
@@ -153,7 +153,7 @@ export function exportDashboardExcel(
     name: 'Base Filtrada',
     colWidths: [20, 30, 20, 35, 16, 30],
     data: [
-      ['Data Criação', 'Nome', 'Origem', 'Status', 'Valor', 'Motivo Cancelamento'],
+      ['Data Criação', 'Nome', 'Origem', 'Status', 'Valor', 'Motivo Encerramento'],
       ...data.map((c): CellValue[] => [
         dateCell(c.created_at),
         c.lead_nome || c.nome || '',

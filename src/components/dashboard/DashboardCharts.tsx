@@ -122,7 +122,7 @@ export function DashboardCharts({ data }: { data: DashboardContact[] }) {
           <ChartContainer
             config={{
               approved: { label: 'Aprovados', color: '#16a34a' },
-              cancelled: { label: 'Cancelados', color: '#dc2626' },
+              cancelled: { label: 'Encerrados', color: '#dc2626' },
             }}
             className="h-[300px] w-full"
           >

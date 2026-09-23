@@ -501,7 +501,7 @@ export function ContactModal({
           {isCancelado && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/50">
               <div className="grid gap-2">
-                <Label className="text-rose-600 dark:text-rose-400">Motivo do Cancelamento</Label>
+                <Label className="text-rose-600 dark:text-rose-400">Motivo do Encerramento</Label>
                 <Select
                   disabled={isView}
                   value={formData.cancel_reason_id || 'none'}
@@ -524,14 +524,14 @@ export function ContactModal({
               </div>
               <div className="grid gap-2">
                 <Label className="text-rose-600 dark:text-rose-400">
-                  Observação do Cancelamento
+                  Observação do Encerramento
                 </Label>
                 <Textarea
                   className="min-h-[80px] border-rose-200 dark:border-rose-900"
                   value={formData.cancel_obs || ''}
                   onChange={(e) => handleChange('cancel_obs', e.target.value)}
                   disabled={isView}
-                  placeholder="Detalhes e justificativas do cancelamento..."
+                  placeholder="Detalhes e justificativas do encerramento..."
                 />
               </div>
             </div>
