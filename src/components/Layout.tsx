@@ -68,10 +68,10 @@ export default function Layout() {
     if (!loading) {
       if (profile && profile.ativo === false) {
         signOut().then(() => {
-          navigate('/login?reason=disabled')
+          navigate('/login?reason=disabled', { replace: true })
         })
       } else if (!user && location.pathname !== '/login') {
-        navigate('/login')
+        navigate('/login', { replace: true })
       } else if (profile && profile.ativo && !isAdmin) {
         const restricted = [
           '/dashboard',
@@ -80,7 +80,7 @@ export default function Layout() {
           '/configuracoes/email',
         ]
         if (restricted.some((p) => location.pathname.startsWith(p))) {
-          navigate('/')
+          navigate('/', { replace: true })
         }
       }
     }
@@ -94,8 +94,8 @@ export default function Layout() {
     )
   }
 
-  if (!user && location.pathname === '/login') {
-    return <Outlet />
+  if (profile && profile.ativo === false) {
+    return null
   }
 
   if (!user) return null

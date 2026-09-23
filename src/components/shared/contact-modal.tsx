@@ -183,6 +183,7 @@ export function ContactModal({
 
   const isView = mode === 'view'
   const isCancelado = formData.current_stage === 'cancelado'
+  const isOperacional = profile?.perfil === 'operacional'
 
   const title =
     mode === 'create'
@@ -256,7 +257,7 @@ export function ContactModal({
             <div className="grid gap-2">
               <Label>Responsável</Label>
               <Select
-                disabled={isView}
+                disabled={isView || isOperacional}
                 value={formData.responsavel_id || formData.responsible_user_id || 'none'}
                 onValueChange={(val) => handleChange('responsavel_id', val === 'none' ? null : val)}
               >

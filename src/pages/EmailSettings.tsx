@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
+import { getSafeErrorMessage } from '@/lib/safe-error'
 import {
   getEmailSettings,
   getEmailReadingSettings,
@@ -77,9 +78,13 @@ export default function EmailSettings() {
         setReadingSecretConfigured(false)
       }
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Erro ao carregar configurações de leitura',
-        description: error.message,
+        description: getSafeErrorMessage(
+          error,
+          'Não foi possível carregar as configurações de leitura.',
+        ),
         variant: 'destructive',
       })
     }
@@ -106,9 +111,13 @@ export default function EmailSettings() {
         })
       }
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Erro ao carregar configurações',
-        description: error.message,
+        description: getSafeErrorMessage(
+          error,
+          'Não foi possível carregar as configurações de e-mail.',
+        ),
         variant: 'destructive',
       })
     } finally {
@@ -130,9 +139,13 @@ export default function EmailSettings() {
       setSecret('')
       loadSettings()
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Erro ao salvar',
-        description: error.message,
+        description: getSafeErrorMessage(
+          error,
+          'Não foi possível salvar as configurações de e-mail.',
+        ),
         variant: 'destructive',
       })
     } finally {
@@ -165,9 +178,13 @@ export default function EmailSettings() {
       setImapPassword('')
       await loadReadingSettings()
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Erro ao salvar',
-        description: error.message || 'Não foi possível salvar as configurações do E-mail Leitura.',
+        description: getSafeErrorMessage(
+          error,
+          'Não foi possível salvar as configurações do E-mail Leitura.',
+        ),
         variant: 'destructive',
       })
     } finally {
@@ -194,9 +211,10 @@ export default function EmailSettings() {
       })
       setTestEmail('')
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Falha no envio',
-        description: error.message || 'Ocorreu um erro ao enviar o e-mail de teste.',
+        description: getSafeErrorMessage(error, 'Ocorreu um erro ao enviar o e-mail de teste.'),
         variant: 'destructive',
       })
     } finally {
@@ -221,9 +239,10 @@ export default function EmailSettings() {
         })
       }
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Falha na conexão',
-        description: 'Não foi possível conectar ao E-mail Leitura.',
+        description: getSafeErrorMessage(error, 'Não foi possível conectar ao E-mail Leitura.'),
         variant: 'destructive',
       })
     } finally {
@@ -252,9 +271,10 @@ export default function EmailSettings() {
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     } catch (error: any) {
+      console.error(error)
       toast({
         title: 'Erro ao baixar',
-        description: error.message || 'Não foi possível gerar o arquivo .eml.',
+        description: getSafeErrorMessage(error, 'Não foi possível gerar o arquivo .eml.'),
         variant: 'destructive',
       })
     }
@@ -308,10 +328,11 @@ export default function EmailSettings() {
         })
       }
     } catch (error: any) {
+      console.error(error)
       setSearchResult(null)
       toast({
         title: 'Erro na busca',
-        description: error.message || 'Não foi possível buscar e-mails.',
+        description: getSafeErrorMessage(error, 'Não foi possível buscar e-mails.'),
         variant: 'destructive',
       })
     } finally {

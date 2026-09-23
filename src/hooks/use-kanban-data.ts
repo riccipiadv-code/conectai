@@ -64,9 +64,41 @@ export function useKanbanData() {
   const moveContact = useCallback(
     async (id: string, newStage: string) => {
       const currentContacts = contactsRef.current
-      const contact = currentContacts.find((c) => c.id === id)
+      const contact = currentContacts.find((c: any) => c.id === id)
 
       if (!contact || contact.current_stage === newStage) return
+
+      // Obter perfil autenticado atual para validação
+      const { data: authData } = await supabase.auth.getUser()
+      if (authData?.user?.id) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('perfil, legaldesk_usuario_id, ativo')
+          .eq('id', authData.user.id)
+          .maybeSingle()
+
+        if (profile && profile.ativo === false) {
+          toast({
+            title: 'Acesso Negado',
+            description: 'Seu usuário está desativado.',
+            variant: 'destructive',
+          })
+          return
+        }
+
+        if (profile?.perfil === 'operacional') {
+          const userLdId = profile.legaldesk_usuario_id
+          const currentResp = contact.responsavel_id
+          if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
+            toast({
+              title: 'Aviso',
+              description: 'Operacional só pode alterar o status de seus próprios atendimentos.',
+              variant: 'destructive',
+            })
+            return
+          }
+        }
+      }
 
       const previousStage = contact.current_stage
       const previousCancelReasonId = contact.cancel_reason_id

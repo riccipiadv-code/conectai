@@ -53,12 +53,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error('Erro ao buscar perfil do usuário:', error)
       }
 
+      // Se usuário não tiver perfil ou estiver inativo: não conceder acesso
       if (!profileData) {
+        // Perfil inexistente no sistema: encerrar sessão
         setProfile(null)
-        setSession(currentSession)
-        setUser(currentSession.user)
+        setUser(null)
+        setSession(null)
+        await supabase.auth.signOut()
       } else if (profileData.ativo === false) {
-        // Usuário inativo: destruir sessão Supabase e manter user null
+        // Usuário inativo: destruir sessão Supabase e manter user e session null
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: false,
@@ -78,8 +81,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('Exceção ao carregar perfil:', err)
-      setSession(currentSession)
-      setUser(currentSession.user)
+      setSession(null)
+      setUser(null)
       setProfile(null)
     } finally {
       setLoading(false)

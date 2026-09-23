@@ -72,6 +72,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
+import { getSafeErrorMessage } from '@/lib/safe-error'
 
 export default function Contacts() {
   const { user, profile } = useAuth()
@@ -324,7 +325,7 @@ export default function Contacts() {
       console.error(error)
       toast({
         title: 'Erro',
-        description: error.message || 'Erro ao exportar atendimentos.',
+        description: getSafeErrorMessage(error, 'Erro ao exportar atendimentos.'),
         variant: 'destructive',
       })
     } finally {
@@ -346,7 +347,7 @@ export default function Contacts() {
       console.error(error)
       toast({
         title: 'Erro',
-        description: error.message || 'Erro ao exportar atendimentos.',
+        description: getSafeErrorMessage(error, 'Erro ao exportar atendimentos.'),
         variant: 'destructive',
       })
     } finally {
@@ -362,12 +363,32 @@ export default function Contacts() {
   }
 
   const handleEdit = (c: any) => {
+    if (profile?.perfil === 'operacional') {
+      const userLdId = profile?.legaldesk_usuario_id
+      const currentResp = c.responsavel_id
+      if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
+        toast({
+          title: 'Aviso',
+          description: 'Operacional só pode editar seus próprios atendimentos.',
+          variant: 'destructive',
+        })
+        return
+      }
+    }
     setUpdatingContact(c)
     setModalMode('edit')
     setIsModalOpen(true)
   }
 
   const handleDelete = (c: any) => {
+    if (profile?.perfil !== 'administrador') {
+      toast({
+        title: 'Acesso Negado',
+        description: 'Apenas administradores podem excluir atendimentos.',
+        variant: 'destructive',
+      })
+      return
+    }
     setDeletingContact(c)
     setIsDeleteDialogOpen(true)
   }
@@ -375,7 +396,7 @@ export default function Contacts() {
   const confirmDelete = async () => {
     if (profile?.perfil !== 'administrador') {
       toast({
-        title: 'Aviso',
+        title: 'Acesso Negado',
         description: 'Apenas administradores podem excluir atendimentos.',
         variant: 'destructive',
       })
@@ -393,7 +414,7 @@ export default function Contacts() {
         console.error(error)
         toast({
           title: 'Erro',
-          description: error?.message || 'Erro ao excluir contato.',
+          description: getSafeErrorMessage(error, 'Erro ao excluir contato.'),
           variant: 'destructive',
         })
       }
@@ -431,6 +452,8 @@ export default function Contacts() {
             })
             return
           }
+          // Operacional não pode transferir responsabilidade
+          delete payload.responsavel_id
         }
 
         const previousResponsavelId = updatingContact?.responsavel_id || null
@@ -489,7 +512,7 @@ export default function Contacts() {
       console.error(error)
       toast({
         title: 'Erro',
-        description: error.message || 'Ocorreu um erro.',
+        description: getSafeErrorMessage(error, 'Ocorreu um erro ao processar o atendimento.'),
         variant: 'destructive',
       })
     }

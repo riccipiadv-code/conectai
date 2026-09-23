@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { getSafeErrorMessage } from '@/lib/safe-error'
 import { Lock } from 'lucide-react'
 
 export default function ResetPassword() {
@@ -46,9 +47,10 @@ export default function ResetPassword() {
     const { error } = await updatePassword(password)
 
     if (error) {
+      console.error('[ResetPassword] Erro:', error)
       toast({
-        title: 'Erro ao redefinir senha',
-        description: error.message || 'Não foi possível redefinir a senha.',
+        title: 'Erro ao atualizar',
+        description: getSafeErrorMessage(error, 'Não foi possível redefinir a senha.'),
         variant: 'destructive',
       })
     } else {

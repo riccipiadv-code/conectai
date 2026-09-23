@@ -11,8 +11,11 @@ import {
   notifyReabertura,
 } from '@/services/contacts'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
+import { getSafeErrorMessage } from '@/lib/safe-error'
 
 export default function Index() {
+  const { user, profile } = useAuth()
   const {
     contacts,
     servicos,
@@ -41,6 +44,18 @@ export default function Index() {
   }
 
   const handleEdit = (contact: Contact) => {
+    if (profile?.perfil === 'operacional') {
+      const userLdId = profile?.legaldesk_usuario_id
+      const currentResp = contact.responsavel_id
+      if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
+        toast({
+          title: 'Aviso',
+          description: 'Operacional só pode editar seus próprios atendimentos.',
+          variant: 'destructive',
+        })
+        return
+      }
+    }
     setSelectedContact(contact)
     setModalMode('edit')
     setModalOpen(true)
@@ -48,7 +63,27 @@ export default function Index() {
 
   const handleSaveContact = async (payload: Partial<Contact>, id?: string, prevStage?: string) => {
     try {
+      if (profile?.perfil !== 'administrador') {
+        delete payload.valor
+      }
+
       if (id) {
+        if (profile?.perfil === 'operacional') {
+          const previousContact = contacts.find((c) => c.id === id)
+          const currentResp = previousContact?.responsavel_id
+          const userLdId = profile?.legaldesk_usuario_id
+          if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
+            toast({
+              title: 'Aviso',
+              description: 'Operacional só pode editar seus próprios atendimentos.',
+              variant: 'destructive',
+            })
+            return
+          }
+          // Operacional não pode transferir responsabilidade
+          delete payload.responsavel_id
+        }
+
         const previousContact = contacts.find((c) => c.id === id)
         const previousResponsavelId = previousContact?.responsavel_id || null
         const newResponsavelId =
@@ -56,7 +91,7 @@ export default function Index() {
         const previousStage = prevStage || previousContact?.current_stage || null
         const newStage = payload.current_stage !== undefined ? payload.current_stage : previousStage
 
-        const updated = await updateContact(id, payload, prevStage)
+        const updated = await updateContact(id, payload, prevStage, user?.id)
         setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)))
         toast({ title: 'Sucesso', description: 'Contato atualizado.' })
 
@@ -104,7 +139,7 @@ export default function Index() {
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: error.message || 'Falha ao salvar.',
+        description: getSafeErrorMessage(error, 'Falha ao salvar atendimento.'),
         variant: 'destructive',
       })
     }

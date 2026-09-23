@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { useToast } from '@/hooks/use-toast'
+import { getSafeErrorMessage } from '@/lib/safe-error'
 import { Lock, Mail, AlertTriangle } from 'lucide-react'
 
 export default function Login() {
@@ -52,9 +53,10 @@ export default function Login() {
     const { error, disabled } = await signIn(email, password)
 
     if (error) {
+      console.error('[Login] Erro:', error)
       toast({
         title: 'Erro ao entrar',
-        description: error.message || 'Verifique suas credenciais e tente novamente.',
+        description: getSafeErrorMessage(error, 'Verifique suas credenciais e tente novamente.'),
         variant: 'destructive',
       })
     } else if (disabled) {
@@ -82,9 +84,10 @@ export default function Login() {
     const { error } = await resetPassword(email)
 
     if (error) {
+      console.error('[Login] Erro na recuperação:', error)
       toast({
         title: 'Erro na recuperação',
-        description: error.message || 'Ocorreu um erro ao enviar o link.',
+        description: getSafeErrorMessage(error, 'Ocorreu um erro ao enviar o link.'),
         variant: 'destructive',
       })
     } else {

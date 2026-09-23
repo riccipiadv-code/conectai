@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useToast } from '@/hooks/use-toast'
+import { getSafeErrorMessage } from '@/lib/safe-error'
 import {
   Table,
   TableBody,
@@ -147,9 +148,10 @@ export default function UserManagement() {
       setPerfisOptions(data?.perfis || [])
     } catch (err: any) {
       setPerfisOptions([])
+      console.error(err)
       toast({
         title: 'Erro ao carregar perfis',
-        description: err.message || 'Falha ao carregar perfis de acesso.',
+        description: getSafeErrorMessage(err, 'Falha ao carregar perfis de acesso.'),
         variant: 'destructive',
       })
     }
@@ -175,9 +177,10 @@ export default function UserManagement() {
         setUsers(data.users)
       }
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Erro ao carregar usuários',
-        description: err.message || 'Falha na comunicação com o banco.',
+        description: getSafeErrorMessage(err, 'Falha na comunicação com o servidor.'),
         variant: 'destructive',
       })
     } finally {
@@ -252,9 +255,10 @@ export default function UserManagement() {
       setCreateModalOpen(false)
       await loadData()
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Erro ao criar usuário',
-        description: err.message || 'Falha ao criar usuário.',
+        description: getSafeErrorMessage(err, 'Falha ao criar usuário.'),
         variant: 'destructive',
       })
     } finally {
@@ -306,9 +310,10 @@ export default function UserManagement() {
       setGrantAccessModalUser(null)
       await loadData()
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Erro ao conceder acesso',
-        description: err.message || 'Falha ao conceder acesso.',
+        description: getSafeErrorMessage(err, 'Falha ao conceder acesso.'),
         variant: 'destructive',
       })
     } finally {
@@ -345,9 +350,10 @@ export default function UserManagement() {
       setActivateModalUser(null)
       await loadData()
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Falha ao reativar acesso',
-        description: err.message,
+        description: getSafeErrorMessage(err, 'Falha ao reativar acesso.'),
         variant: 'destructive',
       })
     } finally {
@@ -386,9 +392,10 @@ export default function UserManagement() {
       setRevokeModalUser(null)
       await loadData()
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Falha ao desativar acesso',
-        description: err.message,
+        description: getSafeErrorMessage(err, 'Falha ao desativar acesso.'),
         variant: 'destructive',
       })
     } finally {
@@ -458,9 +465,10 @@ export default function UserManagement() {
       setEditModalUser(null)
       await loadData()
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Falha ao atualizar usuário',
-        description: err.message,
+        description: getSafeErrorMessage(err, 'Falha ao atualizar usuário.'),
         variant: 'destructive',
       })
     } finally {
@@ -501,9 +509,10 @@ export default function UserManagement() {
       setDeleteModalUser(null)
       await loadData()
     } catch (err: any) {
+      console.error(err)
       toast({
         title: 'Falha ao remover usuário',
-        description: err.message,
+        description: getSafeErrorMessage(err, 'Falha ao remover usuário.'),
         variant: 'destructive',
       })
     } finally {
