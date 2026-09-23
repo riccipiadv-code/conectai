@@ -1079,17 +1079,21 @@ export default function Contacts() {
           <Table className="w-full">
             <TableHeader>
               <TableRow className="bg-slate-50/50 dark:bg-zinc-900/50 hover:bg-slate-50/50 dark:hover:bg-zinc-900/50">
-                <TableHead className="w-[220px] max-w-[220px] pl-6 font-semibold">
+                <TableHead className="w-[200px] max-w-[220px] pl-4 pr-3 py-3 font-semibold">
                   Contato
                 </TableHead>
-                <TableHead className="w-[180px] max-w-[180px] font-semibold">
+                <TableHead className="w-[170px] max-w-[190px] px-3 py-3 font-semibold">
                   Serviço / Empresa
                 </TableHead>
-                <TableHead className="w-[320px] max-w-[320px] font-semibold">Consulta</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="min-w-[140px] font-semibold">Responsável</TableHead>
+                <TableHead className="w-[260px] max-w-[300px] px-3 py-3 font-semibold">
+                  Consulta
+                </TableHead>
+                <TableHead className="w-[130px] px-3 py-3 font-semibold">Status</TableHead>
+                <TableHead className="w-[140px] max-w-[160px] px-3 py-3 font-semibold">
+                  Responsável
+                </TableHead>
                 <TableHead
-                  className="w-[110px] cursor-pointer font-semibold select-none hover:text-primary transition-colors"
+                  className="w-[110px] px-3 py-3 cursor-pointer font-semibold select-none hover:text-primary transition-colors"
                   onClick={() => toggleSort('data_follow_up')}
                 >
                   <div className="flex items-center">
@@ -1097,7 +1101,7 @@ export default function Contacts() {
                     {renderSortIcon('data_follow_up')}
                   </div>
                 </TableHead>
-                <TableHead className="min-w-[160px] pr-6 font-semibold text-center">
+                <TableHead className="w-[140px] pl-3 pr-4 py-3 font-semibold text-center">
                   Ações
                 </TableHead>
               </TableRow>
@@ -1122,8 +1126,6 @@ export default function Contacts() {
                     c.nome ||
                     `${c.first_name || ''} ${c.last_name || ''}`.trim() ||
                     'Desconhecido'
-                  const phone = formatPhone(c.whatsapp_phone || c.telefone)
-
                   const foundStage = OFFICIAL_STAGES.find((s) => s.id === c.current_stage)
                   let stageLabel = foundStage ? foundStage.label : c.current_stage || '-'
                   if (!foundStage && stageLabel !== '-') {
@@ -1139,43 +1141,38 @@ export default function Contacts() {
                       key={c.id}
                       className="group hover:bg-slate-50/80 dark:hover:bg-zinc-800/50 transition-colors"
                     >
-                      <TableCell className="w-[220px] max-w-[220px] pl-6 align-top py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-slate-300">
+                      <TableCell className="w-[200px] max-w-[220px] pl-4 pr-3 align-middle py-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-slate-300">
                             {c.controle || '-'}
                           </div>
-                          <div className="flex flex-col whitespace-normal break-words overflow-hidden">
-                            <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">
-                              {contactName}
-                            </span>
-                            <span className="text-xs text-muted-foreground mt-0.5 font-medium truncate">
-                              {phone}
-                            </span>
-                          </div>
+                          <span className="font-semibold text-sm text-slate-900 dark:text-slate-100 whitespace-normal break-words leading-tight">
+                            {contactName}
+                          </span>
                         </div>
                       </TableCell>
 
-                      <TableCell className="w-[180px] max-w-[180px] align-top py-3">
-                        <div className="flex flex-col whitespace-normal break-words">
+                      <TableCell className="w-[170px] max-w-[190px] px-3 align-middle py-3">
+                        <div className="flex flex-col whitespace-normal break-words leading-snug">
                           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                             {c.lead_servico || c.manychat_servicos?.descricao || '-'}
                           </span>
-                          <span className="text-xs text-muted-foreground mt-1">
+                          <span className="text-xs text-muted-foreground mt-0.5">
                             {c.lead_empresa_pf || '-'}
                           </span>
                         </div>
                       </TableCell>
 
-                      <TableCell className="w-[320px] max-w-[320px] align-top py-3">
+                      <TableCell className="w-[260px] max-w-[300px] px-3 align-middle py-3">
                         <div
-                          className="text-sm whitespace-normal break-words line-clamp-3 text-slate-600 dark:text-slate-400 leading-relaxed"
+                          className="text-sm whitespace-normal break-words line-clamp-2 text-slate-600 dark:text-slate-400 leading-snug"
                           title={c.lead_resumo || c.observacoes || ''}
                         >
                           {c.lead_resumo || c.observacoes || '-'}
                         </div>
                       </TableCell>
 
-                      <TableCell className="align-top py-3">
+                      <TableCell className="w-[130px] px-3 align-middle py-3">
                         <Badge
                           variant="outline"
                           className="whitespace-nowrap bg-background font-medium"
@@ -1184,13 +1181,13 @@ export default function Contacts() {
                         </Badge>
                       </TableCell>
 
-                      <TableCell className="min-w-[140px] align-top py-3">
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      <TableCell className="w-[140px] max-w-[160px] px-3 align-middle py-3">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
                           {responsavelNome}
                         </span>
                       </TableCell>
 
-                      <TableCell className="w-[110px] align-top py-3">
+                      <TableCell className="w-[110px] px-3 align-middle py-3">
                         <span
                           className={cn(
                             'text-sm whitespace-nowrap font-medium',
@@ -1203,7 +1200,7 @@ export default function Contacts() {
                         </span>
                       </TableCell>
 
-                      <TableCell className="min-w-[160px] pr-6 align-top py-3 text-center">
+                      <TableCell className="w-[140px] pl-3 pr-4 align-middle py-3 text-center">
                         <div className="flex justify-center items-center gap-1">
                           {(() => {
                             const isWhatsApp =
