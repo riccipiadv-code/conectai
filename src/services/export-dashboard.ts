@@ -151,16 +151,15 @@ export function exportDashboardExcel(
 
   const baseSheet: ExcelSheet = {
     name: 'Base Filtrada',
-    colWidths: [20, 30, 20, 35, 16, 10, 30],
+    colWidths: [20, 30, 20, 35, 16, 30],
     data: [
-      ['Data Criação', 'Nome', 'Origem', 'Estágio', 'Valor', 'SLA', 'Motivo Cancelamento'],
+      ['Data Criação', 'Nome', 'Origem', 'Estágio', 'Valor', 'Motivo Cancelamento'],
       ...data.map((c): CellValue[] => [
         dateCell(c.created_at),
         c.lead_nome || c.nome || '',
         c.manychat_origens?.nome || c.origem || '',
         getDashboardStageLabel(c.current_stage),
         currency(Number(c.valor) || 0),
-        c.sla_status || '',
         c.manychat_cancel_reasons?.motivo || '',
       ]),
     ],

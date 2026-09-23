@@ -251,24 +251,6 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase text-slate-500">SLA Status</Label>
-        <Select
-          value={filters.sla_status || 'all'}
-          onValueChange={(v) => update('sla_status', v === 'all' ? '' : v)}
-        >
-          <SelectTrigger className="h-9">
-            <SelectValue placeholder="Todos os SLAs" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os SLAs</SelectItem>
-            <SelectItem value="green">No Prazo</SelectItem>
-            <SelectItem value="yellow">Alerta</SelectItem>
-            <SelectItem value="red">Atrasado</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-1.5">
         <Label className="text-xs font-semibold uppercase text-slate-500">Follow-up</Label>
         <Select
           value={filters.follow_up || 'all'}

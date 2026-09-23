@@ -1,13 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  FileText,
-  CheckCircle,
-  XCircle,
-  Percent,
-  DollarSign,
-  AlertTriangle,
-  TrendingDown,
-} from 'lucide-react'
+import { FileText, CheckCircle, XCircle, Percent, DollarSign, TrendingDown } from 'lucide-react'
 import { isFechado, isCancelado, formatCurrency, type DashboardContact } from './utils'
 
 export function DashboardKPIs({ data }: { data: DashboardContact[] }) {
@@ -28,17 +20,8 @@ export function DashboardKPIs({ data }: { data: DashboardContact[] }) {
   const valueContacts = billedContacts.length
   const ticketAvg = valueContacts > 0 ? billedValue / valueContacts : 0
 
-  const pendingFollowUp = data.filter(
-    (c) =>
-      c.data_follow_up &&
-      new Date(c.data_follow_up) <= new Date() &&
-      c.current_stage !== 'orcamento_aprovado' &&
-      c.current_stage !== 'cancelado',
-  ).length
-  const overdueSla = data.filter((c) => c.sla_status === 'red' || c.sla_status === 'yellow').length
-
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4 mb-8">
       <KPICard title="Total Contatos" value={total} icon={FileText} />
       <KPICard title="Com Orçamento" value={withBudget} icon={FileText} />
       <KPICard
@@ -63,12 +46,6 @@ export function DashboardKPIs({ data }: { data: DashboardContact[] }) {
         valueClass="text-green-600 dark:text-green-500"
       />
       <KPICard title="Ticket Médio" value={formatCurrency(ticketAvg)} icon={DollarSign} />
-      <KPICard
-        title="SLA Atraso/Alerta"
-        value={overdueSla}
-        icon={AlertTriangle}
-        valueClass={overdueSla > 0 ? 'text-red-600 dark:text-red-500' : ''}
-      />
     </div>
   )
 }

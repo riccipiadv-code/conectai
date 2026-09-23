@@ -19,7 +19,6 @@ export interface DashboardFilters {
   responsavel_id: string
   current_stage: string
   orcamento: string
-  sla_status: string
   follow_up: string
   search: string
 }
@@ -69,7 +68,6 @@ export async function getDashboardData(filters: DashboardFilters) {
     if (filters.responsavel_id) query = query.eq('responsavel_id', filters.responsavel_id)
     if (filters.current_stage) query = query.eq('current_stage', filters.current_stage)
     if (filters.orcamento) query = query.eq('orcamento', filters.orcamento)
-    if (filters.sla_status) query = query.eq('sla_status', filters.sla_status)
 
     if (filters.follow_up) {
       const todayStart = startOfDay(new Date()).toISOString()

@@ -41,7 +41,6 @@ const HEADERS = [
   'Resumo da Solicitação',
   'Observações',
   'Estágio',
-  'SLA Status',
   'Data Follow Up',
   'Serviços Contratados',
 ]
@@ -118,7 +117,6 @@ async function generateExcel(data: any[]): Promise<{ success: boolean; message?:
     const responsavel = safeStr(c.legaldesk_usuarios?.nome || c.profiles?.name)
     const origem = safeStr(c.manychat_origens?.nome || c.origem)
     const stageLabel = getStageLabel(c.current_stage)
-    const slaLabel = safeStr(c.sla_status)
     const subservicos = subservicoMap.get(c.id)?.join(', ') || ''
     const valor = Number(c.valor) || 0
 
@@ -146,7 +144,6 @@ async function generateExcel(data: any[]): Promise<{ success: boolean; message?:
       sc(safeStr(c.lead_resumo), WRAP),
       sc(safeStr(c.observacoes), WRAP),
       sc(stageLabel, TXT),
-      sc(slaLabel, CTR),
       dataFollowUp,
       sc(subservicos, WRAP),
     ])

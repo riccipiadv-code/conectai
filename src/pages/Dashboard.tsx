@@ -30,7 +30,6 @@ export default function Dashboard() {
     responsavel_id: '',
     current_stage: '',
     orcamento: '',
-    sla_status: '',
     follow_up: '',
     search: '',
   })
