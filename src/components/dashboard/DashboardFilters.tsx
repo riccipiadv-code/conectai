@@ -231,16 +231,16 @@ export function DashboardFilters({ filters, setFilters, meta }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold uppercase text-slate-500">Estágio</Label>
+        <Label className="text-xs font-semibold uppercase text-slate-500">Status</Label>
         <Select
           value={filters.current_stage || 'all'}
           onValueChange={(v) => update('current_stage', v === 'all' ? '' : v)}
         >
           <SelectTrigger className="h-9">
-            <SelectValue placeholder="Todos os Estágios" />
+            <SelectValue placeholder="Todos os Status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos os Estágios</SelectItem>
+            <SelectItem value="all">Todos os Status</SelectItem>
             {OFFICIAL_STAGES.map((stage) => (
               <SelectItem key={stage.id} value={stage.id}>
                 {getDashboardStageLabel(stage.id)}

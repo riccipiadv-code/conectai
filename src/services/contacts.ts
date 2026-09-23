@@ -507,7 +507,7 @@ export async function updateContact(
   if (rawPayload.current_stage) {
     const isValid = OFFICIAL_STAGES.some((s) => s.id === rawPayload.current_stage)
     if (!isValid) {
-      throw new Error(`Estágio inválido: ${rawPayload.current_stage}`)
+      throw new Error(`Status inválido: ${rawPayload.current_stage}`)
     }
   }
 
@@ -536,7 +536,7 @@ export async function updateContactStage(
 ) {
   const isValid = OFFICIAL_STAGES.some((s) => s.id === stage)
   if (!isValid) {
-    throw new Error(`Estágio inválido: ${stage}`)
+    throw new Error(`Status inválido: ${stage}`)
   }
 
   const { data: currentContact } = await supabase

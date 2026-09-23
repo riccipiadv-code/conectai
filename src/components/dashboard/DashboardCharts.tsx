@@ -176,7 +176,7 @@ export function DashboardCharts({ data }: { data: DashboardContact[] }) {
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Volume por Estágio (Kanban)</CardTitle>
+          <CardTitle className="text-lg">Volume por Status (Kanban)</CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer

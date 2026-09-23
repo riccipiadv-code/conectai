@@ -480,10 +480,10 @@ export function ContactModal({
 
           <div className="h-px w-full bg-slate-200 dark:bg-zinc-800 my-2" />
 
-          {/* Row 5: Estágio, Data Follow Up */}
+          {/* Row 5: Status, Data Follow Up */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label>Estágio</Label>
+              <Label>Status</Label>
               <Select
                 disabled={isView}
                 value={formData.current_stage || 'nivel_1_novo'}

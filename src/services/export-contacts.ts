@@ -40,7 +40,7 @@ const HEADERS = [
   'Valor Faturado',
   'Resumo da Solicitação',
   'Observações',
-  'Estágio',
+  'Status',
   'Data Follow Up',
   'Serviços Contratados',
 ]

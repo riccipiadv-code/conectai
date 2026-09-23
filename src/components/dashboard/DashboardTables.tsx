@@ -93,13 +93,13 @@ export function DashboardTables({ data }: { data: DashboardContact[] }) {
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm xl:col-span-2">
         <CardHeader>
-          <CardTitle className="text-lg">Resumo por Estágio</CardTitle>
+          <CardTitle className="text-lg">Resumo por Status</CardTitle>
         </CardHeader>
         <CardContent className="max-h-[350px] overflow-auto px-0">
           <Table>
             <TableHeader>
               <TableRow className="bg-slate-50/50 dark:bg-zinc-900/50">
-                <TableHead className="pl-6">Estágio</TableHead>
+                <TableHead className="pl-6">Status</TableHead>
                 <TableHead className="text-right">Quantidade</TableHead>
                 <TableHead className="text-right pr-6">%</TableHead>
               </TableRow>

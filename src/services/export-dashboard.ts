@@ -153,7 +153,7 @@ export function exportDashboardExcel(
     name: 'Base Filtrada',
     colWidths: [20, 30, 20, 35, 16, 30],
     data: [
-      ['Data Criação', 'Nome', 'Origem', 'Estágio', 'Valor', 'Motivo Cancelamento'],
+      ['Data Criação', 'Nome', 'Origem', 'Status', 'Valor', 'Motivo Cancelamento'],
       ...data.map((c): CellValue[] => [
         dateCell(c.created_at),
         c.lead_nome || c.nome || '',
