@@ -9,6 +9,7 @@ import {
   getOrigens,
   updateContactStage,
   notifyReabertura,
+  canEditContact,
   Contact,
   Servico,
   Depto,
@@ -18,7 +19,14 @@ import {
 } from '@/services/contacts'
 import { useToast } from '@/hooks/use-toast'
 
-export function useKanbanData() {
+export function useKanbanData(
+  currentUserProfile?: {
+    perfil?: string | null
+    legaldesk_usuario_id?: string | null
+    ativo?: boolean
+  } | null,
+  currentManagedUserIds?: string[] | null,
+) {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [servicos, setServicos] = useState<Servico[]>([])
   const [deptos, setDeptos] = useState<Depto[]>([])
@@ -69,36 +77,52 @@ export function useKanbanData() {
 
       if (!contact || contact.current_stage === newStage) return
 
-      // Obter perfil autenticado atual para validação
-      const { data: authData } = await supabase.auth.getUser()
-      if (authData?.user?.id) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('perfil, legaldesk_usuario_id, ativo')
-          .eq('id', authData.user.id)
-          .maybeSingle()
+      // Obter perfil e equipe para validação centralizada
+      let activeProfile = currentUserProfile
+      let activeTeamIds = currentManagedUserIds
 
-        if (profile && profile.ativo === false) {
-          toast({
-            title: 'Acesso Negado',
-            description: 'Seu usuário está desativado.',
-            variant: 'destructive',
-          })
-          return
-        }
+      if (!activeProfile) {
+        const { data: authData } = await supabase.auth.getUser()
+        if (authData?.user?.id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('perfil, legaldesk_usuario_id, ativo')
+            .eq('id', authData.user.id)
+            .maybeSingle()
 
-        if (profile?.perfil === 'operacional') {
-          const userLdId = profile.legaldesk_usuario_id
-          const currentResp = contact.responsavel_id
-          if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
-            toast({
-              title: 'Aviso',
-              description: 'Operacional só pode alterar o status de seus próprios atendimentos.',
-              variant: 'destructive',
-            })
-            return
+          activeProfile = profile
+
+          if (profile?.perfil === 'gestor') {
+            const { data: teamProfiles } = await supabase
+              .from('profiles')
+              .select('legaldesk_usuario_id')
+              .eq('gestor_id', authData.user.id)
+            activeTeamIds = (teamProfiles || [])
+              .map((p) => p.legaldesk_usuario_id)
+              .filter((id): id is string => Boolean(id))
           }
         }
+      }
+
+      if (activeProfile && activeProfile.ativo === false) {
+        toast({
+          title: 'Acesso Negado',
+          description: 'Seu usuário está desativado.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      if (!canEditContact(contact, activeProfile, activeTeamIds)) {
+        toast({
+          title: 'Aviso',
+          description:
+            activeProfile?.perfil === 'gestor'
+              ? 'Gestor só pode alterar o status de atendimentos próprios ou da sua equipe.'
+              : 'Você só pode alterar o status de seus próprios atendimentos.',
+          variant: 'destructive',
+        })
+        return
       }
 
       const previousStage = contact.current_stage
@@ -173,7 +197,7 @@ export function useKanbanData() {
         })
       }
     },
-    [toast],
+    [toast, currentUserProfile, currentManagedUserIds],
   )
 
   return {

@@ -9,13 +9,14 @@ import {
   createContact,
   notifyResponsavelTransfer,
   notifyReabertura,
+  canEditContact,
 } from '@/services/contacts'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { getSafeErrorMessage } from '@/lib/safe-error'
 
 export default function Index() {
-  const { user, profile } = useAuth()
+  const { user, profile, managedUserIds } = useAuth()
   const {
     contacts,
     servicos,
@@ -26,7 +27,7 @@ export default function Index() {
     loading,
     moveContact,
     setContacts,
-  } = useKanbanData()
+  } = useKanbanData(profile, managedUserIds)
   const { toast } = useToast()
 
   const [search, setSearch] = useState('')
@@ -44,17 +45,16 @@ export default function Index() {
   }
 
   const handleEdit = (contact: Contact) => {
-    if (profile?.perfil === 'operacional') {
-      const userLdId = profile?.legaldesk_usuario_id
-      const currentResp = contact.responsavel_id
-      if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
-        toast({
-          title: 'Aviso',
-          description: 'Operacional só pode editar seus próprios atendimentos.',
-          variant: 'destructive',
-        })
-        return
-      }
+    if (!canEditContact(contact, profile, managedUserIds)) {
+      toast({
+        title: 'Aviso',
+        description:
+          profile?.perfil === 'gestor'
+            ? 'Gestor só pode editar atendimentos próprios ou da sua equipe.'
+            : 'Você só pode editar seus próprios atendimentos.',
+        variant: 'destructive',
+      })
+      return
     }
     setSelectedContact(contact)
     setModalMode('edit')
@@ -68,23 +68,24 @@ export default function Index() {
       }
 
       if (id) {
+        const previousContact = contacts.find((c) => c.id === id)
+        if (!canEditContact(previousContact, profile, managedUserIds)) {
+          toast({
+            title: 'Aviso',
+            description:
+              profile?.perfil === 'gestor'
+                ? 'Gestor só pode editar atendimentos próprios ou da sua equipe.'
+                : 'Você só pode editar seus próprios atendimentos.',
+            variant: 'destructive',
+          })
+          return
+        }
+
         if (profile?.perfil === 'operacional') {
-          const previousContact = contacts.find((c) => c.id === id)
-          const currentResp = previousContact?.responsavel_id
-          const userLdId = profile?.legaldesk_usuario_id
-          if (!userLdId || !currentResp || String(currentResp) !== String(userLdId)) {
-            toast({
-              title: 'Aviso',
-              description: 'Operacional só pode editar seus próprios atendimentos.',
-              variant: 'destructive',
-            })
-            return
-          }
           // Operacional não pode transferir responsabilidade
           delete payload.responsavel_id
         }
 
-        const previousContact = contacts.find((c) => c.id === id)
         const previousResponsavelId = previousContact?.responsavel_id || null
         const newResponsavelId =
           payload.responsavel_id !== undefined ? payload.responsavel_id : previousResponsavelId

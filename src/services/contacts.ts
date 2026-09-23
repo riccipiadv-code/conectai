@@ -85,6 +85,57 @@ export interface Subservico {
   ordem: number
 }
 
+/**
+ * Regra central de autorização de edição de atendimentos:
+ * - ADMINISTRADOR: pode editar tudo.
+ * - OPERACIONAL: pode editar somente se contact.responsavel_id === profile.legaldesk_usuario_id.
+ * - GESTOR: pode editar se:
+ *    (1) ele próprio for o responsável (contact.responsavel_id === profile.legaldesk_usuario_id), OU
+ *    (2) o responsável pertencer à sua equipe (managedUserIds inclui contact.responsavel_id).
+ *
+ * Mapeamento:
+ * - contact.responsavel_id corresponde a profiles.legaldesk_usuario_id.
+ * - managedUserIds é o conjunto de legaldesk_usuario_id dos profiles subordinados (profiles onde gestor_id = auth.uid() do gestor).
+ */
+export function canEditContact(
+  contact: Pick<Contact, 'responsavel_id'> | null | undefined,
+  profile:
+    | { perfil?: string | null; legaldesk_usuario_id?: string | null; ativo?: boolean }
+    | null
+    | undefined,
+  managedUserIds?: string[] | null,
+): boolean {
+  if (!profile || profile.ativo === false) {
+    return false
+  }
+
+  // Administrador tem permissão irrestrita
+  if (profile.perfil === 'administrador') {
+    return true
+  }
+
+  const contactRespId = contact?.responsavel_id ? String(contact.responsavel_id) : null
+  if (!contactRespId) {
+    return false
+  }
+
+  const userLdId = profile.legaldesk_usuario_id ? String(profile.legaldesk_usuario_id) : null
+
+  // Se o próprio usuário for o responsável direto pelo atendimento
+  if (userLdId && contactRespId === userLdId) {
+    return true
+  }
+
+  // Se o usuário for gestor, pode editar atendimentos de membros da sua equipe
+  if (profile.perfil === 'gestor') {
+    if (managedUserIds && managedUserIds.length > 0) {
+      return managedUserIds.some((id) => String(id) === contactRespId)
+    }
+  }
+
+  return false
+}
+
 export function sanitizeContactPayload(payload: Partial<Contact>) {
   const allowedFields = [
     'manychat_id',
@@ -477,7 +528,7 @@ export async function updateContact(
   if (userId) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('perfil, legaldesk_usuario_id')
+      .select('perfil, legaldesk_usuario_id, ativo')
       .eq('id', userId)
       .single()
 
@@ -485,19 +536,35 @@ export async function updateContact(
       throw new Error('Erro ao validar permissões de usuário.')
     }
 
-    if (profile?.perfil === 'operacional' && profile.legaldesk_usuario_id) {
+    if (profile?.perfil !== 'administrador') {
       const { data: currentContact, error: contactError } = await supabase
         .from('manychat_contatos')
         .select('responsavel_id')
         .eq('id', id)
         .single()
 
-      if (
-        contactError ||
-        !currentContact ||
-        String(currentContact.responsavel_id) !== String(profile.legaldesk_usuario_id)
-      ) {
-        throw new Error('Operacional só pode editar seus próprios atendimentos.')
+      if (contactError || !currentContact) {
+        throw new Error('Atendimento não encontrado para validação.')
+      }
+
+      let teamUserIds: string[] = []
+      if (profile?.perfil === 'gestor') {
+        const { data: teamProfiles } = await supabase
+          .from('profiles')
+          .select('legaldesk_usuario_id')
+          .eq('gestor_id', userId)
+
+        teamUserIds = (teamProfiles || [])
+          .map((p) => p.legaldesk_usuario_id)
+          .filter((tid): tid is string => Boolean(tid))
+      }
+
+      if (!canEditContact(currentContact, profile, teamUserIds)) {
+        throw new Error(
+          profile?.perfil === 'gestor'
+            ? 'Gestor só pode editar atendimentos próprios ou da sua equipe.'
+            : 'Operacional só pode editar seus próprios atendimentos.',
+        )
       }
     }
   }

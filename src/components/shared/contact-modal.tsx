@@ -38,6 +38,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 import { useAuth } from '@/hooks/use-auth'
+import { canEditContact } from '@/services/contacts'
 
 export interface ContactModalProps {
   contact: Contact | null
@@ -73,7 +74,7 @@ export function ContactModal({
   portesEmpresa = [],
   responsaveis: initialResponsaveis,
 }: ContactModalProps) {
-  const { profile } = useAuth()
+  const { profile, managedUserIds } = useAuth()
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
@@ -151,6 +152,12 @@ export function ContactModal({
   }
 
   const handleSubmit = async () => {
+    if (mode === 'edit' && contact) {
+      if (!canEditContact(contact, profile, managedUserIds)) {
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const payload = { ...formData }
@@ -184,6 +191,8 @@ export function ContactModal({
   const isView = mode === 'view'
   const isCancelado = formData.current_stage === 'cancelado'
   const isOperacional = profile?.perfil === 'operacional'
+  const isGestor = profile?.perfil === 'gestor'
+  const isResponsavelDisabled = isView || isOperacional || isGestor
 
   const title =
     mode === 'create'
@@ -257,7 +266,7 @@ export function ContactModal({
             <div className="grid gap-2">
               <Label>Responsável</Label>
               <Select
-                disabled={isView || isOperacional}
+                disabled={isResponsavelDisabled}
                 value={formData.responsavel_id || formData.responsible_user_id || 'none'}
                 onValueChange={(val) => handleChange('responsavel_id', val === 'none' ? null : val)}
               >

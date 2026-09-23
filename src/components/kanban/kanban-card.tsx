@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
-import { Contact, Depto } from '@/services/contacts'
+import { Contact, Depto, canEditContact } from '@/services/contacts'
+import { useAuth } from '@/hooks/use-auth'
 import { formatDistanceToNow, format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -14,6 +15,9 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps) {
+  const { profile, managedUserIds } = useAuth()
+  const canEdit = canEditContact(contact, profile, managedUserIds)
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: contact.id,
     data: {
@@ -68,19 +72,23 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
             }}
             onPointerDown={(e) => e.stopPropagation()}
             className="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors pointer-events-auto"
+            title="Visualizar"
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onEdit(contact)
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="p-1 text-slate-400 hover:text-primary transition-colors pointer-events-auto"
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
+          {canEdit && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(contact)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="p-1 text-slate-400 hover:text-primary transition-colors pointer-events-auto"
+              title="Editar"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
