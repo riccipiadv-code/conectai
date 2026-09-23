@@ -254,7 +254,7 @@ export default function Layout() {
       </Sidebar>
 
       <SidebarInset className="bg-slate-50/50 dark:bg-zinc-950 min-w-0">
-        <header className="flex h-16 shrink-0 items-center gap-4 border-b border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 shadow-[0_1px_2px_0_rgba(0,0,0,0.02)] sticky top-0 z-10">
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-3 sm:px-4 shadow-[0_1px_2px_0_rgba(0,0,0,0.02)] sticky top-0 z-10">
           <SidebarTrigger className="text-slate-500 hover:text-slate-900" />
           <div className="flex-1">
             <h1 className="font-semibold text-lg tracking-tight text-slate-800 dark:text-slate-100">
@@ -279,11 +279,7 @@ export default function Layout() {
             className={
               location.pathname === '/kanban'
                 ? 'w-full flex-1 flex flex-col min-w-0 h-full overflow-hidden'
-                : location.pathname === '/' ||
-                    location.pathname === '/contatos' ||
-                    location.pathname === '/dashboard'
-                  ? 'w-full mx-auto p-6 md:p-8 overflow-y-auto h-full'
-                  : 'max-w-7xl mx-auto p-6 md:p-8 overflow-y-auto h-full'
+                : 'w-full min-w-0 px-3 py-4 sm:px-4 sm:py-5 overflow-y-auto h-full'
             }
           >
             <Outlet />

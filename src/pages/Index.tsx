@@ -160,7 +160,7 @@ export default function Index() {
   }, [contacts, search, deptoId, servicoId])
 
   return (
-    <div className="p-6 w-full max-w-[100vw] overflow-hidden flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50 dark:bg-zinc-950/50">
+    <div className="p-3 sm:p-4 w-full max-w-[100vw] overflow-hidden flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50 dark:bg-zinc-950/50">
       <div className="mb-4 flex items-center justify-between shrink-0">
         <h1 className="text-2xl font-bold tracking-tight">Kanban</h1>
       </div>

@@ -524,7 +524,7 @@ export default function Contacts() {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in p-4 sm:p-6 lg:p-8">
+    <div className="space-y-4 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
