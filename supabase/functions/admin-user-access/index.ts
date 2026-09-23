@@ -177,11 +177,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'list_gestores') {
-      // Carregar dinamicamente da tabela profiles: usuários ATIVOS com perfil = 'gestor'
+      // Carregar dinamicamente da tabela profiles: usuários ATIVOS com perfil IN ('gestor', 'administrador')
       const { data: gestores, error: gestoresError } = await supabase
         .from('profiles')
         .select('id, name, email')
-        .eq('perfil', 'gestor')
+        .in('perfil', ['gestor', 'administrador'])
         .eq('ativo', true)
         .order('name', { ascending: true })
 
@@ -406,7 +406,7 @@ Deno.serve(async (req: Request) => {
           gestorErr ||
           !gestorProfile ||
           !gestorProfile.ativo ||
-          gestorProfile.perfil !== 'gestor'
+          !['gestor', 'administrador'].includes(gestorProfile.perfil)
         ) {
           throw new Error('Gestor selecionado inválido ou inativo.')
         }
@@ -601,7 +601,7 @@ Deno.serve(async (req: Request) => {
           gestorErr ||
           !gestorProfile ||
           !gestorProfile.ativo ||
-          gestorProfile.perfil !== 'gestor'
+          !['gestor', 'administrador'].includes(gestorProfile.perfil)
         ) {
           throw new Error('Gestor selecionado inválido ou inativo.')
         }
@@ -797,7 +797,7 @@ Deno.serve(async (req: Request) => {
             gestorErr ||
             !gestorProfile ||
             !gestorProfile.ativo ||
-            gestorProfile.perfil !== 'gestor'
+            !['gestor', 'administrador'].includes(gestorProfile.perfil)
           ) {
             throw new Error('Gestor selecionado inválido ou inativo.')
           }
