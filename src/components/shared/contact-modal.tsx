@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
-import { CalendarIcon, Paperclip, Loader2 } from 'lucide-react'
+import { CalendarIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -34,10 +34,7 @@ import {
   Subservico,
   getContatoSubservicos,
   PorteEmpresa,
-  ContatoAnexo,
-  getContatoAnexos,
 } from '@/services/contacts'
-import { AnexosModal } from '@/components/shared/anexos-modal'
 import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 import { useAuth } from '@/hooks/use-auth'
@@ -81,26 +78,6 @@ export function ContactModal({
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>(initialResponsaveis || [])
-  const [anexos, setAnexos] = useState<ContatoAnexo[]>([])
-  const [anexosLoading, setAnexosLoading] = useState(false)
-  const [anexosModalOpen, setAnexosModalOpen] = useState(false)
-
-  const fetchAnexos = useCallback(async () => {
-    if (!contact?.id) {
-      setAnexos([])
-      return
-    }
-    setAnexosLoading(true)
-    try {
-      const data = await getContatoAnexos(contact.id)
-      setAnexos(data)
-    } catch (error) {
-      console.error('Erro ao buscar anexos:', error)
-      setAnexos([])
-    } finally {
-      setAnexosLoading(false)
-    }
-  }, [contact?.id])
 
   useEffect(() => {
     if (!initialResponsaveis || initialResponsaveis.length === 0) {
@@ -123,16 +100,12 @@ export function ContactModal({
             setSelectedSubservicos(ids)
           })
           .catch(console.error)
-
-        fetchAnexos()
       } else {
-        setAnexos([])
         setSelectedSubservicos([])
         const whatsappOrigem = origens?.find((o) => o.nome === 'Whatsapp')
         setFormData({
           origem_id: whatsappOrigem ? whatsappOrigem.id : null,
           current_stage: 'nivel_1_novo',
-          sla_status: 'green',
           lead_nome: '',
           responsavel_id: null,
           servico_id: null,
@@ -153,7 +126,7 @@ export function ContactModal({
         })
       }
     }
-  }, [isOpen, contact, mode, fetchAnexos])
+  }, [isOpen, contact, mode])
 
   const handleChange = (field: keyof Contact, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -438,11 +411,11 @@ export function ContactModal({
             )}
           </div>
 
-          {/* Serviços Contratados e Anexos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Serviços Contratados */}
+          <div className="grid grid-cols-1 gap-4">
             <div className="grid gap-2">
               <Label>Serviços Contratados</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800">
                 {subservicos?.length > 0 ? (
                   subservicos.map((sub) => (
                     <div key={sub.id} className="flex items-start space-x-3">
@@ -477,56 +450,6 @@ export function ContactModal({
                 )}
               </div>
             </div>
-
-            <div className="grid gap-2">
-              <Label>Anexos</Label>
-              <div className="border rounded-md p-4 bg-slate-50/50 dark:bg-zinc-900/50 border-slate-200 dark:border-zinc-800 min-h-[120px]">
-                {anexosLoading ? (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : anexos.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <span className="text-sm text-muted-foreground">Nenhum anexo cadastrado</span>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5">
-                    {anexos.map((anexo, idx) => (
-                      <div
-                        key={anexo.id || idx}
-                        onClick={() => {
-                          if (anexo.link) window.open(anexo.link, '_blank', 'noopener,noreferrer')
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            if (anexo.link) window.open(anexo.link, '_blank', 'noopener,noreferrer')
-                          }
-                        }}
-                        className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline cursor-pointer transition-colors"
-                      >
-                        <Paperclip className="h-4 w-4 shrink-0 text-slate-400" />
-                        <span className="truncate">{anexo.nome}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {/* Botão Gerenciar - só em modo edit/create, não em view */}
-              {!isView && contact && mode !== 'create' && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 w-fit"
-                  onClick={() => setAnexosModalOpen(true)}
-                >
-                  <Paperclip className="h-4 w-4" />
-                  Gerenciar
-                </Button>
-              )}
-            </div>
           </div>
 
           {/* Row 4: Resumo da Solicitação, Observações */}
@@ -556,8 +479,8 @@ export function ContactModal({
 
           <div className="h-px w-full bg-slate-200 dark:bg-zinc-800 my-2" />
 
-          {/* Row 5: Estágio, SLA Status, Data Follow Up */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Row 5: Estágio, Data Follow Up */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>Estágio</Label>
               <Select
@@ -575,26 +498,6 @@ export function ContactModal({
                       {stage.label}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>SLA Status</Label>
-              <Select
-                disabled={isView}
-                value={formData.sla_status || 'green'}
-                onValueChange={(val) => handleChange('sla_status', val === 'none' ? null : val)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  <SelectItem value="green">No Prazo</SelectItem>
-                  <SelectItem value="yellow">Atenção</SelectItem>
-                  <SelectItem value="red">Atrasado</SelectItem>
-                  <SelectItem value="paused">Pausado</SelectItem>
-                  <SelectItem value="done">Finalizado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -686,18 +589,6 @@ export function ContactModal({
           )}
         </DialogFooter>
       </DialogContent>
-
-      {contact && contact.id && (
-        <AnexosModal
-          isOpen={anexosModalOpen}
-          onClose={() => {
-            setAnexosModalOpen(false)
-            // Recarregar anexos ao fechar
-            fetchAnexos()
-          }}
-          contatoId={contact.id}
-        />
-      )}
     </Dialog>
   )
 }

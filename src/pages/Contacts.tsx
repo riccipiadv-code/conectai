@@ -56,18 +56,11 @@ import {
   FileSpreadsheet,
   Loader2,
   Plus,
-  CheckCircle2,
-  AlertTriangle,
-  AlertCircle,
-  Clock,
-  CheckCircle,
-  Paperclip,
   Mail,
   RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ContactModal } from '@/components/shared/contact-modal'
-import { AnexosModal } from '@/components/shared/anexos-modal'
 import { exportVisibleContactsExcel, exportAllContactsExcel } from '@/services/export-contacts'
 import {
   Dialog,
@@ -125,9 +118,6 @@ export default function Contacts() {
   const [updatingContact, setUpdatingContact] = useState<any | null>(null)
   const [modalMode, setModalMode] = useState<'view' | 'edit' | 'create'>('create')
   const [isModalOpen, setIsModalOpen] = useState(false)
-
-  const [anexosModalOpen, setAnexosModalOpen] = useState(false)
-  const [anexosContatoId, setAnexosContatoId] = useState<string | null>(null)
 
   const [deletingContact, setDeletingContact] = useState<any | null>(null)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -203,7 +193,6 @@ export default function Contacts() {
       ...prev,
       servico_ids: meta.servicos.map((s: any) => String(s.id)),
       depto_ids: meta.deptos.map((d: any) => d.id),
-      slas: ['green', 'yellow', 'red', 'paused', 'done'],
       follow_ups: ['today', 'next_7_days', 'overdue', 'none'],
       origem_ids: meta.origens.map((o: any) => o.id),
       responsavel_ids,
@@ -311,71 +300,6 @@ export default function Contacts() {
     const subject = `[CONECTAI:${c.controle || ''}]`
     const mailtoUrl = `mailto:${encodeURIComponent(email)}?bcc=${encodeURIComponent(bcc)}&subject=${encodeURIComponent(subject)}`
     window.location.href = mailtoUrl
-  }
-
-  const renderSlaBadge = (status: string | null) => {
-    switch (status) {
-      case 'green':
-        return (
-          <Badge
-            variant="outline"
-            className="shadow-sm gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            No prazo
-          </Badge>
-        )
-      case 'yellow':
-        return (
-          <Badge
-            variant="outline"
-            className="shadow-sm gap-1.5 border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20"
-          >
-            <AlertTriangle className="h-3.5 w-3.5" />
-            Atenção
-          </Badge>
-        )
-      case 'red':
-        return (
-          <Badge
-            variant="outline"
-            className="shadow-sm gap-1.5 border-rose-200 bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20"
-          >
-            <AlertCircle className="h-3.5 w-3.5" />
-            Atrasado
-          </Badge>
-        )
-      case 'paused':
-        return (
-          <Badge
-            variant="outline"
-            className="shadow-sm gap-1.5 border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-500/10 dark:text-slate-400 dark:border-slate-500/20"
-          >
-            <Clock className="h-3.5 w-3.5" />
-            Pausado
-          </Badge>
-        )
-      case 'done':
-        return (
-          <Badge
-            variant="outline"
-            className="shadow-sm gap-1.5 border-blue-200 bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20"
-          >
-            <CheckCircle className="h-3.5 w-3.5" />
-            Finalizado
-          </Badge>
-        )
-      default:
-        return (
-          <Badge
-            variant="outline"
-            className="shadow-sm gap-1.5 border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            No prazo
-          </Badge>
-        )
-    }
   }
 
   const handleCreateNew = () => {
@@ -619,7 +543,7 @@ export default function Contacts() {
 
       <Card className="border-slate-200/60 dark:border-zinc-800 shadow-sm">
         <CardContent className="p-4 sm:p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Buscar</Label>
               <Input
@@ -963,85 +887,6 @@ export default function Contacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold uppercase text-slate-500">SLA</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-9 w-full justify-start text-left font-normal px-3 bg-white hover:bg-slate-50 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                  >
-                    SLA
-                    {(filters.slas?.length ?? 0) !== 5 && (
-                      <span className="text-slate-400 dark:text-slate-500 ml-0.5">•</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="start">
-                  <div className="p-3 border-b border-slate-100 dark:border-zinc-800">
-                    <h4 className="font-semibold text-sm text-slate-900 dark:text-slate-100">
-                      SLA
-                    </h4>
-                  </div>
-                  <div className="flex gap-2 p-2 bg-slate-50 dark:bg-zinc-900/50 border-b border-slate-100 dark:border-zinc-800">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
-                      onClick={() =>
-                        updateFilter('slas', ['green', 'yellow', 'red', 'paused', 'done'])
-                      }
-                    >
-                      Selecionar todos
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs px-2 hover:bg-slate-200 dark:hover:bg-zinc-800"
-                      onClick={() => updateFilter('slas', [])}
-                    >
-                      Limpar
-                    </Button>
-                  </div>
-                  <div className="p-2 space-y-3 max-h-[300px] overflow-y-auto">
-                    {[
-                      { id: 'green', label: 'No Prazo' },
-                      { id: 'yellow', label: 'Atenção' },
-                      { id: 'red', label: 'Atrasado' },
-                      { id: 'paused', label: 'Pausado' },
-                      { id: 'done', label: 'Finalizado' },
-                    ].map((sla) => {
-                      const isChecked = filters.slas?.includes(sla.id)
-                      return (
-                        <div key={sla.id} className="flex items-center space-x-3 px-1">
-                          <Checkbox
-                            id={`sla-${sla.id}`}
-                            checked={isChecked}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                updateFilter('slas', [...(filters.slas || []), sla.id])
-                              } else {
-                                updateFilter(
-                                  'slas',
-                                  (filters.slas || []).filter((id) => id !== sla.id),
-                                )
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`sla-${sla.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none text-slate-700 dark:text-slate-300"
-                          >
-                            {sla.label}
-                          </label>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-1.5">
               <Label className="text-xs font-semibold uppercase text-slate-500">Follow Up</Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -1218,11 +1063,9 @@ export default function Contacts() {
                 <TableHead className="w-[180px] max-w-[180px] font-semibold">
                   Serviço / Empresa
                 </TableHead>
-                <TableHead className="w-[350px] max-w-[350px] font-semibold">Consulta</TableHead>
+                <TableHead className="w-[320px] max-w-[320px] font-semibold">Consulta</TableHead>
                 <TableHead className="font-semibold">Estágio</TableHead>
-                {/* oculto temporariamente */}
-                {/* <TableHead className="w-[80px] font-semibold text-center">Enviar e-mail</TableHead> */}
-                <TableHead className="w-[80px] font-semibold text-center">Anexos</TableHead>
+                <TableHead className="min-w-[140px] font-semibold">Responsável</TableHead>
                 <TableHead
                   className="w-[110px] cursor-pointer font-semibold select-none hover:text-primary transition-colors"
                   onClick={() => toggleSort('data_follow_up')}
@@ -1232,14 +1075,15 @@ export default function Contacts() {
                     {renderSortIcon('data_follow_up')}
                   </div>
                 </TableHead>
-                <TableHead className="min-w-[160px] font-semibold text-center">Ações</TableHead>
-                <TableHead className="pr-6 font-semibold text-right">SLA</TableHead>
+                <TableHead className="min-w-[160px] pr-6 font-semibold text-center">
+                  Ações
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredData.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <FileText className="h-8 w-8 text-slate-300" />
                       <span>Nenhum atendimento encontrado para os filtros selecionados.</span>
@@ -1265,6 +1109,8 @@ export default function Contacts() {
                       .replace(/_/g, ' ')
                       .replace(/\b\w/g, (l: any) => l.toUpperCase())
                   }
+
+                  const responsavelNome = c.legaldesk_usuarios?.nome || c.profiles?.name || '-'
 
                   return (
                     <TableRow
@@ -1298,7 +1144,7 @@ export default function Contacts() {
                         </div>
                       </TableCell>
 
-                      <TableCell className="w-[350px] max-w-[350px] align-top py-3">
+                      <TableCell className="w-[320px] max-w-[320px] align-top py-3">
                         <div
                           className="text-sm whitespace-normal break-words line-clamp-3 text-slate-600 dark:text-slate-400 leading-relaxed"
                           title={c.lead_resumo || c.observacoes || ''}
@@ -1316,30 +1162,10 @@ export default function Contacts() {
                         </Badge>
                       </TableCell>
 
-                      {/* oculto temporariamente */}
-                      {/* <TableCell className="w-[80px] align-top py-3 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-slate-600"
-                          onClick={() => handleSendEmail(c)}
-                        >
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                      </TableCell> */}
-
-                      <TableCell className="align-top py-3 text-center">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-slate-400 hover:text-slate-600"
-                          onClick={() => {
-                            setAnexosContatoId(c.id)
-                            setAnexosModalOpen(true)
-                          }}
-                        >
-                          <Paperclip className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="min-w-[140px] align-top py-3">
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          {responsavelNome}
+                        </span>
                       </TableCell>
 
                       <TableCell className="w-[110px] align-top py-3">
@@ -1355,7 +1181,7 @@ export default function Contacts() {
                         </span>
                       </TableCell>
 
-                      <TableCell className="min-w-[160px] align-top py-3 text-center">
+                      <TableCell className="min-w-[160px] pr-6 align-top py-3 text-center">
                         <div className="flex justify-center items-center gap-1">
                           {(() => {
                             const isWhatsApp =
@@ -1441,10 +1267,6 @@ export default function Contacts() {
                             </Tooltip>
                           )}
                         </div>
-                      </TableCell>
-
-                      <TableCell className="pr-6 align-top py-3 text-right">
-                        {renderSlaBadge(c.sla_status)}
                       </TableCell>
                     </TableRow>
                   )
@@ -1547,15 +1369,6 @@ export default function Contacts() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <AnexosModal
-        isOpen={anexosModalOpen}
-        onClose={() => {
-          setAnexosModalOpen(false)
-          setAnexosContatoId(null)
-        }}
-        contatoId={anexosContatoId || ''}
-      />
     </div>
   )
 }
