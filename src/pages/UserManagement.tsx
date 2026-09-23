@@ -48,6 +48,8 @@ export type UserRow = {
   profile_id?: string | null
   perfil: string | null // null quando não tem profile
   ativo_sys: boolean
+  gestor_id?: string | null
+  gestor_nome?: string | null
   auth_user_exists: boolean
   status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
   tem_acesso?: boolean
@@ -56,6 +58,12 @@ export type UserRow = {
 type PerfilOption = {
   codigo: string
   nome: string
+}
+
+type GestorOption = {
+  id: string
+  name: string
+  email: string
 }
 
 async function extractErrorMessage(
@@ -97,6 +105,7 @@ export default function UserManagement() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
   const { toast } = useToast()
   const [perfisOptions, setPerfisOptions] = useState<PerfilOption[]>([])
+  const [gestoresOptions, setGestoresOptions] = useState<GestorOption[]>([])
 
   const getPerfilLabel = (codigo: string | null): string => {
     if (!codigo) return ''
@@ -110,12 +119,14 @@ export default function UserManagement() {
   const [createSigla, setCreateSigla] = useState('')
   const [createEmail, setCreateEmail] = useState('')
   const [createPerfil, setCreatePerfil] = useState('')
+  const [createGestorId, setCreateGestorId] = useState<string>('none')
   const [createErrors, setCreateErrors] = useState<Record<string, string>>({})
   const [creatingUser, setCreatingUser] = useState(false)
 
   // Diálogos modais de linha
   const [grantAccessModalUser, setGrantAccessModalUser] = useState<UserRow | null>(null)
   const [grantAccessPerfil, setGrantAccessPerfil] = useState<string>('')
+  const [grantAccessGestorId, setGrantAccessGestorId] = useState<string>('none')
   const [grantingAccess, setGrantingAccess] = useState(false)
 
   const [activateModalUser, setActivateModalUser] = useState<UserRow | null>(null)
@@ -125,6 +136,7 @@ export default function UserManagement() {
   const [editModalUser, setEditModalUser] = useState<UserRow | null>(null)
   const [editPerfil, setEditPerfil] = useState<string>('administrador')
   const [editEmail, setEditEmail] = useState<string>('')
+  const [editGestorId, setEditGestorId] = useState<string>('none')
   const [editErrors, setEditErrors] = useState<Record<string, string>>({})
   const [editingUser, setEditingUser] = useState(false)
 
@@ -154,6 +166,28 @@ export default function UserManagement() {
         description: getSafeErrorMessage(err, 'Falha ao carregar perfis de acesso.'),
         variant: 'destructive',
       })
+    }
+  }
+
+  const loadGestores = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: { action: 'list_gestores' },
+      })
+
+      if (error || data?.error) {
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Falha ao carregar lista de gestores.',
+        )
+        throw new Error(finalErrorMessage)
+      }
+
+      setGestoresOptions(data?.gestores || [])
+    } catch (err: any) {
+      setGestoresOptions([])
+      console.error(err)
     }
   }
 
@@ -190,6 +224,7 @@ export default function UserManagement() {
 
   useEffect(() => {
     loadPerfis()
+    loadGestores()
     loadData()
   }, [])
 
@@ -199,7 +234,9 @@ export default function UserManagement() {
     setCreateSigla('')
     setCreateEmail('')
     setCreatePerfil('')
+    setCreateGestorId('none')
     setCreateErrors({})
+    loadGestores() // Atualizar lista de gestores frescos ao abrir
     setCreateModalOpen(true)
   }
 
@@ -240,6 +277,7 @@ export default function UserManagement() {
           sigla: createSigla.trim().toUpperCase(),
           email: createEmail.trim().toLowerCase(),
           perfil: createPerfil,
+          gestor_id: createGestorId !== 'none' ? createGestorId : null,
         },
       })
 
@@ -253,7 +291,7 @@ export default function UserManagement() {
         description: 'Usuário criado com sucesso.',
       })
       setCreateModalOpen(false)
-      await loadData()
+      await Promise.all([loadData(), loadGestores()])
     } catch (err: any) {
       console.error(err)
       toast({
@@ -270,6 +308,8 @@ export default function UserManagement() {
   const handleOpenGrantAccessModal = (user: UserRow) => {
     setGrantAccessModalUser(user)
     setGrantAccessPerfil('')
+    setGrantAccessGestorId('none')
+    loadGestores()
   }
 
   const handleConfirmGrantAccess = async () => {
@@ -291,6 +331,7 @@ export default function UserManagement() {
           action: 'grant_access',
           legaldesk_usuario_id: user.legaldesk_id,
           perfil: grantAccessPerfil,
+          gestor_id: grantAccessGestorId !== 'none' ? grantAccessGestorId : null,
         },
       })
 
@@ -308,7 +349,7 @@ export default function UserManagement() {
         description: `Acesso concedido com sucesso para ${user.nome} com perfil "${getPerfilLabel(grantAccessPerfil) || grantAccessPerfil}".`,
       })
       setGrantAccessModalUser(null)
-      await loadData()
+      await Promise.all([loadData(), loadGestores()])
     } catch (err: any) {
       console.error(err)
       toast({
@@ -408,7 +449,9 @@ export default function UserManagement() {
     setEditModalUser(user)
     setEditPerfil(user.perfil || 'administrador')
     setEditEmail(user.email || '')
+    setEditGestorId(user.gestor_id || 'none')
     setEditErrors({})
+    loadGestores()
   }
 
   const handleConfirmEdit = async () => {
@@ -446,6 +489,7 @@ export default function UserManagement() {
           email: trimmedEmail,
           name: user.nome,
           perfil: editPerfil,
+          gestor_id: editGestorId !== 'none' ? editGestorId : null,
         },
       })
 
@@ -463,7 +507,7 @@ export default function UserManagement() {
         description: `Os dados de ${user.nome} foram salvos com sucesso.`,
       })
       setEditModalUser(null)
-      await loadData()
+      await Promise.all([loadData(), loadGestores()])
     } catch (err: any) {
       console.error(err)
       toast({
@@ -576,6 +620,7 @@ export default function UserManagement() {
                 <TableHead>Sigla / E-mail</TableHead>
                 <TableHead className="text-center">Acesso</TableHead>
                 <TableHead className="text-center">Ativo</TableHead>
+                <TableHead>Gestor</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -583,13 +628,13 @@ export default function UserManagement() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center">
+                  <TableCell colSpan={7} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     Nenhum colaborador encontrado.
                   </TableCell>
                 </TableRow>
@@ -656,7 +701,14 @@ export default function UserManagement() {
                         </button>
                       </TableCell>
 
-                      {/* 5. Perfil */}
+                      {/* 5. Gestor */}
+                      <TableCell>
+                        <span className="text-[13px] text-slate-700 dark:text-slate-300">
+                          {u.gestor_nome || '-'}
+                        </span>
+                      </TableCell>
+
+                      {/* 6. Perfil */}
                       <TableCell>
                         {u.status === 'ativo' || u.status === 'bloqueado' ? (
                           <Badge
@@ -854,6 +906,25 @@ export default function UserManagement() {
               {createErrors.perfil && <p className="text-xs text-red-500">{createErrors.perfil}</p>}
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Gestor <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <Select value={createGestorId} onValueChange={(val) => setCreateGestorId(val)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione um gestor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {gestoresOptions.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <DialogFooter className="pt-2">
               <Button
                 type="button"
@@ -941,6 +1012,30 @@ export default function UserManagement() {
                       {p.nome}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Gestor <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <Select
+                value={grantAccessGestorId}
+                onValueChange={(val) => setGrantAccessGestorId(val)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione um gestor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {gestoresOptions
+                    .filter((g) => g.id !== grantAccessModalUser?.profile_id)
+                    .map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1131,6 +1226,31 @@ export default function UserManagement() {
                 </SelectContent>
               </Select>
               {editErrors.perfil && <p className="text-xs text-red-500">{editErrors.perfil}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Gestor <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <Select
+                value={editGestorId}
+                onValueChange={(val) => setEditGestorId(val)}
+                disabled={editingUser}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione o gestor..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Nenhum</SelectItem>
+                  {gestoresOptions
+                    .filter((g) => g.id !== editModalUser?.profile_id)
+                    .map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <DialogFooter className="pt-2">

@@ -1597,6 +1597,7 @@ export type Database = {
           email: string
           ferias_fim: string | null
           ferias_inicio: string | null
+          gestor_id: string | null
           id: string
           legaldesk_usuario_id: string | null
           name: string
@@ -1610,6 +1611,7 @@ export type Database = {
           email: string
           ferias_fim?: string | null
           ferias_inicio?: string | null
+          gestor_id?: string | null
           id: string
           legaldesk_usuario_id?: string | null
           name: string
@@ -1623,6 +1625,7 @@ export type Database = {
           email?: string
           ferias_fim?: string | null
           ferias_inicio?: string | null
+          gestor_id?: string | null
           id?: string
           legaldesk_usuario_id?: string | null
           name?: string
@@ -1635,6 +1638,13 @@ export type Database = {
             columns: ['area_id']
             isOneToOne: false
             referencedRelation: 'areas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'profiles_gestor_id_fkey'
+            columns: ['gestor_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
           {
