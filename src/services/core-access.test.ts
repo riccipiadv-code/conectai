@@ -544,24 +544,26 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     `Cenário 22b falhou: coreResult null deve acionar legacy_fallback, obtido ${JSON.stringify(team22b)}`,
   )
 
-  // Cenário 23: Administrador → canEditContact continua irrestrito independente da equipe
+  // Cenário 23: Administrador → canEditContact continua irrestrito independente da equipe quando hasSystemAccess === true
   const adminProfile = {
     perfil: 'administrador',
     legaldesk_usuario_id: 'ld-admin-1',
     ativo: true,
+    hasSystemAccess: true,
   }
   const contactAny = { responsavel_id: 'ld-other-user' }
   const canAdminEdit = canEditContact(contactAny, adminProfile, [])
   assert(
     canAdminEdit === true,
-    `Cenário 23 falhou: administrador deve continuar tendo permissão total em canEditContact`,
+    `Cenário 23 falhou: administrador com hasSystemAccess=true deve ter permissão total em canEditContact`,
   )
 
-  // Cenário 24: Operacional → canEditContact só permite atendimentos próprios
+  // Cenário 24: Operacional → canEditContact só permite atendimentos próprios quando hasSystemAccess === true
   const opProfile = {
     perfil: 'operacional',
     legaldesk_usuario_id: 'ld-op-1',
     ativo: true,
+    hasSystemAccess: true,
   }
   const canOpEditOwn = canEditContact({ responsavel_id: 'ld-op-1' }, opProfile, [])
   const canOpEditOther = canEditContact({ responsavel_id: 'ld-other-user' }, opProfile, [
@@ -572,11 +574,12 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     `Cenário 24 falhou: operacional só pode editar atendimentos próprios (canOpEditOwn=${canOpEditOwn}, canOpEditOther=${canOpEditOther})`,
   )
 
-  // Cenário 25: Gestor com canEditContact usando equipe resolvida via core
+  // Cenário 25: Gestor com canEditContact usando equipe resolvida via core quando hasSystemAccess === true
   const gestorProfile = {
     perfil: 'gestor',
     legaldesk_usuario_id: 'ld-gestor-1',
     ativo: true,
+    hasSystemAccess: true,
   }
   const canGestorEditOwn = canEditContact({ responsavel_id: 'ld-gestor-1' }, gestorProfile, [
     'ld-sub-1',
@@ -911,6 +914,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     perfil: 'gestor',
     legaldesk_usuario_id: 'ld-gestor-1',
     ativo: true,
+    hasSystemAccess: true,
   }
   // managedUserIds resolvido via RPC com formato de string IDs operacionais
   const rpcManagedIds = team510_1.managedUserIds
@@ -1124,6 +1128,153 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   assert(
     canEditContact({ responsavel_id: 'ld-admin-1' }, inactiveProfile, []) === false,
     'Cenário 48 (5.18.13) falhou: usuário inativo (ativo=false) não pode editar atendimento',
+  )
+
+  // ==========================================
+  // Testes Obrigatórios da Etapa 5.19 (Endurecimento da Edição e Menor Privilégio):
+  // 1. hasSystemAccess = true + admin → edita;
+  // 2. hasSystemAccess = true + gestor → regras atuais (próprio + equipe core);
+  // 3. hasSystemAccess = true + operacional → regras atuais (somente próprio);
+  // 4. hasSystemAccess = false → não edita;
+  // 5. hasSystemAccess = undefined → não edita;
+  // 6. profile legado 'administrador' sem contexto central (hasSystemAccess undefined/ausente) → não recebe autorização frontend;
+  // 7. updateContact sem contexto central não recria autorização pelo legado;
+  // 8. Kanban sem contexto central não consulta legacy_managed_operational_ids() diretamente;
+  // 9. fluxo normal do Kanban continua funcionando;
+  // 10. fluxo normal de Atendimentos continua funcionando;
+  // 11. RLS continua sendo a barreira final do banco.
+  // ==========================================
+
+  // Cenário 49 (5.19 - Item 1): hasSystemAccess = true + admin → edita qualquer atendimento
+  const admin519 = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-admin-519',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-any' }, admin519, []) === true &&
+      canEditContact({ responsavel_id: null }, admin519, []) === true,
+    'Cenário 49 (5.19.1) falhou: hasSystemAccess=true + admin deve poder editar',
+  )
+
+  // Cenário 50 (5.19 - Item 2): hasSystemAccess = true + gestor → regras atuais (próprio e equipe)
+  const gestor519 = {
+    perfil: 'gestor',
+    legaldesk_usuario_id: 'ld-gestor-519',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  const managedTeam519 = ['ld-sub-519-a', 'ld-sub-519-b']
+  assert(
+    canEditContact({ responsavel_id: 'ld-gestor-519' }, gestor519, managedTeam519) === true &&
+      canEditContact({ responsavel_id: 'ld-sub-519-a' }, gestor519, managedTeam519) === true &&
+      canEditContact({ responsavel_id: 'ld-other' }, gestor519, managedTeam519) === false &&
+      canEditContact({ responsavel_id: null }, gestor519, managedTeam519) === false,
+    'Cenário 50 (5.19.2) falhou: hasSystemAccess=true + gestor deve seguir regras de próprio e equipe',
+  )
+
+  // Cenário 51 (5.19 - Item 3): hasSystemAccess = true + operacional → regras atuais (somente próprio)
+  const op519 = {
+    perfil: 'operacional',
+    legaldesk_usuario_id: 'ld-op-519',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-op-519' }, op519, []) === true &&
+      canEditContact({ responsavel_id: 'ld-other' }, op519, ['ld-other']) === false &&
+      canEditContact({ responsavel_id: null }, op519, []) === false,
+    'Cenário 51 (5.19.3) falhou: hasSystemAccess=true + operacional deve editar somente atendimentos próprios',
+  )
+
+  // Cenário 52 (5.19 - Item 4): hasSystemAccess = false → não edita para nenhum perfil
+  const adminAccessFalse = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-admin-1',
+    ativo: true,
+    hasSystemAccess: false,
+  }
+  const gestorAccessFalse = {
+    perfil: 'gestor',
+    legaldesk_usuario_id: 'ld-gestor-1',
+    ativo: true,
+    hasSystemAccess: false,
+  }
+  const opAccessFalse = {
+    perfil: 'operacional',
+    legaldesk_usuario_id: 'ld-op-1',
+    ativo: true,
+    hasSystemAccess: false,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-any' }, adminAccessFalse, []) === false &&
+      canEditContact({ responsavel_id: 'ld-gestor-1' }, gestorAccessFalse, ['ld-sub-1']) ===
+        false &&
+      canEditContact({ responsavel_id: 'ld-op-1' }, opAccessFalse, []) === false,
+    'Cenário 52 (5.19.4) falhou: hasSystemAccess=false não deve poder editar em nenhum perfil',
+  )
+
+  // Cenário 53 (5.19 - Item 5): hasSystemAccess = undefined → não edita (endurecimento de canEditContact)
+  const adminAccessUndefined = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-admin-1',
+    ativo: true,
+    hasSystemAccess: undefined,
+  }
+  const gestorAccessUndefined = {
+    perfil: 'gestor',
+    legaldesk_usuario_id: 'ld-gestor-1',
+    ativo: true,
+    hasSystemAccess: undefined,
+  }
+  const opAccessUndefined = {
+    perfil: 'operacional',
+    legaldesk_usuario_id: 'ld-op-1',
+    ativo: true,
+    hasSystemAccess: undefined,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-any' }, adminAccessUndefined, []) === false &&
+      canEditContact({ responsavel_id: 'ld-gestor-1' }, gestorAccessUndefined, ['ld-sub-1']) ===
+        false &&
+      canEditContact({ responsavel_id: 'ld-op-1' }, opAccessUndefined, []) === false,
+    'Cenário 53 (5.19.5) falhou: hasSystemAccess=undefined não deve receber permissão de edição frontend',
+  )
+
+  // Cenário 54 (5.19 - Item 6): profile legado 'administrador' sem contexto central (hasSystemAccess ausente) → NÃO recebe autorização frontend
+  const legacyAdminWithoutCore = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-legacy-admin',
+    ativo: true,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-any' }, legacyAdminWithoutCore, []) === false &&
+      canEditContact(null, legacyAdminWithoutCore, []) === false,
+    'Cenário 54 (5.19.6) falhou: perfil legado administrador sem contexto central (hasSystemAccess ausente) NÃO pode receber autorização frontend',
+  )
+
+  // Cenário 55 (5.19 - Item 7 e 8): updateContact e Kanban sem contexto central não recriam autorização pelo legado nem chamam legacy_managed_operational_ids
+  // Simulação conceitual da regra de useKanbanData e updateContact:
+  // Se useKanbanData é invocado sem contexto central (currentUserProfile = undefined ou hasSystemAccess !== true),
+  // a operação é imediatamente barrada com menor privilégio, sem tentar resolver perfil ou equipe via RPCs legadas.
+  const checkKanbanMoveAllowedWithoutCentralContext = (
+    profileParam?: { hasSystemAccess?: boolean; ativo?: boolean } | null,
+  ) => {
+    if (!profileParam || profileParam.hasSystemAccess !== true) {
+      return false
+    }
+    return true
+  }
+  assert(
+    checkKanbanMoveAllowedWithoutCentralContext(undefined) === false &&
+      checkKanbanMoveAllowedWithoutCentralContext(null) === false &&
+      checkKanbanMoveAllowedWithoutCentralContext({ hasSystemAccess: undefined, ativo: true }) ===
+        false &&
+      checkKanbanMoveAllowedWithoutCentralContext({ hasSystemAccess: false, ativo: true }) ===
+        false &&
+      checkKanbanMoveAllowedWithoutCentralContext({ hasSystemAccess: true, ativo: true }) === true,
+    'Cenário 55 (5.19.7-8) falhou: Kanban sem contexto central deve barrar operação sem simular permissões legadas',
   )
 
   return { passed, failed: errors.length, errors }

@@ -114,15 +114,14 @@ export function canEditContact(
     return false
   }
 
-  // 1. Sem acesso ao Conectaí: se hasSystemAccess !== true → não pode editar.
-  // Se hasSystemAccess for explicitamente false, bloqueia.
-  // (Caso hasSystemAccess seja undefined em chamadas legadas/testes sem a flag,
-  // preservamos compatibilidade se profile.ativo === true e profile.perfil for válido).
-  if (profile.hasSystemAccess === false) {
+  // 1. Princípio de menor privilégio (Etapa 5.19): a autorização de edição exige contexto central resolvido.
+  // Se hasSystemAccess !== true (incluindo undefined, false, null) → não edita.
+  // Nem administrador recebe autorização frontend se hasSystemAccess !== true.
+  if (profile.hasSystemAccess !== true) {
     return false
   }
 
-  // 2. Administrador (perfil efetivo 'administrador') → pode editar qualquer atendimento.
+  // 2. Administrador (perfil efetivo 'administrador' com hasSystemAccess === true) → pode editar qualquer atendimento.
   if (profile.perfil === 'administrador') {
     return true
   }
@@ -546,49 +545,13 @@ export async function updateContact(
   id: string,
   updates: any,
   previousStage?: string,
-  userId?: string,
+  _userId?: string,
 ) {
-  if (userId) {
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('perfil, legaldesk_usuario_id, ativo')
-      .eq('id', userId)
-      .single()
-
-    if (profileError) {
-      throw new Error('Erro ao validar permissões de usuário.')
-    }
-
-    if (profile?.perfil !== 'administrador') {
-      const { data: currentContact, error: contactError } = await supabase
-        .from('manychat_contatos')
-        .select('responsavel_id')
-        .eq('id', id)
-        .single()
-
-      if (contactError || !currentContact) {
-        throw new Error('Atendimento não encontrado para validação.')
-      }
-
-      let teamUserIds: string[] = []
-      if (profile?.perfil === 'gestor') {
-        // Fallback de segurança para quando updateContact for chamado diretamente sem o contexto do useAuth.
-        // Utiliza a RPC legacy_managed_operational_ids para evitar consulta direta a profiles.gestor_id.
-        const { data: legacyRpcData } = await supabase.rpc('legacy_managed_operational_ids')
-        teamUserIds = (legacyRpcData || [])
-          .map((p: any) => p.legaldesk_usuario_id)
-          .filter((tid: any): tid is string => Boolean(tid))
-      }
-
-      if (!canEditContact(currentContact, profile, teamUserIds)) {
-        throw new Error(
-          profile?.perfil === 'gestor'
-            ? 'Gestor só pode editar atendimentos próprios ou da sua equipe.'
-            : 'Operacional só pode editar seus próprios atendimentos.',
-        )
-      }
-    }
-  }
+  // Etapa 5.19: A validação de frontend é feita antes da chamada nos componentes
+  // (Contacts, Kanban, ContactModal) com o contexto central resolvido pelo useAuth().
+  // Não reconstruir autorização pelo legado dentro do service (sem chamadas a profiles.perfil,
+  // profiles.legaldesk_usuario_id ou legacy_managed_operational_ids). A RLS e as policies
+  // do banco atuam como a barreira final de segurança.
 
   const rawPayload = { ...updates }
 

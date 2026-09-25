@@ -24,6 +24,7 @@ export function useKanbanData(
     perfil?: string | null
     legaldesk_usuario_id?: string | null
     ativo?: boolean
+    hasSystemAccess?: boolean
   } | null,
   currentManagedUserIds?: string[] | null,
 ) {
@@ -77,34 +78,23 @@ export function useKanbanData(
 
       if (!contact || contact.current_stage === newStage) return
 
-      // Obter perfil e equipe para validação centralizada
-      // Prioriza os valores passados como parâmetro (providos pelo useAuth() na página)
-      let activeProfile = currentUserProfile
-      let activeTeamIds = currentManagedUserIds
+      // Etapa 5.19: Para decisões normais de edição no frontend, a autorização exige
+      // contexto central resolvido vindo do useAuth() (hasSystemAccess === true, perfil efetivo, equipe).
+      // Se chamado sem contexto central de autorização: comportamento seguro (menor privilégio),
+      // impedindo a operação frontend sem consultar profiles.perfil nem chamar legacy_managed_operational_ids().
+      const activeProfile = currentUserProfile
+      const activeTeamIds = currentManagedUserIds
 
-      if (!activeProfile) {
-        const { data: authData } = await supabase.auth.getUser()
-        if (authData?.user?.id) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('perfil, legaldesk_usuario_id, ativo')
-            .eq('id', authData.user.id)
-            .maybeSingle()
-
-          activeProfile = profile
-
-          // Fallback autônomo apenas quando useKanbanData for chamado sem profile/managedUserIds.
-          // Utiliza a RPC legacy_managed_operational_ids para evitar consulta a profiles.gestor_id.
-          if (profile?.perfil === 'gestor') {
-            const { data: legacyRpcData } = await supabase.rpc('legacy_managed_operational_ids')
-            activeTeamIds = (legacyRpcData || [])
-              .map((p: any) => p.legaldesk_usuario_id)
-              .filter((id: any): id is string => Boolean(id))
-          }
-        }
+      if (!activeProfile || activeProfile.hasSystemAccess !== true) {
+        toast({
+          title: 'Aviso',
+          description: 'Ação não permitida: contexto de autorização não resolvido.',
+          variant: 'destructive',
+        })
+        return
       }
 
-      if (activeProfile && activeProfile.ativo === false) {
+      if (activeProfile.ativo === false) {
         toast({
           title: 'Acesso Negado',
           description: 'Seu usuário está desativado.',
@@ -117,7 +107,7 @@ export function useKanbanData(
         toast({
           title: 'Aviso',
           description:
-            activeProfile?.perfil === 'gestor'
+            activeProfile.perfil === 'gestor'
               ? 'Gestor só pode alterar o status de atendimentos próprios ou da sua equipe.'
               : 'Você só pode alterar o status de seus próprios atendimentos.',
           variant: 'destructive',
