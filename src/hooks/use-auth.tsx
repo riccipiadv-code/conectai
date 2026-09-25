@@ -30,6 +30,75 @@ export interface UserProfile {
    * Status detalhado da leitura no Gestor de Acessos Ricci (`core_*`).
    */
   coreStatus?: CoreAccessStatus
+  /**
+   * Indica se o usuário possui acesso permitido ao sistema Conectaí.
+   * Falso quando core_denied ('no_core_user', 'no_system_link', 'link_inactive', 'profile_inactive_or_invalid')
+   * ou quando o cadastro legado estiver inativo (ativo = false).
+   */
+  hasSystemAccess?: boolean
+}
+
+/**
+ * Função utilitária pura para avaliar se uma tentativa de acesso deve ser permitida ou bloqueada
+ * e se a sessão Supabase Auth deve ser preservada ou encerrada.
+ * Centraliza as regras de negócio utilizadas pelo AuthGuard e useAuth, facilitando testes unitários isolados.
+ */
+export function evaluateAccessDecision(params: {
+  user: { id: string } | null
+  profile: {
+    ativo: boolean
+    perfil: string
+    perfilSource?: EffectiveProfileSource
+    coreStatus?: CoreAccessStatus
+  } | null
+}): {
+  allowed: boolean
+  redirectReason?: 'disabled' | 'no_access' | 'login'
+  shouldSignOut: boolean
+} {
+  const { user, profile } = params
+
+  if (!user) {
+    return {
+      allowed: false,
+      redirectReason: 'login',
+      shouldSignOut: false,
+    }
+  }
+
+  // Cadastro desativado em profiles.ativo: bloqueado e com logout/sessão encerrada
+  if (profile && profile.ativo === false) {
+    return {
+      allowed: false,
+      redirectReason: 'disabled',
+      shouldSignOut: true,
+    }
+  }
+
+  // Acesso negado pelo Gestor de Acessos Ricci:
+  // Bloqueado no Conectaí, MAS NÃO deve encerrar a sessão Supabase Auth
+  // (o usuário pode ter acesso a outros sistemas Ricci com a mesma credencial)
+  if (profile?.perfilSource === 'core_denied') {
+    return {
+      allowed: false,
+      redirectReason: 'no_access',
+      shouldSignOut: false,
+    }
+  }
+
+  // Se não há perfil carregado ou o perfil está vazio sem ter sido technical_error
+  if (!profile || !profile.perfil) {
+    return {
+      allowed: false,
+      redirectReason: 'no_access',
+      shouldSignOut: false,
+    }
+  }
+
+  return {
+    allowed: true,
+    shouldSignOut: false,
+  }
 }
 
 interface AuthContextType {
@@ -47,6 +116,11 @@ interface AuthContextType {
    * Opcional / aditivo.
    */
   identity?: AggregatedUserIdentity | null
+  /**
+   * Flag central indicando se o usuário autenticado tem acesso permitido ao Conectaí.
+   * Verdadeiro apenas se autenticado, profiles.ativo !== false e perfilSource !== 'core_denied'.
+   */
+  hasSystemAccess: boolean
   signIn: (email: string, password: string) => Promise<{ error: any; disabled?: boolean }>
   signOut: () => Promise<{ error: any }>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -218,6 +292,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       auditCoreEquivalence(legacyProfileInfo, coreData, resolution.perfil, resolution.source)
 
+      // Determinar se tem acesso ao sistema Conectaí:
+      // Acesso negado se o core explicitamente negar o vínculo/perfil do Conectaí ou cadastro inativo
+      const hasAccess = legacyProfileInfo.ativo && resolution.hasSystemAccess
+
       // Somente agora, com a resolução final do perfil concluída, publicar dados de autenticação e perfil
       setManagedUserIds(teamUserIds)
       setCoreAccess(coreData)
@@ -229,6 +307,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         managed_user_ids: teamUserIds,
         perfilSource: resolution.source,
         coreStatus: resolution.coreStatus,
+        hasSystemAccess: hasAccess,
       })
       setSession(currentSession)
       setUser(currentSession.user)
@@ -381,6 +460,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error }
   }
 
+  const hasSystemAccess = Boolean(
+    user && profile && profile.ativo !== false && profile.perfilSource !== 'core_denied',
+  )
+
   return (
     <AuthContext.Provider
       value={{
@@ -390,6 +473,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         managedUserIds,
         coreAccess,
         identity,
+        hasSystemAccess,
         signIn,
         signOut,
         resetPassword,

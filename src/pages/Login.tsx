@@ -29,6 +29,7 @@ export default function Login() {
 
   const reason = searchParams.get('reason')
   const isDisabledParam = reason === 'disabled'
+  const isNoAccessParam = reason === 'no_access'
 
   useEffect(() => {
     if (isDisabledParam) {
@@ -37,11 +38,25 @@ export default function Login() {
         description: 'Seu acesso foi desativado. Entre em contato com o administrador.',
         variant: 'destructive',
       })
+    } else if (isNoAccessParam) {
+      toast({
+        title: 'Acesso não permitido',
+        description:
+          'Seu usuário não possui acesso ao Conectaí. Procure o administrador do Gestor de Acessos Ricci.',
+        variant: 'destructive',
+      })
     }
-  }, [isDisabledParam, toast])
+  }, [isDisabledParam, isNoAccessParam, toast])
 
   useEffect(() => {
-    if (!loading && user && profile && profile.ativo !== false) {
+    // Redireciona para home apenas se autenticado, ativo e NÃO negado pelo core
+    if (
+      !loading &&
+      user &&
+      profile &&
+      profile.ativo !== false &&
+      profile.perfilSource !== 'core_denied'
+    ) {
       navigate('/')
     }
   }, [user, profile, loading, navigate])
@@ -169,6 +184,23 @@ export default function Login() {
               </AlertTitle>
               <AlertDescription className="text-rose-800 dark:text-rose-300 text-xs">
                 Seu acesso foi desativado. Entre em contato com o administrador.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+        {isNoAccessParam && (
+          <div className="px-6 pb-2">
+            <Alert
+              variant="destructive"
+              className="border-amber-300 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/40"
+            >
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertTitle className="text-amber-900 dark:text-amber-200 font-semibold text-sm">
+                Acesso Não Permitido
+              </AlertTitle>
+              <AlertDescription className="text-amber-800 dark:text-amber-300 text-xs">
+                Seu usuário não possui acesso ao Conectaí. Procure o administrador do Gestor de
+                Acessos Ricci.
               </AlertDescription>
             </Alert>
           </div>

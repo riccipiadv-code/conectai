@@ -390,12 +390,14 @@ export function resolveEffectiveProfile(
   perfil: string
   source: EffectiveProfileSource
   coreStatus: CoreAccessStatus
+  hasSystemAccess: boolean
 } {
   if (!coreResult) {
     return {
       perfil: legacyPerfil || '',
       source: 'legacy_fallback',
       coreStatus: 'technical_error',
+      hasSystemAccess: Boolean(legacyPerfil),
     }
   }
 
@@ -406,6 +408,7 @@ export function resolveEffectiveProfile(
       perfil: resolvedPerfil,
       source: 'core',
       coreStatus: 'ok',
+      hasSystemAccess: true,
     }
   }
 
@@ -415,6 +418,7 @@ export function resolveEffectiveProfile(
       perfil: legacyPerfil || '',
       source: 'legacy_fallback',
       coreStatus: 'technical_error',
+      hasSystemAccess: Boolean(legacyPerfil),
     }
   }
 
@@ -424,6 +428,7 @@ export function resolveEffectiveProfile(
     perfil: '',
     source: 'core_denied',
     coreStatus: status,
+    hasSystemAccess: false,
   }
 }
 

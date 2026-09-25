@@ -15,7 +15,7 @@ interface AuthGuardProps {
  * Se o usuário for inativo ou não autenticado, redireciona para /login sem renderizar a rota.
  */
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, hasSystemAccess } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -26,7 +26,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // Usuário inativo deve ser redirecionado para /login com aviso
+  // Usuário inativo no cadastro legado: redirecionar para /login com aviso de desativação
   if (profile && profile.ativo === false) {
     return <Navigate to="/login?reason=disabled" replace />
   }
@@ -34,6 +34,14 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // Usuário não autenticado
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // Bloqueio do Conectaí quando o Gestor de Acessos Ricci negar acesso:
+  // (no_core_user, no_system_link, link_inactive, profile_inactive_or_invalid)
+  // O usuário está autenticado, mas NÃO possui acesso/vínculo válido com o Conectaí.
+  // NÃO destrói a sessão Supabase (pode ter acesso a outros sistemas Ricci com a mesma identidade).
+  if (profile?.perfilSource === 'core_denied' || !hasSystemAccess) {
+    return <Navigate to="/login?reason=no_access" replace />
   }
 
   return <>{children}</>
@@ -51,7 +59,7 @@ interface AdminGuardProps {
  * antes de qualquer componente filho ser montado ou dados administrativos serem carregados.
  */
 export function AdminGuard({ children }: AdminGuardProps) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, hasSystemAccess } = useAuth()
 
   if (loading) {
     return (
@@ -67,6 +75,10 @@ export function AdminGuard({ children }: AdminGuardProps) {
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  if (profile?.perfilSource === 'core_denied' || !hasSystemAccess) {
+    return <Navigate to="/login?reason=no_access" replace />
   }
 
   // Apenas 'administrador' com perfil ativo pode prosseguir
