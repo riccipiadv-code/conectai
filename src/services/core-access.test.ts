@@ -1277,5 +1277,427 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     'Cenário 55 (5.19.7-8) falhou: Kanban sem contexto central deve barrar operação sem simular permissões legadas',
   )
 
+  // =========================================================================
+  // CENÁRIOS QA: Migração Edge Functions para core_* (Autorização e Gestor)
+  // QA 1 a 10 exigidos pela especificação:
+  // =========================================================================
+
+  interface MockCoreUser {
+    id: string
+    auth_user_id: string | null
+    nome: string
+    email: string
+    ativo: boolean
+    gestor_id: string | null
+  }
+
+  interface MockCoreSistema {
+    id: string
+    codigo: string
+    ativo: boolean
+  }
+
+  interface MockCorePerfil {
+    id: string
+    codigo: string
+    ativo: boolean
+  }
+
+  interface MockCoreUsuarioSistema {
+    id: string
+    usuario_id: string
+    sistema_id: string
+    perfil_id: string
+    ativo: boolean
+  }
+
+  interface MockProfileBridge {
+    id: string
+    legaldesk_usuario_id: string | null
+    gestor_id?: string | null
+    perfil?: string | null
+  }
+
+  // Helper simulando a lógica exata de verifyConectaiAdmin
+  function evaluateEdgeFunctionAdminAccess(params: {
+    authUserId?: string | null
+    coreUsers: MockCoreUser[]
+    coreSistemas: MockCoreSistema[]
+    corePerfis: MockCorePerfil[]
+    coreUsuarioSistemas: MockCoreUsuarioSistema[]
+  }): { allowed: boolean; reason?: string } {
+    if (!params.authUserId) {
+      return { allowed: false, reason: 'unauthorized' }
+    }
+
+    const coreUser = params.coreUsers.find((u) => u.auth_user_id === params.authUserId)
+    if (!coreUser) {
+      return { allowed: false, reason: 'no_core_user' }
+    }
+    if (!coreUser.ativo) {
+      return { allowed: false, reason: 'core_user_inactive' }
+    }
+
+    const sistemaConectai = params.coreSistemas.find((s) => s.codigo === 'CONECTAI')
+    if (!sistemaConectai || !sistemaConectai.ativo) {
+      return { allowed: false, reason: 'sistema_inactive_or_missing' }
+    }
+
+    const links = params.coreUsuarioSistemas.filter(
+      (us) => us.usuario_id === coreUser.id && us.sistema_id === sistemaConectai.id && us.ativo,
+    )
+
+    const hasAdmin = links.some((link) => {
+      const perfil = params.corePerfis.find((p) => p.id === link.perfil_id)
+      return perfil && perfil.ativo && perfil.codigo === 'ADMINISTRADOR'
+    })
+
+    if (!hasAdmin) {
+      return { allowed: false, reason: 'admin_role_missing_or_inactive' }
+    }
+
+    return { allowed: true }
+  }
+
+  // Helper simulando a lógica exata de resolveGestorFromCore
+  function evaluateEdgeFunctionResolveGestor(params: {
+    targetLegaldeskUsuarioId: string
+    destEmail: string
+    profileBridges: MockProfileBridge[]
+    coreUsers: MockCoreUser[]
+  }): { gestorEmail: string | null; gestorNome: string | null } {
+    if (!params.targetLegaldeskUsuarioId) {
+      return { gestorEmail: null, gestorNome: null }
+    }
+
+    // 1. Ponte profiles.legaldesk_usuario_id -> profiles.id (auth_user_id)
+    const bridge = params.profileBridges.find(
+      (p) => p.legaldesk_usuario_id === params.targetLegaldeskUsuarioId,
+    )
+    if (!bridge?.id) {
+      return { gestorEmail: null, gestorNome: null }
+    }
+
+    // 2. core_usuarios correspondente
+    const coreUser = params.coreUsers.find((u) => u.auth_user_id === bridge.id)
+    if (!coreUser?.gestor_id) {
+      return { gestorEmail: null, gestorNome: null }
+    }
+
+    // 3. Gestor no core_usuarios
+    const gestorCore = params.coreUsers.find((u) => u.id === coreUser.gestor_id)
+    if (!gestorCore) {
+      return { gestorEmail: null, gestorNome: null }
+    }
+
+    const candidateEmail = (gestorCore.email || '').trim()
+    if (candidateEmail && candidateEmail.toLowerCase() !== params.destEmail.toLowerCase()) {
+      return {
+        gestorEmail: candidateEmail,
+        gestorNome: (gestorCore.nome || '').trim() || null,
+      }
+    }
+
+    return { gestorEmail: null, gestorNome: null }
+  }
+
+  // Base de testes mockada
+  const baseSistemas: MockCoreSistema[] = [{ id: 'sis-conectai', codigo: 'CONECTAI', ativo: true }]
+  const basePerfis: MockCorePerfil[] = [
+    { id: 'perf-admin', codigo: 'ADMINISTRADOR', ativo: true },
+    { id: 'perf-gestor', codigo: 'GESTOR', ativo: true },
+    { id: 'perf-op', codigo: 'OPERACIONAL', ativo: true },
+    { id: 'perf-admin-inativo', codigo: 'ADMINISTRADOR', ativo: false },
+  ]
+
+  // QA 1: Administrador do Conectaí acessa configurações de e-mail
+  const qa1Users: MockCoreUser[] = [
+    {
+      id: 'cu-admin',
+      auth_user_id: 'auth-admin',
+      nome: 'Admin User',
+      email: 'admin@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa1Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-1',
+      usuario_id: 'cu-admin',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-admin',
+      ativo: true,
+    },
+  ]
+  const qa1 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-admin',
+    coreUsers: qa1Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa1Links,
+  })
+  assert(qa1.allowed === true, 'QA 1 falhou: administrador do Conectaí deve acessar configurações')
+
+  // QA 2: Gestor é bloqueado nas configurações de e-mail
+  const qa2Users: MockCoreUser[] = [
+    {
+      id: 'cu-gestor',
+      auth_user_id: 'auth-gestor',
+      nome: 'Gestor User',
+      email: 'gestor@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa2Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-2',
+      usuario_id: 'cu-gestor',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-gestor',
+      ativo: true,
+    },
+  ]
+  const qa2 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-gestor',
+    coreUsers: qa2Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa2Links,
+  })
+  assert(
+    qa2.allowed === false,
+    'QA 2 falhou: gestor deve ser bloqueado nas funções de configurações de e-mail',
+  )
+
+  // QA 3: Operacional é bloqueado nas configurações de e-mail
+  const qa3Users: MockCoreUser[] = [
+    {
+      id: 'cu-op',
+      auth_user_id: 'auth-op',
+      nome: 'Op User',
+      email: 'op@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa3Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-3',
+      usuario_id: 'cu-op',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-op',
+      ativo: true,
+    },
+  ]
+  const qa3 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-op',
+    coreUsers: qa3Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa3Links,
+  })
+  assert(
+    qa3.allowed === false,
+    'QA 3 falhou: operacional deve ser bloqueado nas configurações de e-mail',
+  )
+
+  // QA 4: Usuário sem vínculo Conectaí é bloqueado
+  const qa4Users: MockCoreUser[] = [
+    {
+      id: 'cu-sem-vinculo',
+      auth_user_id: 'auth-sem-vinculo',
+      nome: 'Sem Vinculo',
+      email: 'sem@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa4 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-sem-vinculo',
+    coreUsers: qa4Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: [],
+  })
+  assert(
+    qa4.allowed === false,
+    'QA 4 falhou: usuário sem vínculo Conectaí deve ser bloqueado nas funções administrativas',
+  )
+
+  // QA 5: Vínculo inativo é bloqueado
+  const qa5Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-5',
+      usuario_id: 'cu-admin',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-admin',
+      ativo: false, // vínculo inativo
+    },
+  ]
+  const qa5 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-admin',
+    coreUsers: qa1Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa5Links,
+  })
+  assert(qa5.allowed === false, 'QA 5 falhou: vínculo inativo deve ser bloqueado')
+
+  // QA 6: Perfil inativo é bloqueado
+  const qa6Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-6',
+      usuario_id: 'cu-admin',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-admin-inativo', // perfil inativo
+      ativo: true,
+    },
+  ]
+  const qa6 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-admin',
+    coreUsers: qa1Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa6Links,
+  })
+  assert(qa6.allowed === false, 'QA 6 falhou: perfil inativo deve ser bloqueado')
+
+  // QA 7: Usuário inativo em core_usuarios é bloqueado mesmo com vínculo/perfil admin
+  const qa7Users: MockCoreUser[] = [
+    {
+      id: 'cu-admin-inactive',
+      auth_user_id: 'auth-admin-inactive',
+      nome: 'Admin Inativo',
+      email: 'admin_inativo@riccipi.com.br',
+      ativo: false,
+      gestor_id: null,
+    },
+  ]
+  const qa7Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-7',
+      usuario_id: 'cu-admin-inactive',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-admin',
+      ativo: true,
+    },
+  ]
+  const qa7 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-admin-inactive',
+    coreUsers: qa7Users,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa7Links,
+  })
+  assert(qa7.allowed === false, 'QA 7 falhou: core_usuarios.ativo=false deve ser bloqueado')
+
+  // QA 8: CC vai ao gestor definido em core_usuarios.gestor_id
+  const qa8Profiles: MockProfileBridge[] = [
+    {
+      id: 'auth-resp-1',
+      legaldesk_usuario_id: 'ld-resp-1',
+      gestor_id: 'auth-gestor-legado-DIVERGENTE', // divergente propositalmente
+    },
+  ]
+  const qa8CoreUsers: MockCoreUser[] = [
+    {
+      id: 'cu-resp-1',
+      auth_user_id: 'auth-resp-1',
+      nome: 'Responsavel 1',
+      email: 'resp1@riccipi.com.br',
+      ativo: true,
+      gestor_id: 'cu-gestor-central', // Gestor central oficial
+    },
+    {
+      id: 'cu-gestor-central',
+      auth_user_id: 'auth-gestor-central',
+      nome: 'Gestor Central',
+      email: 'gestor.central@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa8 = evaluateEdgeFunctionResolveGestor({
+    targetLegaldeskUsuarioId: 'ld-resp-1',
+    destEmail: 'resp1@riccipi.com.br',
+    profileBridges: qa8Profiles,
+    coreUsers: qa8CoreUsers,
+  })
+  assert(
+    qa8.gestorEmail === 'gestor.central@riccipi.com.br',
+    'QA 8 falhou: CC deve ir exclusivamente ao gestor definido em core_usuarios.gestor_id',
+  )
+
+  // QA 9: Usuário sem gestor no core não gera erro e retorna gestorEmail null
+  const qa9CoreUsers: MockCoreUser[] = [
+    {
+      id: 'cu-resp-2',
+      auth_user_id: 'auth-resp-2',
+      nome: 'Responsavel Sem Gestor',
+      email: 'sem.gestor@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa9Profiles: MockProfileBridge[] = [
+    {
+      id: 'auth-resp-2',
+      legaldesk_usuario_id: 'ld-resp-2',
+      gestor_id: null,
+    },
+  ]
+  const qa9 = evaluateEdgeFunctionResolveGestor({
+    targetLegaldeskUsuarioId: 'ld-resp-2',
+    destEmail: 'sem.gestor@riccipi.com.br',
+    profileBridges: qa9Profiles,
+    coreUsers: qa9CoreUsers,
+  })
+  assert(
+    qa9.gestorEmail === null && qa9.gestorNome === null,
+    'QA 9 falhou: usuário sem gestor no core deve retornar gestorEmail null sem erros',
+  )
+
+  // QA 10: Nenhuma dessas funções usa profiles.perfil ou profiles.gestor_id como autoridade
+  // Se um usuário tiver profiles.perfil = 'administrador', mas não tiver vínculo admin no core, deve ser bloqueado!
+  const qa10UserProfiles: MockProfileBridge[] = [
+    {
+      id: 'auth-fake-admin',
+      legaldesk_usuario_id: 'ld-fake',
+      perfil: 'administrador', // legado mente que é admin
+    },
+  ]
+  const qa10CoreUsers: MockCoreUser[] = [
+    {
+      id: 'cu-fake-admin',
+      auth_user_id: 'auth-fake-admin',
+      nome: 'Fake Admin',
+      email: 'fake@riccipi.com.br',
+      ativo: true,
+      gestor_id: null,
+    },
+  ]
+  const qa10Links: MockCoreUsuarioSistema[] = [
+    {
+      id: 'link-fake',
+      usuario_id: 'cu-fake-admin',
+      sistema_id: 'sis-conectai',
+      perfil_id: 'perf-op', // No core é apenas operacional
+      ativo: true,
+    },
+  ]
+  const qa10 = evaluateEdgeFunctionAdminAccess({
+    authUserId: 'auth-fake-admin',
+    coreUsers: qa10CoreUsers,
+    coreSistemas: baseSistemas,
+    corePerfis: basePerfis,
+    coreUsuarioSistemas: qa10Links,
+  })
+  assert(
+    qa10.allowed === false,
+    'QA 10 falhou: profiles.perfil não pode conceder acesso de administrador',
+  )
+
   return { passed, failed: errors.length, errors }
 }

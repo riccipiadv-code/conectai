@@ -1,6 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import nodemailer from 'npm:nodemailer'
+import { resolveGestorFromCore } from '../_shared/core-auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +34,7 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
   try {
-    const token = authHeader.replace('Bearer ', '')
+    const token = authHeader.replace(/^Bearer\s+/i, '')
     const {
       data: { user },
       error: userError,
@@ -169,36 +170,12 @@ Deno.serve(async (req: Request) => {
     if (contatoError) throw contatoError
     if (!contato) throw new Error('Contato não encontrado.')
 
-    // 5.1. Buscar gestor vinculado ao responsável (profiles.legaldesk_usuario_id -> profiles.gestor_id)
-    let gestorEmail: string | null = null
-    try {
-      const { data: respProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('gestor_id')
-        .eq('legaldesk_usuario_id', targetResponsavelId)
-        .maybeSingle()
-
-      if (profileError) {
-        console.warn('Erro ao consultar profile do responsável para obter gestor:', profileError)
-      } else if (respProfile?.gestor_id) {
-        const { data: gestorProfile, error: gestorError } = await supabase
-          .from('profiles')
-          .select('email, name, perfil')
-          .eq('id', respProfile.gestor_id)
-          .maybeSingle()
-
-        if (gestorError) {
-          console.warn('Erro ao consultar profile do gestor:', gestorError)
-        } else if (gestorProfile?.email) {
-          const candidateEmail = gestorProfile.email.trim()
-          if (candidateEmail && candidateEmail.toLowerCase() !== destEmail.toLowerCase()) {
-            gestorEmail = candidateEmail
-          }
-        }
-      }
-    } catch (gestorLookupError) {
-      console.warn('Falha segura na busca de gestor:', gestorLookupError)
-    }
+    // 5.1. Buscar gestor vinculado ao responsável exclusivamente pelo core_*
+    // 1. targetResponsavelId -> profiles.legaldesk_usuario_id apenas como ponte para descobrir auth_user_id
+    // 2. localizar correspondente em core_usuarios
+    // 3. usar core_usuarios.gestor_id para determinar o gestor
+    // 4. buscar os dados do gestor em core_usuarios
+    const { gestorEmail } = await resolveGestorFromCore(supabase, targetResponsavelId, destEmail)
 
     // 6. Buscar configuração ativa do E-mail Geral
     const { data: setting, error: settingError } = await supabase
@@ -227,7 +204,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // 7. Montar o e-mail
-    // Extrair o primeiro nome: split por espaço, pegar o primeiro token
     const fullName = (responsavel.nome || '').trim()
     const firstName = fullName ? fullName.split(/\s+/)[0] : 'Responsável'
 
