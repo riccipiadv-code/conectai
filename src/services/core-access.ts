@@ -121,11 +121,11 @@ export interface CoreSubordinate {
 export type ManagedTeamSource = 'core' | 'legacy_fallback'
 
 export interface ManagedTeamResult {
-  /** Fonte utilizada para resolver a equipe: 'core' quando core válido; 'legacy_fallback' apenas em falha técnica */
+  /** Fonte utilizada para resolver a equipe: 'core' quando core válido; 'legacy_fallback' apenas em falha técnica ou inconsistência da RPC */
   source: ManagedTeamSource
   /** Status da leitura central */
   status: 'ok' | 'technical_error'
-  /** Subordinados válidos e ativos encontrados no core (se core foi usado) */
+  /** Subordinados válidos e ativos encontrados no core */
   coreSubordinates: CoreSubordinate[]
   /** IDs operacionais (legaldesk_usuario_id) prontos para consumo por canEditContact */
   managedUserIds: string[]
@@ -133,6 +133,8 @@ export interface ManagedTeamResult {
   managedCoreUserIds: string[]
   /** Mensagem descritiva em caso de falha ou auditoria */
   detail?: string
+  /** Diagnóstico de inconsistência na ponte RPC, se houver */
+  rpcDiscrepancy?: 'empty_rpc' | 'partial_rpc' | 'rpc_error' | null
 }
 
 export interface AggregatedUserIdentity {
@@ -464,53 +466,64 @@ export function resolveEffectiveProfile(
 }
 
 /**
- * Converte subordinados do core em IDs operacionais (`legaldesk_usuario_id`) através da ponte legada `profiles`.
- * Nota: Ponte transitória (Etapa 5.8) necessária até que canEditContact e manychat_contatos
- * deixem de depender de legaldesk_usuarios.id.
+ * Converte subordinados do core em IDs operacionais (`legaldesk_usuario_id`) através da RPC `core_managed_operational_ids`.
+ * Etapa 5.10: Substitui a consulta direta à tabela `profiles` pela RPC `core_managed_operational_ids()`.
+ *
+ * Retorna `{ status: 'ok', items }` ou `{ status: 'error', error }`.
  */
-export async function bridgeSubordinatesToOperationalIds(
-  subordinateAuthUserIds: string[],
-): Promise<string[]> {
-  const validAuthIds = subordinateAuthUserIds.filter(Boolean)
-  if (validAuthIds.length === 0) return []
-
+export async function bridgeSubordinatesToOperationalIds(): Promise<{
+  status: 'ok' | 'error'
+  items: Array<{ auth_user_id: string; legaldesk_usuario_id: string }>
+  error?: string
+}> {
   try {
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('legaldesk_usuario_id')
-      .in('id', validAuthIds)
+    const { data, error } = await supabase.rpc('core_managed_operational_ids')
 
     if (error) {
       if (import.meta.env.DEV) {
         console.warn(
-          '[core-access] Erro ao obter ponte legaldesk_usuario_id para subordinados:',
-          error,
+          '[core-access] Erro ao chamar RPC core_managed_operational_ids:',
+          error.message,
         )
       }
-      return []
+      return {
+        status: 'error',
+        items: [],
+        error: error.message,
+      }
     }
 
-    return (profiles || [])
-      .map((p) => p.legaldesk_usuario_id)
-      .filter((id): id is string => Boolean(id))
-  } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[core-access] Exceção ao mapear legaldesk_usuario_id de subordinados:', err)
+    const items = (data || []).filter(
+      (item): item is { auth_user_id: string; legaldesk_usuario_id: string } =>
+        Boolean(item && item.auth_user_id && item.legaldesk_usuario_id),
+    )
+
+    return {
+      status: 'ok',
+      items,
     }
-    return []
+  } catch (err: any) {
+    if (import.meta.env.DEV) {
+      console.warn('[core-access] Exceção na RPC core_managed_operational_ids:', err)
+    }
+    return {
+      status: 'error',
+      items: [],
+      error: err?.message || 'Exceção inesperada na RPC core_managed_operational_ids',
+    }
   }
 }
 
 /**
  * Consulta a equipe de subordinados diretos de um gestor no Gestor de Acessos Ricci (`core_*`).
  *
- * Regras:
+ * Regras (Etapa 5.10):
  * - Filtra `core_usuarios` onde `gestor_id = gestorCoreId` e `ativo = true`.
  * - Valida vínculo com Conectaí em `core_usuario_sistemas`: `sistema_id = CORE_CONECTAI_SYSTEM_ID`, `ativo = true`.
  * - Valida perfil associado em `core_perfis`: `ativo = true` e código válido (`ADMINISTRADOR`, `GESTOR` ou `OPERACIONAL`).
- * - Obtém temporariamente os `legaldesk_usuario_id` correspondentes via tabela `profiles` como ponte operacional.
+ * - Obtém temporariamente os `legaldesk_usuario_id` correspondentes via RPC `core_managed_operational_ids()`.
  *
- * Retorna `{ status: 'ok', subordinates, managedUserIds, managedCoreUserIds }` ou `{ status: 'technical_error' }`.
+ * Retorna `{ status: 'ok', subordinates, managedUserIds, managedCoreUserIds, rpcBridge }` ou `{ status: 'technical_error' }`.
  * NUNCA lança exceção.
  */
 export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<{
@@ -519,6 +532,11 @@ export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<
   managedUserIds: string[]
   managedCoreUserIds: string[]
   detail?: string
+  rpcBridge?: {
+    status: 'ok' | 'error'
+    items: Array<{ auth_user_id: string; legaldesk_usuario_id: string }>
+    error?: string
+  }
 }> {
   if (!gestorCoreId) {
     return {
@@ -560,6 +578,7 @@ export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<
         subordinates: [],
         managedUserIds: [],
         managedCoreUserIds: [],
+        rpcBridge: { status: 'ok', items: [] },
       }
     }
 
@@ -571,6 +590,7 @@ export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<
         subordinates: [],
         managedUserIds: [],
         managedCoreUserIds: [],
+        rpcBridge: { status: 'ok', items: [] },
       }
     }
 
@@ -641,18 +661,39 @@ export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<
       })
     }
 
-    // 4. Mapear para legaldesk_usuario_id através da ponte transitória profiles
-    const subAuthUserIds = eligibleSubordinates
-      .map((s) => s.authUserId)
-      .filter((id): id is string => Boolean(id))
+    // Se nenhum subordinado for elegível (vínculo ou perfil inativo no Conectaí)
+    if (eligibleSubordinates.length === 0) {
+      return {
+        status: 'ok',
+        subordinates: [],
+        managedUserIds: [],
+        managedCoreUserIds: [],
+        rpcBridge: { status: 'ok', items: [] },
+      }
+    }
 
-    const operationalIds = await bridgeSubordinatesToOperationalIds(subAuthUserIds)
+    // 4. Etapa 5.10: Obter legaldesk_usuario_id via RPC core_managed_operational_ids
+    const rpcResult = await bridgeSubordinatesToOperationalIds()
+
+    // Mapear apenas para os subordinados elegíveis do core
+    const eligibleAuthIds = new Set(
+      eligibleSubordinates.map((s) => s.authUserId).filter((id): id is string => Boolean(id)),
+    )
+
+    let operationalIds: string[] = []
+    if (rpcResult.status === 'ok') {
+      operationalIds = rpcResult.items
+        .filter((item) => eligibleAuthIds.has(item.auth_user_id))
+        .map((item) => item.legaldesk_usuario_id)
+        .filter(Boolean)
+    }
 
     return {
       status: 'ok',
       subordinates: eligibleSubordinates,
       managedUserIds: operationalIds,
       managedCoreUserIds: eligibleSubordinates.map((s) => s.id),
+      rpcBridge: rpcResult,
     }
   } catch (err: any) {
     if (import.meta.env.DEV) {
@@ -670,8 +711,14 @@ export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<
 
 /**
  * Função utilitária pura para resolver a equipe gerenciada (`managedUserIds`) seguindo core-first com fallback legado:
- * - Se coreTeamResult tiver status 'ok': utiliza a equipe central (mesmo que vazia).
- * - Se coreTeamResult for falha técnica ('technical_error') ou null: utiliza a equipe legada de profiles.
+ * Etapa 5.10 - Tratamento de Inconsistência da Ponte RPC:
+ * 1. Falha técnica na leitura central ('technical_error' ou null) → fallback legado (`source: 'legacy_fallback'`).
+ * 2. RPC OK + lista vazia + equipe central também vazia → resultado válido, `managedUserIds = []`, SEM fallback (`source: 'core'`).
+ * 3. Equipe central COM subordinados válidos + RPC retorna zero IDs → inconsistência técnica da ponte:
+ *    NÃO tratar como equipe vazia válida; registrar log técnico em dev; usar fallback legado temporário (`source: 'legacy_fallback'`).
+ * 4. RPC parcial (ex.: central tem 3 subordinados, RPC retorna 2) → detectar inconsistência, NÃO mesclar silenciosamente,
+ *    registrar diagnóstico em dev, usar fallback legado (`source: 'legacy_fallback'`).
+ * 5. Erro técnico da RPC (status === 'error') com subordinados centrais presentes → fallback legado (`source: 'legacy_fallback'`).
  */
 export function resolveManagedTeam(
   coreTeamResult: {
@@ -680,30 +727,114 @@ export function resolveManagedTeam(
     managedUserIds: string[]
     managedCoreUserIds: string[]
     detail?: string
+    rpcBridge?: {
+      status: 'ok' | 'error'
+      items: Array<{ auth_user_id: string; legaldesk_usuario_id: string }>
+      error?: string
+    }
   } | null,
   legacyManagedUserIds: string[],
 ): ManagedTeamResult {
-  // Se o core retornou status 'ok', o core prevalece categoricamente.
-  // Equipe vazia válida é resultado legítimo, NÃO deve acionar fallback legado.
-  if (coreTeamResult && coreTeamResult.status === 'ok') {
+  // Se coreTeamResult for nulo ou status técnico de erro: fallback legado
+  if (!coreTeamResult || coreTeamResult.status !== 'ok') {
     return {
-      source: 'core',
-      status: 'ok',
-      coreSubordinates: coreTeamResult.subordinates,
-      managedUserIds: coreTeamResult.managedUserIds,
-      managedCoreUserIds: coreTeamResult.managedCoreUserIds,
-      detail: coreTeamResult.detail,
+      source: 'legacy_fallback',
+      status: 'technical_error',
+      coreSubordinates: [],
+      managedUserIds: legacyManagedUserIds || [],
+      managedCoreUserIds: [],
+      detail: coreTeamResult?.detail || 'Fallback legado por falha técnica no core',
+      rpcDiscrepancy: null,
     }
   }
 
-  // Falha técnica: fallback seguro para a equipe legada
+  const { subordinates, managedUserIds, managedCoreUserIds, detail, rpcBridge } = coreTeamResult
+  const centralSubsCount = subordinates.length
+
+  // Cenário 1: Gestor sem subordinados válidos no core
+  if (centralSubsCount === 0) {
+    // Equipe central vazia válida: managedUserIds = [], SEM fallback legado
+    return {
+      source: 'core',
+      status: 'ok',
+      coreSubordinates: [],
+      managedUserIds: [],
+      managedCoreUserIds: [],
+      detail,
+      rpcDiscrepancy: null,
+    }
+  }
+
+  // Se a central possui subordinados (centralSubsCount > 0):
+  // Avaliar o retorno da ponte RPC
+
+  // A. Erro técnico na execução da RPC
+  if (rpcBridge && rpcBridge.status === 'error') {
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[core-access:resolveManagedTeam] Erro técnico na RPC core_managed_operational_ids: ${rpcBridge.error}. Usando fallback legado seguro temporário.`,
+      )
+    }
+    return {
+      source: 'legacy_fallback',
+      status: 'technical_error',
+      coreSubordinates: subordinates,
+      managedUserIds: legacyManagedUserIds || [],
+      managedCoreUserIds,
+      detail: `Erro técnico na RPC de IDs operacionais: ${rpcBridge.error}`,
+      rpcDiscrepancy: 'rpc_error',
+    }
+  }
+
+  const rpcReturnedCount = managedUserIds.length
+
+  // B. Equipe central com subordinados válidos, mas RPC retornou zero IDs operacionais
+  if (rpcReturnedCount === 0) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[core-access:resolveManagedTeam] Inconsistência na ponte RPC: equipe central possui ${centralSubsCount} subordinado(s), mas RPC retornou 0 IDs operacionais. Aplicando fallback legado temporário para preservar permissões operacionais.`,
+        { subordinates, legacyManagedUserIds },
+      )
+    }
+    return {
+      source: 'legacy_fallback',
+      status: 'technical_error',
+      coreSubordinates: subordinates,
+      managedUserIds: legacyManagedUserIds || [],
+      managedCoreUserIds,
+      detail: `Inconsistência da ponte operacional: central possui ${centralSubsCount} subordinados válidos mas RPC retornou 0 IDs.`,
+      rpcDiscrepancy: 'empty_rpc',
+    }
+  }
+
+  // C. Retorno parcial da RPC (ex.: central possui 3 subordinados, RPC retornou 2)
+  if (rpcReturnedCount < centralSubsCount) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[core-access:resolveManagedTeam] Inconsistência parcial na ponte RPC: central possui ${centralSubsCount} subordinados, mas RPC retornou apenas ${rpcReturnedCount} IDs operacionais. Aplicando fallback legado temporário para evitar perda parcial de permissão.`,
+        { centralSubsCount, rpcReturnedCount, managedUserIds, legacyManagedUserIds },
+      )
+    }
+    return {
+      source: 'legacy_fallback',
+      status: 'technical_error',
+      coreSubordinates: subordinates,
+      managedUserIds: legacyManagedUserIds || [],
+      managedCoreUserIds,
+      detail: `Inconsistência parcial da ponte: central tem ${centralSubsCount} subordinados, RPC retornou ${rpcReturnedCount}.`,
+      rpcDiscrepancy: 'partial_rpc',
+    }
+  }
+
+  // D. RPC completa e consistente com a hierarquia central
   return {
-    source: 'legacy_fallback',
-    status: 'technical_error',
-    coreSubordinates: [],
-    managedUserIds: legacyManagedUserIds || [],
-    managedCoreUserIds: [],
-    detail: coreTeamResult?.detail || 'Fallback legado por falha técnica no core',
+    source: 'core',
+    status: 'ok',
+    coreSubordinates: subordinates,
+    managedUserIds,
+    managedCoreUserIds,
+    detail,
+    rpcDiscrepancy: null,
   }
 }
 

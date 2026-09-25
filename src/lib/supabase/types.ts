@@ -2577,6 +2577,13 @@ export type Database = {
       }
       core_current_user_id: { Args: never; Returns: string }
       core_is_gestor_acesso_admin: { Args: never; Returns: boolean }
+      core_managed_operational_ids: {
+        Args: never
+        Returns: {
+          auth_user_id: string
+          legaldesk_usuario_id: string
+        }[]
+      }
       hard_delete_manychat_contato: {
         Args: { p_contato_id: string }
         Returns: undefined

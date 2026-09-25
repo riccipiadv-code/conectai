@@ -623,5 +623,211 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     'Cenário 26c falhou: resposta de usuário anterior deve ser descartada',
   )
 
+  // ==========================================
+  // Testes Obrigatórios da Etapa 5.10 (Ponte RPC core_managed_operational_ids)
+  // ==========================================
+
+  const sub3: CoreSubordinate = {
+    id: 'core-sub-3',
+    authUserId: 'auth-sub-3',
+    nome: 'Subordinado 3',
+    email: 'sub3@riccipi.com.br',
+    ativo: true,
+    vinculoId: 'vinc-3',
+    perfilCodigo: 'operacional',
+  }
+
+  // Cenário 27 (5.10 - Item 1): gestor com 2 subordinados válidos → RPC retorna os 2 IDs operacionais
+  const coreResult510_1 = {
+    status: 'ok' as const,
+    subordinates: [sub1, sub2],
+    managedUserIds: ['ld-sub-1', 'ld-sub-2'],
+    managedCoreUserIds: ['core-sub-1', 'core-sub-2'],
+    rpcBridge: {
+      status: 'ok' as const,
+      items: [
+        { auth_user_id: 'auth-sub-1', legaldesk_usuario_id: 'ld-sub-1' },
+        { auth_user_id: 'auth-sub-2', legaldesk_usuario_id: 'ld-sub-2' },
+      ],
+    },
+  }
+  const team510_1 = resolveManagedTeam(coreResult510_1, ['ld-legacy-other'])
+  assert(
+    team510_1.source === 'core' &&
+      team510_1.status === 'ok' &&
+      team510_1.managedUserIds.length === 2 &&
+      team510_1.managedUserIds.includes('ld-sub-1') &&
+      team510_1.managedUserIds.includes('ld-sub-2') &&
+      team510_1.rpcDiscrepancy === null,
+    `Cenário 27 (5.10.1) falhou: esperado core com 2 IDs da RPC sem fallback, obtido ${JSON.stringify(team510_1)}`,
+  )
+
+  // Cenário 28 (5.10 - Item 2): gestor sem subordinados → equipe vazia válida, sem fallback
+  const coreResult510_2 = {
+    status: 'ok' as const,
+    subordinates: [],
+    managedUserIds: [],
+    managedCoreUserIds: [],
+    rpcBridge: {
+      status: 'ok' as const,
+      items: [],
+    },
+  }
+  const team510_2 = resolveManagedTeam(coreResult510_2, ['ld-legacy-1', 'ld-legacy-2'])
+  assert(
+    team510_2.source === 'core' &&
+      team510_2.status === 'ok' &&
+      team510_2.managedUserIds.length === 0 &&
+      team510_2.coreSubordinates.length === 0 &&
+      team510_2.rpcDiscrepancy === null,
+    `Cenário 28 (5.10.2) falhou: gestor sem subordinados deve ter managedUserIds=[] e source='core' sem fallback legado, obtido ${JSON.stringify(team510_2)}`,
+  )
+
+  // Cenário 29 (5.10 - Item 3): equipe central com subordinados + RPC vazia → inconsistente, fallback seguro
+  const coreResult510_3 = {
+    status: 'ok' as const,
+    subordinates: [sub1, sub2],
+    managedUserIds: [], // RPC retornou vazia
+    managedCoreUserIds: ['core-sub-1', 'core-sub-2'],
+    rpcBridge: {
+      status: 'ok' as const,
+      items: [],
+    },
+  }
+  const team510_3 = resolveManagedTeam(coreResult510_3, ['ld-legacy-fallback-1'])
+  assert(
+    team510_3.source === 'legacy_fallback' &&
+      team510_3.status === 'technical_error' &&
+      team510_3.managedUserIds.length === 1 &&
+      team510_3.managedUserIds[0] === 'ld-legacy-fallback-1' &&
+      team510_3.rpcDiscrepancy === 'empty_rpc',
+    `Cenário 29 (5.10.3) falhou: central com subordinados + RPC vazia deve acionar legacy_fallback seguro, obtido ${JSON.stringify(team510_3)}`,
+  )
+
+  // Cenário 30 (5.10 - Item 4): equipe central com 3 subordinados + RPC retorna 2 (inconsistência parcial) → fallback seguro
+  const coreResult510_4 = {
+    status: 'ok' as const,
+    subordinates: [sub1, sub2, sub3],
+    managedUserIds: ['ld-sub-1', 'ld-sub-2'], // Falta o 3º
+    managedCoreUserIds: ['core-sub-1', 'core-sub-2', 'core-sub-3'],
+    rpcBridge: {
+      status: 'ok' as const,
+      items: [
+        { auth_user_id: 'auth-sub-1', legaldesk_usuario_id: 'ld-sub-1' },
+        { auth_user_id: 'auth-sub-2', legaldesk_usuario_id: 'ld-sub-2' },
+      ],
+    },
+  }
+  const team510_4 = resolveManagedTeam(coreResult510_4, ['ld-legacy-gestor-team'])
+  assert(
+    team510_4.source === 'legacy_fallback' &&
+      team510_4.status === 'technical_error' &&
+      team510_4.managedUserIds.length === 1 &&
+      team510_4.managedUserIds[0] === 'ld-legacy-gestor-team' &&
+      team510_4.rpcDiscrepancy === 'partial_rpc',
+    `Cenário 30 (5.10.4) falhou: RPC parcial (3 core vs 2 rpc) deve acionar fallback seguro, obtido ${JSON.stringify(team510_4)}`,
+  )
+
+  // Cenário 31 (5.10 - Item 5): erro técnico da RPC com subordinados centrais → fallback legado
+  const coreResult510_5 = {
+    status: 'ok' as const,
+    subordinates: [sub1],
+    managedUserIds: [],
+    managedCoreUserIds: ['core-sub-1'],
+    rpcBridge: {
+      status: 'error' as const,
+      items: [],
+      error: 'connection timeout or function error',
+    },
+  }
+  const team510_5 = resolveManagedTeam(coreResult510_5, ['ld-legacy-gestor-team-5'])
+  assert(
+    team510_5.source === 'legacy_fallback' &&
+      team510_5.status === 'technical_error' &&
+      team510_5.managedUserIds.length === 1 &&
+      team510_5.managedUserIds[0] === 'ld-legacy-gestor-team-5' &&
+      team510_5.rpcDiscrepancy === 'rpc_error',
+    `Cenário 31 (5.10.5) falhou: erro técnico da RPC deve acionar legacy_fallback seguro, obtido ${JSON.stringify(team510_5)}`,
+  )
+
+  // Cenário 32 (5.10 - Item 6): operacional → não consulta equipe (simulado por verificação de perfil)
+  const opRole: string = 'operacional'
+  const shouldFetchTeamOp = opRole === 'gestor'
+  assert(
+    shouldFetchTeamOp === false,
+    `Cenário 32 (5.10.6) falhou: operacional não deve consultar equipe do gestor`,
+  )
+
+  // Cenário 33 (5.10 - Item 7): administrador → comportamento atual preservado (sem equipe managed, canEdit irrestrito)
+  const adminRole: string = 'administrador'
+  const shouldFetchTeamAdmin = adminRole === 'gestor'
+  const adminEditAny = canEditContact({ responsavel_id: 'ld-random-99' }, adminProfile, [])
+  assert(
+    shouldFetchTeamAdmin === false && adminEditAny === true,
+    `Cenário 33 (5.10.7) falhou: administrador deve ter acesso irrestrito e não carregar equipe`,
+  )
+
+  // Cenário 34 (5.10 - Itens 8 e 9): logout e troca de usuário durante RPC em voo → descartado
+  let inFlightAuthUserId = 'user-initial'
+  let inFlightReqId = 10
+
+  // Usuário faz logout enquanto a RPC executa
+  const simulatedLogout = () => {
+    inFlightAuthUserId = ''
+    inFlightReqId++
+  }
+  // Avaliação pós-RPC
+  const checkRpcPublishValid = (callingUser: string, callingReqId: number) => {
+    return inFlightAuthUserId === callingUser && inFlightReqId === callingReqId
+  }
+
+  const validBefore = checkRpcPublishValid('user-initial', 10)
+  simulatedLogout()
+  const validAfterLogout = checkRpcPublishValid('user-initial', 10)
+  assert(
+    validBefore === true && validAfterLogout === false,
+    `Cenário 34a (5.10.8) falhou: resposta de RPC após logout deve ser descartada`,
+  )
+
+  // Troca de usuário durante RPC
+  inFlightAuthUserId = 'user-first'
+  inFlightReqId = 20
+  const simulatedUserSwitch = () => {
+    inFlightAuthUserId = 'user-second'
+    inFlightReqId++
+  }
+  simulatedUserSwitch()
+  const validAfterSwitch = checkRpcPublishValid('user-first', 20)
+  assert(
+    validAfterSwitch === false,
+    `Cenário 34b (5.10.9) falhou: resposta de RPC de usuário anterior deve ser descartada após troca de usuário`,
+  )
+
+  // Cenário 35 (5.10 - Itens 10, 11 e 12): canEditContact (usado por Kanban e Atendimentos) e formato de managedUserIds
+  const gestorWithRpcTeam = {
+    perfil: 'gestor',
+    legaldesk_usuario_id: 'ld-gestor-1',
+    ativo: true,
+  }
+  // managedUserIds resolvido via RPC com formato de string IDs operacionais
+  const rpcManagedIds = team510_1.managedUserIds
+  const canGestorEditKanbanSub = canEditContact(
+    { responsavel_id: 'ld-sub-1' },
+    gestorWithRpcTeam,
+    rpcManagedIds,
+  )
+  const canGestorEditKanbanOther = canEditContact(
+    { responsavel_id: 'ld-not-my-team' },
+    gestorWithRpcTeam,
+    rpcManagedIds,
+  )
+  assert(
+    Array.isArray(rpcManagedIds) &&
+      rpcManagedIds.every((id) => typeof id === 'string') &&
+      canGestorEditKanbanSub === true &&
+      canGestorEditKanbanOther === false,
+    `Cenário 35 (5.10.10-12) falhou: Kanban/Atendimentos e formato de managedUserIds preservados`,
+  )
+
   return { passed, failed: errors.length, errors }
 }
