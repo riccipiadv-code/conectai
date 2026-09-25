@@ -26,8 +26,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // Usuário inativo no cadastro legado: redirecionar para /login com aviso de desativação
-  if (profile && profile.ativo === false) {
+  // Usuário inativo no Gestor de Acessos Ricci (core_usuarios.ativo = false): redirecionar com aviso de desativação
+  if (profile && (profile.ativo === false || profile.coreStatus === 'user_inactive')) {
     return <Navigate to="/login?reason=disabled" replace />
   }
 
@@ -37,7 +37,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }
 
   // Bloqueio do Conectaí quando não possuir acesso permitido ao sistema
-  // (hasSystemAccess central false: core_denied, fallback com perfil vazio, etc).
+  // (hasSystemAccess central false: vínculo inativo, sistema inativo, perfil inativo, core_denied, etc).
   // NÃO destrói a sessão Supabase (pode ter acesso a outros sistemas Ricci com a mesma identidade).
   if (!hasSystemAccess) {
     return <Navigate to="/login?reason=no_access" replace />
@@ -68,7 +68,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
     )
   }
 
-  if (profile && profile.ativo === false) {
+  if (profile && (profile.ativo === false || profile.coreStatus === 'user_inactive')) {
     return <Navigate to="/login?reason=disabled" replace />
   }
 

@@ -82,8 +82,9 @@ export function evaluateAccessDecision(params: {
     }
   }
 
-  // Cadastro desativado em profiles.ativo: bloqueado e com logout/sessão encerrada
-  if (profile && profile.ativo === false) {
+  // Usuário desativado no Gestor de Acessos Ricci (core_usuarios.ativo = false / coreStatus === 'user_inactive'):
+  // Bloqueado e com encerramento de sessão (redirect para /login?reason=disabled)
+  if (profile && (profile.ativo === false || profile.coreStatus === 'user_inactive')) {
     return {
       allowed: false,
       redirectReason: 'disabled',
@@ -92,7 +93,8 @@ export function evaluateAccessDecision(params: {
   }
 
   // Se profile possui hasSystemAccess explicitamente falso ou perfilSource === 'core_denied'
-  // Bloqueado no Conectaí, MAS NÃO deve encerrar a sessão Supabase Auth
+  // (ex: sem vínculo com o Conectaí, sistema inativo, vínculo inativo, perfil inativo/inválido)
+  // Bloqueado no Conectaí, MAS NÃO encerra a sessão Supabase Auth caso ativo seja true
   // (o usuário pode ter acesso a outros sistemas Ricci com a mesma credencial)
   if (profile?.hasSystemAccess === false || profile?.perfilSource === 'core_denied') {
     return {
@@ -151,7 +153,10 @@ interface AuthContextType {
    * (respeitando a decisão única já produzida por resolveEffectiveProfile).
    */
   hasSystemAccess: boolean
-  signIn: (email: string, password: string) => Promise<{ error: any; disabled?: boolean }>
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: any; disabled?: boolean; noAccess?: boolean }>
   signOut: () => Promise<{ error: any }>
   resetPassword: (email: string) => Promise<{ error: any }>
   updatePassword: (password: string) => Promise<{ error: any }>
@@ -207,11 +212,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const requestId = ++coreAccessRequestIdRef.current
 
     try {
-      const { data: profileData, error } = await supabase
+      // 1. Consultar dados do Gestor de Acessos Ricci (core_*) e profiles em paralelo
+      // Timeout seguro de 10s para evitar qualquer chance de loading infinito em caso de rede travada.
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('core_timeout')), 10000),
+      )
+
+      const profilePromise = supabase
         .from('profiles')
         .select('perfil, ativo, legaldesk_usuario_id, gestor_id')
         .eq('id', authUserId)
         .maybeSingle()
+
+      const [profileResponse, coreResultRaw] = await Promise.allSettled([
+        profilePromise,
+        Promise.race([fetchCoreAccessResult(authUserId), timeoutPromise]),
+      ])
 
       // Verificar se a sessão ainda é a mesma antes de prosseguir
       if (
@@ -221,39 +237,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      if (error) {
-        console.error('Erro ao buscar perfil do usuário:', error)
+      const profileData = profileResponse.status === 'fulfilled' ? profileResponse.value.data : null
+
+      if (profileResponse.status === 'fulfilled' && profileResponse.value.error) {
+        console.error('Erro ao buscar perfil do usuário:', profileResponse.value.error)
       }
 
-      // Se usuário não tiver perfil ou estiver inativo: não conceder acesso
-      if (!profileData) {
-        // Perfil inexistente no sistema: encerrar sessão
-        currentAuthUserIdRef.current = null
-        coreAccessRequestIdRef.current += 1
-        setProfile(null)
-        setUser(null)
-        setSession(null)
-        setManagedUserIds([])
-        setManagedCoreUserIds([])
-        setManagedTeamSource(undefined)
-        setManagedCoreSubordinates([])
-        setCoreAccess(null)
-        setIdentity(null)
-        await supabase.auth.signOut()
-        return
+      let coreResult: Awaited<ReturnType<typeof fetchCoreAccessResult>>
+      if (coreResultRaw.status === 'fulfilled') {
+        coreResult = coreResultRaw.value
+      } else {
+        if (import.meta.env.DEV) {
+          console.warn(
+            '[use-auth] Falha técnica ou timeout ao consultar core access:',
+            coreResultRaw.reason,
+          )
+        }
+        coreResult = {
+          status: 'technical_error',
+          data: null,
+          resolvedPerfil: null,
+          detail: coreResultRaw.reason?.message || 'Erro inesperado ou timeout ao consultar core',
+        }
       }
 
-      if (profileData.ativo === false) {
-        // Usuário inativo: destruir sessão Supabase e manter user e session null
+      // Se o usuário foi inativado no Gestor de Acessos Ricci (core_usuarios.ativo = false)
+      // A autoridade de sessão agora é o core_usuarios.ativo: encerrar sessão Supabase Auth e redirecionar
+      if (coreResult.status === 'user_inactive' || coreResult.data?.ativo === false) {
         currentAuthUserIdRef.current = null
         coreAccessRequestIdRef.current += 1
         setProfile({
-          perfil: profileData.perfil ?? '',
+          perfil: '',
           ativo: false,
-          gestor_id: profileData.gestor_id ?? null,
-          legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
+          gestor_id: coreResult.data?.gestorId ?? profileData?.gestor_id ?? null,
+          legaldesk_usuario_id: profileData?.legaldesk_usuario_id ?? null,
           managed_user_ids: [],
           managed_core_user_ids: [],
+          coreStatus: 'user_inactive',
+          hasSystemAccess: false,
         })
         setUser(null)
         setSession(null)
@@ -261,53 +282,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setManagedCoreUserIds([])
         setManagedTeamSource(undefined)
         setManagedCoreSubordinates([])
-        setCoreAccess(null)
+        setCoreAccess(coreResult.data)
         setIdentity(null)
         await supabase.auth.signOut()
-        return
-      }
-
-      // Verificar novamente sessão antes de consultar core
-      if (
-        currentAuthUserIdRef.current !== authUserId ||
-        coreAccessRequestIdRef.current !== requestId
-      ) {
-        return
-      }
-
-      // Consultar Gestor de Acessos Ricci (core_*) ANTES de liberar o perfil efetivo e o loading.
-      // Timeout seguro de 10s para evitar qualquer chance de loading infinito em caso de rede travada.
-      let coreResult: Awaited<ReturnType<typeof fetchCoreAccessResult>>
-      try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('core_timeout')), 10000),
-        )
-        coreResult = await Promise.race([fetchCoreAccessResult(authUserId), timeoutPromise])
-      } catch (coreErr: any) {
-        if (import.meta.env.DEV) {
-          console.warn('[use-auth] Falha técnica ou timeout ao consultar core access:', coreErr)
-        }
-        coreResult = {
-          status: 'technical_error',
-          data: null,
-          resolvedPerfil: null,
-          detail: coreErr?.message || 'Erro inesperado ou timeout ao consultar core',
-        }
-      }
-
-      // Verificar se a sessão não mudou enquanto a consulta ao core estava em andamento
-      if (
-        currentAuthUserIdRef.current !== authUserId ||
-        coreAccessRequestIdRef.current !== requestId
-      ) {
         return
       }
 
       // Resolver perfil efetivo via camada central:
       // - ok -> perfil do core
       // - technical_error -> fallback para profiles.perfil (legacy_fallback)
-      // - no_core_user, no_system_link, link_inactive, profile_inactive_or_invalid -> perfil vazio (core_denied)
-      const resolution = resolveEffectiveProfile(coreResult, profileData.perfil ?? '')
+      // - no_core_user, user_inactive, system_inactive, no_system_link, link_inactive, profile_inactive_or_invalid -> perfil vazio (core_denied)
+      const resolution = resolveEffectiveProfile(coreResult, profileData?.perfil ?? '')
       const coreData = coreResult.data
       const effectiveRole = resolution.perfil
 
@@ -416,18 +401,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const legacyProfileInfo = {
-        perfil: profileData.perfil ?? '',
-        ativo: Boolean(profileData.ativo),
-        legaldeskUsuarioId: profileData.legaldesk_usuario_id ?? null,
-        gestorId: profileData.gestor_id ?? null,
+        perfil: profileData?.perfil ?? '',
+        ativo: Boolean(profileData?.ativo),
+        legaldeskUsuarioId: profileData?.legaldesk_usuario_id ?? null,
+        gestorId: profileData?.gestor_id ?? null,
         managedUserIds: legacyTeamIds,
       }
 
       auditCoreEquivalence(legacyProfileInfo, coreData, resolution.perfil, resolution.source)
 
-      // Determinar se tem acesso ao sistema Conectaí:
-      // Acesso negado se o core explicitamente negar o vínculo/perfil do Conectaí ou cadastro inativo
-      const hasAccess = legacyProfileInfo.ativo && resolution.hasSystemAccess
+      // Autoridade de usuário ativo/inativo migrada para core_usuarios.ativo:
+      // Se coreData existir, a autoridade de `ativo` é coreData.ativo.
+      // Em fallback técnico puro (sem coreData), preserva profileData?.ativo.
+      const isUserActive = coreData ? coreData.ativo : Boolean(profileData?.ativo ?? true)
+
+      // Regra de acesso: permitido apenas se usuário ativo, vínculo Conectaí ativo, sistema ativo e perfil ativo
+      // resolution.hasSystemAccess valida vínculo ativo, sistema ativo e perfil ativo.
+      const hasAccess = isUserActive && resolution.hasSystemAccess
 
       // Publicar dados finais de autenticação, equipe e perfil
       setManagedUserIds(finalManagedUserIds)
@@ -437,8 +427,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCoreAccess(coreData)
       setProfile({
         perfil: resolution.perfil,
-        ativo: legacyProfileInfo.ativo,
-        gestor_id: legacyProfileInfo.gestorId,
+        ativo: isUserActive,
+        gestor_id: coreData?.gestorId ?? legacyProfileInfo.gestorId,
         legaldesk_usuario_id: legacyProfileInfo.legaldeskUsuarioId,
         managed_user_ids: finalManagedUserIds,
         managed_core_user_ids: finalManagedCoreUserIds,
@@ -507,44 +497,152 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
-    const channel = supabase
-      .channel(`profile-status-${user.id}`)
-      .on(
+    const authUserId = user.id
+    const coreUserId = coreAccess?.id
+
+    // Função centralizada para encerrar sessão e redirecionar quando usuário for desativado
+    const terminateSessionDisabled = async () => {
+      // Proteção de concorrência: verificar se a sessão ainda pertence a este usuário
+      if (currentAuthUserIdRef.current !== authUserId) {
+        return
+      }
+      currentAuthUserIdRef.current = null
+      coreAccessRequestIdRef.current += 1
+      await supabase.auth.signOut()
+      setUser(null)
+      setSession(null)
+      setManagedUserIds([])
+      setManagedCoreUserIds([])
+      setManagedTeamSource(undefined)
+      setManagedCoreSubordinates([])
+      setCoreAccess(null)
+      setIdentity(null)
+      setProfile({
+        perfil: '',
+        ativo: false,
+        coreStatus: 'user_inactive',
+        hasSystemAccess: false,
+      })
+      window.location.href = '/login?reason=disabled'
+    }
+
+    // Função para reavaliar as regras centrais caso haja alteração de vínculo, perfil ou sistema
+    const reevaluateCoreAccess = async () => {
+      if (currentAuthUserIdRef.current !== authUserId) {
+        return
+      }
+      const requestId = ++coreAccessRequestIdRef.current
+      try {
+        const coreResult = await fetchCoreAccessResult(authUserId)
+        if (
+          currentAuthUserIdRef.current !== authUserId ||
+          coreAccessRequestIdRef.current !== requestId
+        ) {
+          return
+        }
+
+        // Se o usuário foi desativado no Gestor de Acessos Ricci:
+        if (coreResult.status === 'user_inactive' || coreResult.data?.ativo === false) {
+          await terminateSessionDisabled()
+          return
+        }
+
+        // Se qualquer condição central ficou inválida (sistema, vínculo, perfil):
+        // Bloquear acesso no Conectaí
+        const resolution = resolveEffectiveProfile(coreResult, profile.perfil)
+        const hasAccess = Boolean(coreResult.data?.ativo && resolution.hasSystemAccess)
+
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                perfil: resolution.perfil,
+                ativo: Boolean(coreResult.data?.ativo),
+                perfilSource: resolution.source,
+                coreStatus: resolution.coreStatus,
+                hasSystemAccess: hasAccess,
+              }
+            : null,
+        )
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('[use-auth:realtime] Erro ao reavaliar acesso central:', err)
+        }
+      }
+    }
+
+    // Consolidar em um canal único para as tabelas centrais do Gestor de Acessos Ricci
+    const channelName = `core-access-${authUserId}`
+    let channel = supabase.channel(channelName)
+
+    // 1. Monitorar core_usuarios do usuário autenticado (inativação direta encerra sessão para /login?reason=disabled)
+    channel = channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'core_usuarios',
+        filter: `auth_user_id=eq.${authUserId}`,
+      },
+      async (payload) => {
+        const updatedUser = payload.new as { id?: string; ativo?: boolean }
+        if (updatedUser && updatedUser.ativo === false) {
+          await terminateSessionDisabled()
+        } else {
+          await reevaluateCoreAccess()
+        }
+      },
+    )
+
+    // 2. Monitorar vínculo em core_usuario_sistemas (se o ID de core_usuarios estiver disponível)
+    if (coreUserId) {
+      channel = channel.on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`,
+          table: 'core_usuario_sistemas',
+          filter: `usuario_id=eq.${coreUserId}`,
         },
-        async (payload) => {
-          const updatedProfile = payload.new as { perfil?: string; ativo?: boolean }
-          if (updatedProfile && updatedProfile.ativo === false) {
-            currentAuthUserIdRef.current = null
-            coreAccessRequestIdRef.current += 1
-            await supabase.auth.signOut()
-            setUser(null)
-            setSession(null)
-            setManagedUserIds([])
-            setManagedCoreUserIds([])
-            setManagedTeamSource(undefined)
-            setManagedCoreSubordinates([])
-            setCoreAccess(null)
-            setIdentity(null)
-            setProfile({
-              perfil: updatedProfile.perfil ?? '',
-              ativo: false,
-            })
-            window.location.href = '/login?reason=disabled'
-          }
+        async () => {
+          await reevaluateCoreAccess()
         },
       )
-      .subscribe()
+    }
+
+    // 3. Monitorar alteração de status do sistema Conectaí
+    channel = channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'core_sistemas',
+        filter: `codigo=eq.CONECTAI`,
+      },
+      async () => {
+        await reevaluateCoreAccess()
+      },
+    )
+
+    // 4. Monitorar alteração de perfis do Conectaí
+    channel = channel.on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'core_perfis',
+      },
+      async () => {
+        await reevaluateCoreAccess()
+      },
+    )
+
+    channel.subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, profile?.ativo])
+  }, [user?.id, profile?.ativo, coreAccess?.id])
 
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
@@ -553,13 +651,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     if (data.user) {
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('perfil, ativo, legaldesk_usuario_id, gestor_id')
-        .eq('id', data.user.id)
-        .maybeSingle()
+      // Validar acesso considerando o Gestor de Acessos Ricci (core_usuarios.ativo)
+      const coreResult = await fetchCoreAccessResult(data.user.id)
 
-      if (profileData && profileData.ativo === false) {
+      // Se usuário estiver desativado no Gestor de Acessos Ricci:
+      if (coreResult.status === 'user_inactive' || coreResult.data?.ativo === false) {
         currentAuthUserIdRef.current = null
         coreAccessRequestIdRef.current += 1
         await supabase.auth.signOut()
@@ -569,17 +665,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setManagedCoreUserIds([])
         setManagedTeamSource(undefined)
         setManagedCoreSubordinates([])
-        setCoreAccess(null)
+        setCoreAccess(coreResult.data)
         setIdentity(null)
         setProfile({
-          perfil: profileData.perfil ?? '',
+          perfil: '',
           ativo: false,
-          gestor_id: profileData.gestor_id ?? null,
-          legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
+          gestor_id: coreResult.data?.gestorId ?? null,
+          legaldesk_usuario_id: null,
           managed_user_ids: [],
           managed_core_user_ids: [],
+          coreStatus: 'user_inactive',
+          hasSystemAccess: false,
         })
         return { error: null, disabled: true }
+      }
+
+      // Se usuário for negado no core por ausência de vínculo / perfil inativo / sistema inativo:
+      if (
+        coreResult.status === 'no_core_user' ||
+        coreResult.status === 'no_system_link' ||
+        coreResult.status === 'link_inactive' ||
+        coreResult.status === 'profile_inactive_or_invalid' ||
+        coreResult.status === 'system_inactive'
+      ) {
+        return { error: null, disabled: false, noAccess: true }
       }
     }
 

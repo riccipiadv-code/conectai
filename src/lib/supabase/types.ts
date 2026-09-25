@@ -2580,6 +2580,7 @@ export type Database = {
         Returns: boolean
       }
       core_current_user_id: { Args: never; Returns: string }
+      core_is_conectai_admin: { Args: never; Returns: boolean }
       core_is_gestor_acesso_admin: { Args: never; Returns: boolean }
       core_managed_operational_ids: {
         Args: never

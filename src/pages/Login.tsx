@@ -49,12 +49,13 @@ export default function Login() {
   }, [isDisabledParam, isNoAccessParam, toast])
 
   useEffect(() => {
-    // Redireciona para home apenas se autenticado, ativo e NÃO negado pelo core
+    // Redireciona para home apenas se autenticado, ativo no core e com acesso liberado ao sistema Conectaí
     if (
       !loading &&
       user &&
       profile &&
-      profile.ativo !== false &&
+      profile.ativo === true &&
+      profile.hasSystemAccess === true &&
       profile.perfilSource !== 'core_denied'
     ) {
       navigate('/')
@@ -65,7 +66,7 @@ export default function Login() {
     e.preventDefault()
     setIsLoading(true)
 
-    const { error, disabled } = await signIn(email, password)
+    const { error, disabled, noAccess } = await signIn(email, password)
 
     if (error) {
       console.error('[Login] Erro:', error)
@@ -81,6 +82,14 @@ export default function Login() {
         variant: 'destructive',
       })
       navigate('/login?reason=disabled')
+    } else if (noAccess) {
+      toast({
+        title: 'Acesso Não Permitido',
+        description:
+          'Seu usuário não possui acesso ao Conectaí. Procure o administrador do Gestor de Acessos Ricci.',
+        variant: 'destructive',
+      })
+      navigate('/login?reason=no_access')
     } else {
       toast({
         title: 'Bem-vindo!',

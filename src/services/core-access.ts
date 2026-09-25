@@ -26,6 +26,8 @@ export const CORE_CONECTAI_SYSTEM_ID = '1b085fa4-a4fa-4490-889a-9fea074f41d7'
 export type CoreAccessStatus =
   | 'ok'
   | 'no_core_user'
+  | 'user_inactive'
+  | 'system_inactive'
   | 'no_system_link'
   | 'link_inactive'
   | 'profile_inactive_or_invalid'
@@ -226,6 +228,25 @@ export async function fetchCoreAccessResult(authUserId: string): Promise<CoreAcc
     // 2. Identificar ID do sistema Conectaí
     const sistemaId = CORE_CONECTAI_SYSTEM_ID
 
+    // 2. Se o usuário estiver inativo no Gestor de Acessos Ricci (core_usuarios.ativo = false)
+    if (!usuario.ativo) {
+      return {
+        status: 'user_inactive',
+        data: {
+          id: usuario.id,
+          authUserId: usuario.auth_user_id,
+          nome: usuario.nome,
+          email: usuario.email,
+          ativo: false,
+          gestorId: usuario.gestor_id,
+          gestor: null,
+          vinculoConectai: null,
+        },
+        resolvedPerfil: null,
+        detail: 'Usuário desativado no Gestor de Acessos Ricci (core_usuarios.ativo = false)',
+      }
+    }
+
     // 3. Consultar vínculo em core_usuario_sistemas com perfil associado em core_perfis
     const { data: vinculo, error: vinculoError } = await supabase
       .from('core_usuario_sistemas')
@@ -234,7 +255,7 @@ export async function fetchCoreAccessResult(authUserId: string): Promise<CoreAcc
         sistema_id,
         perfil_id,
         ativo,
-        core_sistemas (id, codigo, nome),
+        core_sistemas (id, codigo, nome, ativo),
         core_perfis (id, codigo, nome, ativo)
       `)
       .eq('usuario_id', usuario.id)
@@ -326,6 +347,7 @@ export async function fetchCoreAccessResult(authUserId: string): Promise<CoreAcc
       ? vinculo.core_sistemas[0]
       : vinculo.core_sistemas
 
+    const sistemaAtivo = sisRaw ? Boolean(sisRaw.ativo) : false
     const vinculoAtivo = Boolean(vinculo.ativo)
     const perfilAtivo = perfilRaw ? Boolean(perfilRaw.ativo) : false
     const perfilCodigo = perfilRaw?.codigo || ''
@@ -352,6 +374,16 @@ export async function fetchCoreAccessResult(authUserId: string): Promise<CoreAcc
       gestorId: usuario.gestor_id,
       gestor,
       vinculoConectai,
+    }
+
+    // Validar status do sistema Conectaí
+    if (!sistemaAtivo) {
+      return {
+        status: 'system_inactive',
+        data: coreData,
+        resolvedPerfil: null,
+        detail: 'Sistema Conectaí está desativado (core_sistemas.ativo = false)',
+      }
     }
 
     // Validar status do vínculo e perfil
