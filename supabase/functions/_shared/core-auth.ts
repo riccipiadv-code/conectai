@@ -139,13 +139,15 @@ export async function resolveGestorFromCore(
     }
 
     // 3. Buscar dados do gestor em core_usuarios usando core_usuarios.gestor_id
+    // O gestor encontrado em core_usuarios deve estar com ativo = true.
+    // Se estiver inativo, não enviar CC (comportar como se não houvesse gestor).
     const { data: gestorCore, error: gestorError } = await supabase
       .from('core_usuarios')
       .select('id, nome, email, ativo')
       .eq('id', coreUser.gestor_id)
       .maybeSingle()
 
-    if (gestorError || !gestorCore) {
+    if (gestorError || !gestorCore || gestorCore.ativo !== true) {
       return { gestorEmail: null, gestorNome: null }
     }
 

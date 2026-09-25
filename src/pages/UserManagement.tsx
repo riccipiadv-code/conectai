@@ -377,19 +377,33 @@ export default function UserManagement() {
     const user = activateModalUser
     setActionLoadingId(user.legaldesk_id)
     try {
-      const { error: activateErr } = await supabase
-        .from('profiles')
-        .update({ ativo: true })
-        .eq('id', user.profile_id!)
+      // Reativação do acesso via autoridade central (admin-user-access grant_access),
+      // mantendo sincronizados core_* e perfis vigentes, em vez de alterar apenas profiles.
+      const perfilToGrant = user.perfil || 'operacional'
+      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+        body: {
+          action: 'grant_access',
+          legaldesk_usuario_id: user.legaldesk_id,
+          perfil: perfilToGrant,
+          gestor_id: user.gestor_id || null,
+        },
+      })
 
-      if (activateErr) throw activateErr
+      if (error || data?.error) {
+        const finalErrorMessage = await extractErrorMessage(
+          error,
+          data,
+          'Falha ao reativar acesso.',
+        )
+        throw new Error(finalErrorMessage)
+      }
 
       toast({
         title: 'Acesso reativado',
         description: `O acesso de ${user.nome} foi reativado com sucesso.`,
       })
       setActivateModalUser(null)
-      await loadData()
+      await Promise.all([loadData(), loadGestores()])
     } catch (err: any) {
       console.error(err)
       toast({

@@ -248,24 +248,23 @@ export async function createContact(payload: Partial<Contact>) {
   return data
 }
 
-export async function deleteContact(id: string) {
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData?.user) {
-    throw new Error('Usuário não autenticado.')
-  }
+export interface DeleteContactAuthContext {
+  perfil?: string | null
+  ativo?: boolean
+  hasSystemAccess?: boolean
+}
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('perfil')
-    .eq('id', authData.user.id)
-    .single()
-
-  if (profileError || !profile) {
-    throw new Error('Perfil de usuário não encontrado.')
-  }
-
-  if (profile.perfil !== 'administrador') {
-    throw new Error('Apenas administradores podem excluir atendimentos.')
+export async function deleteContact(id: string, authContext?: DeleteContactAuthContext | null) {
+  // Apenas administradores com acesso confirmado ao sistema Conectaí podem excluir atendimentos.
+  // Utiliza autorização central via useAuth() (hasSystemAccess === true e perfil efetivo 'administrador').
+  // Não cria nova consulta independente em profiles.
+  if (
+    !authContext ||
+    authContext.ativo === false ||
+    authContext.hasSystemAccess !== true ||
+    authContext.perfil !== 'administrador'
+  ) {
+    throw new Error('Permissão negada: apenas administradores podem excluir atendimentos.')
   }
 
   const { error } = await supabase.rpc('hard_delete_manychat_contato', { p_contato_id: id })
@@ -274,15 +273,25 @@ export async function deleteContact(id: string) {
 
 export async function getResponsaveis(): Promise<Responsavel[]> {
   try {
-    const { data, error } = await supabase.functions.invoke('admin-user-access', {
-      body: { action: 'list_responsaveis' },
-    })
+    // Listagem operacional de responsáveis para Atendimentos e Kanban:
+    // Consulta direta dos usuários cadastrados em legaldesk_usuarios com exibir_gestao_usuarios = true e ativo = true.
+    // Não exige admin-user-access nem permissões administrativas.
+    // Preserva exatamente o mesmo formato Responsavel[] ({ id, nome }) e UX de seleção.
+    const { data, error } = await supabase
+      .from('legaldesk_usuarios')
+      .select('id, nome')
+      .eq('exibir_gestao_usuarios', true)
+      .eq('ativo', true)
+      .order('nome', { ascending: true })
 
-    if (error || !data || !Array.isArray(data.responsaveis)) {
+    if (error || !data) {
       return []
     }
 
-    return data.responsaveis
+    return data.map((u) => ({
+      id: u.id,
+      nome: u.nome || '',
+    }))
   } catch {
     return []
   }

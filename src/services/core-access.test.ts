@@ -1384,9 +1384,9 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       return { gestorEmail: null, gestorNome: null }
     }
 
-    // 3. Gestor no core_usuarios
+    // 3. Gestor no core_usuarios (deve estar com ativo = true)
     const gestorCore = params.coreUsers.find((u) => u.id === coreUser.gestor_id)
-    if (!gestorCore) {
+    if (!gestorCore || gestorCore.ativo !== true) {
       return { gestorEmail: null, gestorNome: null }
     }
 
@@ -1697,6 +1697,121 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   assert(
     qa10.allowed === false,
     'QA 10 falhou: profiles.perfil não pode conceder acesso de administrador',
+  )
+
+  // QA 11: resolveGestorFromCore com gestor inativo em core_usuarios não envia CC
+  const qa11Profiles: MockProfileBridge[] = [
+    {
+      id: 'auth-resp-inactive-gestor',
+      legaldesk_usuario_id: 'ld-resp-inactive-gestor',
+    },
+  ]
+  const qa11CoreUsers: MockCoreUser[] = [
+    {
+      id: 'cu-resp-inactive-gestor',
+      auth_user_id: 'auth-resp-inactive-gestor',
+      nome: 'Subordinado',
+      email: 'sub@riccipi.com.br',
+      ativo: true,
+      gestor_id: 'cu-gestor-inativo',
+    },
+    {
+      id: 'cu-gestor-inativo',
+      auth_user_id: 'auth-gestor-inativo',
+      nome: 'Gestor Inativo',
+      email: 'gestor.inativo@riccipi.com.br',
+      ativo: false, // inativo!
+      gestor_id: null,
+    },
+  ]
+  const qa11 = evaluateEdgeFunctionResolveGestor({
+    targetLegaldeskUsuarioId: 'ld-resp-inactive-gestor',
+    destEmail: 'sub@riccipi.com.br',
+    profileBridges: qa11Profiles,
+    coreUsers: qa11CoreUsers,
+  })
+  assert(
+    qa11.gestorEmail === null && qa11.gestorNome === null,
+    'QA 11 falhou: gestor inativo em core_usuarios não deve receber CC',
+  )
+
+  // QA 12: deleteContact validação central de autorização
+  // Helper para simular a autorização de deleteContact
+  function evaluateDeleteContactAuthorization(
+    authContext?: {
+      perfil?: string | null
+      ativo?: boolean
+      hasSystemAccess?: boolean
+    } | null,
+  ): { allowed: boolean; reason?: string } {
+    if (
+      !authContext ||
+      authContext.ativo === false ||
+      authContext.hasSystemAccess !== true ||
+      authContext.perfil !== 'administrador'
+    ) {
+      return {
+        allowed: false,
+        reason: 'Permissão negada: apenas administradores podem excluir atendimentos.',
+      }
+    }
+    return { allowed: true }
+  }
+
+  // 12a: Sem contexto central -> bloqueado (não consulta profiles.perfil)
+  assert(
+    evaluateDeleteContactAuthorization(null).allowed === false,
+    'QA 12a falhou: deleteContact sem contexto central deve ser bloqueado',
+  )
+  assert(
+    evaluateDeleteContactAuthorization(undefined).allowed === false,
+    'QA 12a bis falhou: deleteContact undefined deve ser bloqueado',
+  )
+
+  // 12b: Contexto com admin central e hasSystemAccess === true -> autorizado
+  assert(
+    evaluateDeleteContactAuthorization({
+      perfil: 'administrador',
+      ativo: true,
+      hasSystemAccess: true,
+    }).allowed === true,
+    'QA 12b falhou: deleteContact com admin central ativo e hasSystemAccess deve ser autorizado',
+  )
+
+  // 12c: Gestor ou operacional central -> bloqueado
+  assert(
+    evaluateDeleteContactAuthorization({
+      perfil: 'gestor',
+      ativo: true,
+      hasSystemAccess: true,
+    }).allowed === false,
+    'QA 12c falhou: deleteContact com perfil gestor deve ser bloqueado',
+  )
+  assert(
+    evaluateDeleteContactAuthorization({
+      perfil: 'operacional',
+      ativo: true,
+      hasSystemAccess: true,
+    }).allowed === false,
+    'QA 12c bis falhou: deleteContact com perfil operacional deve ser bloqueado',
+  )
+
+  // 12d: Perfil administrador mas hasSystemAccess === false ou inativo -> bloqueado
+  assert(
+    evaluateDeleteContactAuthorization({
+      perfil: 'administrador',
+      ativo: false,
+      hasSystemAccess: true,
+    }).allowed === false,
+    'QA 12d falhou: deleteContact com admin inativo deve ser bloqueado',
+  )
+  assert(
+    evaluateDeleteContactAuthorization({
+      perfil: 'administrador',
+      ativo: true,
+      hasSystemAccess: false,
+    }).allowed === false,
+    'QA 12d bis falhou: deleteContact com admin sem hasSystemAccess deve ser bloqueado',
   )
 
   return { passed, failed: errors.length, errors }

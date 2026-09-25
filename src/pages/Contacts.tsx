@@ -394,7 +394,12 @@ export default function Contacts() {
   }
 
   const confirmDelete = async () => {
-    if (profile?.perfil !== 'administrador') {
+    if (
+      !profile ||
+      profile.ativo === false ||
+      profile.hasSystemAccess !== true ||
+      profile.perfil !== 'administrador'
+    ) {
       toast({
         title: 'Acesso Negado',
         description: 'Apenas administradores podem excluir atendimentos.',
@@ -407,7 +412,7 @@ export default function Contacts() {
 
     if (deletingContact) {
       try {
-        await deleteContact(deletingContact.id)
+        await deleteContact(deletingContact.id, profile)
         toast({ title: 'Sucesso', description: 'Contato excluído.' })
         fetchData()
       } catch (error: any) {
