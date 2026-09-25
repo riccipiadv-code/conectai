@@ -78,6 +78,7 @@ export function useKanbanData(
       if (!contact || contact.current_stage === newStage) return
 
       // Obter perfil e equipe para validação centralizada
+      // Prioriza os valores passados como parâmetro (providos pelo useAuth() na página)
       let activeProfile = currentUserProfile
       let activeTeamIds = currentManagedUserIds
 
@@ -92,6 +93,7 @@ export function useKanbanData(
 
           activeProfile = profile
 
+          // Fallback autônomo apenas quando useKanbanData for chamado sem profile/managedUserIds
           if (profile?.perfil === 'gestor') {
             const { data: teamProfiles } = await supabase
               .from('profiles')

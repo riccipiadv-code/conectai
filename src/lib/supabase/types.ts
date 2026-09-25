@@ -2575,6 +2575,7 @@ export type Database = {
         Args: { p_acessos: Json; p_usuario_id: string }
         Returns: number
       }
+      core_current_user_id: { Args: never; Returns: string }
       core_is_gestor_acesso_admin: { Args: never; Returns: boolean }
       hard_delete_manychat_contato: {
         Args: { p_contato_id: string }

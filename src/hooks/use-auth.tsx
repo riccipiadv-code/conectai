@@ -6,9 +6,14 @@ import {
   CoreAccessStatus,
   EffectiveProfileSource,
   AggregatedUserIdentity,
+  ManagedTeamSource,
+  CoreSubordinate,
   fetchCoreAccessResult,
+  fetchCoreManagedTeamResult,
   resolveEffectiveProfile,
+  resolveManagedTeam,
   auditCoreEquivalence,
+  auditManagedTeamDiscrepancy,
 } from '@/services/core-access'
 
 export interface UserProfile {
@@ -21,6 +26,15 @@ export interface UserProfile {
   gestor_id?: string | null
   legaldesk_usuario_id?: string | null
   managed_user_ids?: string[]
+  /**
+   * IDs em core_usuarios dos subordinados diretos da equipe.
+   * Estrutura complementar aditiva (Etapa 5.8).
+   */
+  managed_core_user_ids?: string[]
+  /**
+   * Fonte de onde a equipe gerenciada foi resolvida ('core' ou 'legacy_fallback').
+   */
+  managedTeamSource?: ManagedTeamSource
   /**
    * Fonte efetiva de onde o perfil foi resolvido.
    * 'core' | 'legacy_fallback' | 'core_denied'
@@ -108,10 +122,23 @@ interface AuthContextType {
   profile: UserProfile | null
   managedUserIds: string[]
   /**
+   * IDs em core_usuarios da equipe do gestor.
+   * Complementar e opcional / aditivo (Etapa 5.8).
+   */
+  managedCoreUserIds?: string[]
+  /**
+   * Fonte de resolução da equipe gerenciada ('core' | 'legacy_fallback').
+   */
+  managedTeamSource?: ManagedTeamSource
+  /**
    * Dados corporativos centrais lidos de `core_*` (camada preparatória).
    * Opcional / aditivo para não quebrar consumidores existentes.
    */
   coreAccess?: CoreAccessData | null
+  /**
+   * Subordinados válidos da equipe central do gestor (Etapa 5.8).
+   */
+  managedCoreSubordinates?: CoreSubordinate[]
   /**
    * Estrutura agregada consolidando identidade legada, central e resolução efetiva.
    * Opcional / aditivo.
@@ -143,6 +170,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [managedUserIds, setManagedUserIds] = useState<string[]>([])
+  const [managedCoreUserIds, setManagedCoreUserIds] = useState<string[]>([])
+  const [managedTeamSource, setManagedTeamSource] = useState<ManagedTeamSource | undefined>(
+    undefined,
+  )
+  const [managedCoreSubordinates, setManagedCoreSubordinates] = useState<CoreSubordinate[]>([])
   const [coreAccess, setCoreAccess] = useState<CoreAccessData | null>(null)
   const [identity, setIdentity] = useState<AggregatedUserIdentity | null>(null)
   const [loading, setLoading] = useState(true)
@@ -160,6 +192,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null)
       setProfile(null)
       setManagedUserIds([])
+      setManagedCoreUserIds([])
+      setManagedTeamSource(undefined)
+      setManagedCoreSubordinates([])
       setCoreAccess(null)
       setIdentity(null)
       setLoading(false)
@@ -198,6 +233,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null)
         setSession(null)
         setManagedUserIds([])
+        setManagedCoreUserIds([])
+        setManagedTeamSource(undefined)
+        setManagedCoreSubordinates([])
         setCoreAccess(null)
         setIdentity(null)
         await supabase.auth.signOut()
@@ -214,31 +252,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           gestor_id: profileData.gestor_id ?? null,
           legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
           managed_user_ids: [],
+          managed_core_user_ids: [],
         })
         setUser(null)
         setSession(null)
         setManagedUserIds([])
+        setManagedCoreUserIds([])
+        setManagedTeamSource(undefined)
+        setManagedCoreSubordinates([])
         setCoreAccess(null)
         setIdentity(null)
         await supabase.auth.signOut()
         return
-      }
-
-      // Carregar dados legados necessários (equipe do gestor se perfil for gestor)
-      let teamUserIds: string[] = []
-      if (profileData.perfil === 'gestor') {
-        const { data: teamProfiles, error: teamError } = await supabase
-          .from('profiles')
-          .select('legaldesk_usuario_id')
-          .eq('gestor_id', authUserId)
-
-        if (teamError) {
-          console.error('Erro ao buscar equipe do gestor:', teamError)
-        } else if (teamProfiles) {
-          teamUserIds = teamProfiles
-            .map((p) => p.legaldesk_usuario_id)
-            .filter((id): id is string => Boolean(id))
-        }
       }
 
       // Verificar novamente sessão antes de consultar core
@@ -247,14 +272,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         coreAccessRequestIdRef.current !== requestId
       ) {
         return
-      }
-
-      const legacyProfileInfo = {
-        perfil: profileData.perfil ?? '',
-        ativo: Boolean(profileData.ativo),
-        legaldeskUsuarioId: profileData.legaldesk_usuario_id ?? null,
-        gestorId: profileData.gestor_id ?? null,
-        managedUserIds: teamUserIds,
       }
 
       // Consultar Gestor de Acessos Ricci (core_*) ANTES de liberar o perfil efetivo e o loading.
@@ -285,12 +302,103 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      // Resolver perfil efetivo:
+      // Resolver perfil efetivo via camada central:
       // - ok -> perfil do core
       // - technical_error -> fallback para profiles.perfil (legacy_fallback)
       // - no_core_user, no_system_link, link_inactive, profile_inactive_or_invalid -> perfil vazio (core_denied)
-      const resolution = resolveEffectiveProfile(coreResult, legacyProfileInfo.perfil)
+      const resolution = resolveEffectiveProfile(coreResult, profileData.perfil ?? '')
       const coreData = coreResult.data
+      const effectiveRole = resolution.perfil
+
+      // Etapa 5.8: Montagem da equipe do gestor (managedUserIds)
+      // NÃO utilizar profileData.perfil === 'gestor' do legado para decidir se deve carregar equipe.
+      // Utilizar o perfil efetivo (effectiveRole === 'gestor').
+      let finalManagedUserIds: string[] = []
+      let finalManagedCoreUserIds: string[] = []
+      let finalManagedCoreSubs: CoreSubordinate[] = []
+      let finalTeamSource: ManagedTeamSource | undefined = undefined
+
+      let legacyTeamIds: string[] = []
+
+      if (effectiveRole === 'gestor') {
+        // 1. Sempre carregar equipe legada (para permitir fallback em falha técnica e auditoria de equivalência)
+        const { data: teamProfiles, error: teamError } = await supabase
+          .from('profiles')
+          .select('legaldesk_usuario_id')
+          .eq('gestor_id', authUserId)
+
+        if (teamError) {
+          console.error('Erro ao buscar equipe do gestor (legado):', teamError)
+        } else if (teamProfiles) {
+          legacyTeamIds = teamProfiles
+            .map((p) => p.legaldesk_usuario_id)
+            .filter((id): id is string => Boolean(id))
+        }
+
+        // Verificar novamente sessão após a query legada
+        if (
+          currentAuthUserIdRef.current !== authUserId ||
+          coreAccessRequestIdRef.current !== requestId
+        ) {
+          return
+        }
+
+        // 2. Se o core estiver acessível e o usuário tiver coreData.id, consultar subordinados no core_*
+        if (coreData?.id) {
+          try {
+            const teamResult = await fetchCoreManagedTeamResult(coreData.id)
+
+            // Verificar novamente sessão após a query central
+            if (
+              currentAuthUserIdRef.current !== authUserId ||
+              coreAccessRequestIdRef.current !== requestId
+            ) {
+              return
+            }
+
+            const teamResolution = resolveManagedTeam(teamResult, legacyTeamIds)
+            finalTeamSource = teamResolution.source
+            finalManagedUserIds = teamResolution.managedUserIds
+            finalManagedCoreUserIds = teamResolution.managedCoreUserIds
+            finalManagedCoreSubs = teamResolution.coreSubordinates
+
+            auditManagedTeamDiscrepancy(
+              teamResolution.managedUserIds,
+              legacyTeamIds,
+              teamResolution.source,
+            )
+          } catch (teamErr: any) {
+            if (import.meta.env.DEV) {
+              console.warn(
+                '[use-auth] Exceção na carga da equipe central, aplicando fallback legado:',
+                teamErr,
+              )
+            }
+            finalTeamSource = 'legacy_fallback'
+            finalManagedUserIds = legacyTeamIds
+          }
+        } else {
+          // Usuário sem id no core (ex: core em falha técnica): aplicar fallback legado
+          finalTeamSource = 'legacy_fallback'
+          finalManagedUserIds = legacyTeamIds
+        }
+      }
+
+      // Verificar se a sessão não mudou antes de publicar o estado final
+      if (
+        currentAuthUserIdRef.current !== authUserId ||
+        coreAccessRequestIdRef.current !== requestId
+      ) {
+        return
+      }
+
+      const legacyProfileInfo = {
+        perfil: profileData.perfil ?? '',
+        ativo: Boolean(profileData.ativo),
+        legaldeskUsuarioId: profileData.legaldesk_usuario_id ?? null,
+        gestorId: profileData.gestor_id ?? null,
+        managedUserIds: legacyTeamIds,
+      }
 
       auditCoreEquivalence(legacyProfileInfo, coreData, resolution.perfil, resolution.source)
 
@@ -298,15 +406,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Acesso negado se o core explicitamente negar o vínculo/perfil do Conectaí ou cadastro inativo
       const hasAccess = legacyProfileInfo.ativo && resolution.hasSystemAccess
 
-      // Somente agora, com a resolução final do perfil concluída, publicar dados de autenticação e perfil
-      setManagedUserIds(teamUserIds)
+      // Publicar dados finais de autenticação, equipe e perfil
+      setManagedUserIds(finalManagedUserIds)
+      setManagedCoreUserIds(finalManagedCoreUserIds)
+      setManagedTeamSource(finalTeamSource)
+      setManagedCoreSubordinates(finalManagedCoreSubs)
       setCoreAccess(coreData)
       setProfile({
         perfil: resolution.perfil,
         ativo: legacyProfileInfo.ativo,
         gestor_id: legacyProfileInfo.gestorId,
         legaldesk_usuario_id: legacyProfileInfo.legaldeskUsuarioId,
-        managed_user_ids: teamUserIds,
+        managed_user_ids: finalManagedUserIds,
+        managed_core_user_ids: finalManagedCoreUserIds,
+        managedTeamSource: finalTeamSource,
         perfilSource: resolution.source,
         coreStatus: resolution.coreStatus,
         hasSystemAccess: hasAccess,
@@ -325,7 +438,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ativo: legacyProfileInfo.ativo,
           gestorId: legacyProfileInfo.gestorId,
           legaldeskUsuarioId: legacyProfileInfo.legaldeskUsuarioId,
-          managedUserIds: legacyProfileInfo.managedUserIds,
+          managedUserIds: finalManagedUserIds,
           coreStatus: resolution.coreStatus,
         },
       })
@@ -337,6 +450,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null)
       setProfile(null)
       setManagedUserIds([])
+      setManagedCoreUserIds([])
+      setManagedTeamSource(undefined)
+      setManagedCoreSubordinates([])
       setCoreAccess(null)
       setIdentity(null)
     } finally {
@@ -387,6 +503,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser(null)
             setSession(null)
             setManagedUserIds([])
+            setManagedCoreUserIds([])
+            setManagedTeamSource(undefined)
+            setManagedCoreSubordinates([])
             setCoreAccess(null)
             setIdentity(null)
             setProfile({
@@ -424,6 +543,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null)
         setSession(null)
         setManagedUserIds([])
+        setManagedCoreUserIds([])
+        setManagedTeamSource(undefined)
+        setManagedCoreSubordinates([])
         setCoreAccess(null)
         setIdentity(null)
         setProfile({
@@ -432,6 +554,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           gestor_id: profileData.gestor_id ?? null,
           legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
           managed_user_ids: [],
+          managed_core_user_ids: [],
         })
         return { error: null, disabled: true }
       }
@@ -444,6 +567,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     currentAuthUserIdRef.current = null
     coreAccessRequestIdRef.current += 1
     setManagedUserIds([])
+    setManagedCoreUserIds([])
+    setManagedTeamSource(undefined)
+    setManagedCoreSubordinates([])
     setCoreAccess(null)
     setIdentity(null)
     const { error } = await supabase.auth.signOut()
@@ -473,6 +599,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         session,
         profile,
         managedUserIds,
+        managedCoreUserIds,
+        managedTeamSource,
+        managedCoreSubordinates,
         coreAccess,
         identity,
         hasSystemAccess,

@@ -104,6 +104,37 @@ export type EffectiveProfileSource = 'core' | 'legacy_fallback' | 'core_denied'
  * Estrutura agregada expondo identidade legada, central e resolução efetiva.
  * Na Etapa 4: perfil é resolvido via core-first com fallback legado e menor privilégio.
  */
+export interface CoreSubordinate {
+  /** ID na tabela `core_usuarios` */
+  id: string
+  /** ID no Supabase Auth (`auth.users.id`) */
+  authUserId: string | null
+  nome: string
+  email: string
+  ativo: boolean
+  /** ID do vínculo com o Conectaí em `core_usuario_sistemas` */
+  vinculoId: string
+  /** Perfil normalizado no Conectaí ('administrador' | 'gestor' | 'operacional') */
+  perfilCodigo: ConectaiRole
+}
+
+export type ManagedTeamSource = 'core' | 'legacy_fallback'
+
+export interface ManagedTeamResult {
+  /** Fonte utilizada para resolver a equipe: 'core' quando core válido; 'legacy_fallback' apenas em falha técnica */
+  source: ManagedTeamSource
+  /** Status da leitura central */
+  status: 'ok' | 'technical_error'
+  /** Subordinados válidos e ativos encontrados no core (se core foi usado) */
+  coreSubordinates: CoreSubordinate[]
+  /** IDs operacionais (legaldesk_usuario_id) prontos para consumo por canEditContact */
+  managedUserIds: string[]
+  /** IDs de core_usuarios correspondentes aos subordinados válidos */
+  managedCoreUserIds: string[]
+  /** Mensagem descritiva em caso de falha ou auditoria */
+  detail?: string
+}
+
 export interface AggregatedUserIdentity {
   authUserId: string
   /** Identidade e dados legados (tabela `profiles`) */
@@ -429,6 +460,281 @@ export function resolveEffectiveProfile(
     source: 'core_denied',
     coreStatus: status,
     hasSystemAccess: false,
+  }
+}
+
+/**
+ * Converte subordinados do core em IDs operacionais (`legaldesk_usuario_id`) através da ponte legada `profiles`.
+ * Nota: Ponte transitória (Etapa 5.8) necessária até que canEditContact e manychat_contatos
+ * deixem de depender de legaldesk_usuarios.id.
+ */
+export async function bridgeSubordinatesToOperationalIds(
+  subordinateAuthUserIds: string[],
+): Promise<string[]> {
+  const validAuthIds = subordinateAuthUserIds.filter(Boolean)
+  if (validAuthIds.length === 0) return []
+
+  try {
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('legaldesk_usuario_id')
+      .in('id', validAuthIds)
+
+    if (error) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[core-access] Erro ao obter ponte legaldesk_usuario_id para subordinados:',
+          error,
+        )
+      }
+      return []
+    }
+
+    return (profiles || [])
+      .map((p) => p.legaldesk_usuario_id)
+      .filter((id): id is string => Boolean(id))
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn('[core-access] Exceção ao mapear legaldesk_usuario_id de subordinados:', err)
+    }
+    return []
+  }
+}
+
+/**
+ * Consulta a equipe de subordinados diretos de um gestor no Gestor de Acessos Ricci (`core_*`).
+ *
+ * Regras:
+ * - Filtra `core_usuarios` onde `gestor_id = gestorCoreId` e `ativo = true`.
+ * - Valida vínculo com Conectaí em `core_usuario_sistemas`: `sistema_id = CORE_CONECTAI_SYSTEM_ID`, `ativo = true`.
+ * - Valida perfil associado em `core_perfis`: `ativo = true` e código válido (`ADMINISTRADOR`, `GESTOR` ou `OPERACIONAL`).
+ * - Obtém temporariamente os `legaldesk_usuario_id` correspondentes via tabela `profiles` como ponte operacional.
+ *
+ * Retorna `{ status: 'ok', subordinates, managedUserIds, managedCoreUserIds }` ou `{ status: 'technical_error' }`.
+ * NUNCA lança exceção.
+ */
+export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<{
+  status: 'ok' | 'technical_error'
+  subordinates: CoreSubordinate[]
+  managedUserIds: string[]
+  managedCoreUserIds: string[]
+  detail?: string
+}> {
+  if (!gestorCoreId) {
+    return {
+      status: 'technical_error',
+      subordinates: [],
+      managedUserIds: [],
+      managedCoreUserIds: [],
+      detail: 'gestorCoreId não fornecido',
+    }
+  }
+
+  try {
+    // 1. Buscar subordinados diretos na tabela core_usuarios
+    const { data: directSubs, error: subsError } = await supabase
+      .from('core_usuarios')
+      .select('id, auth_user_id, nome, email, ativo, gestor_id')
+      .eq('gestor_id', gestorCoreId)
+
+    if (subsError) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[core-access] Erro técnico ao buscar subordinados em core_usuarios:',
+          subsError.message,
+        )
+      }
+      return {
+        status: 'technical_error',
+        subordinates: [],
+        managedUserIds: [],
+        managedCoreUserIds: [],
+        detail: subsError.message,
+      }
+    }
+
+    // Se o gestor não possui subordinados cadastrados no core
+    if (!directSubs || directSubs.length === 0) {
+      return {
+        status: 'ok',
+        subordinates: [],
+        managedUserIds: [],
+        managedCoreUserIds: [],
+      }
+    }
+
+    // Apenas subordinados com cadastro de usuário ativo
+    const activeSubs = directSubs.filter((s) => s.ativo === true)
+    if (activeSubs.length === 0) {
+      return {
+        status: 'ok',
+        subordinates: [],
+        managedUserIds: [],
+        managedCoreUserIds: [],
+      }
+    }
+
+    const subCoreIds = activeSubs.map((s) => s.id)
+
+    // 2. Buscar vínculos com o Conectaí em core_usuario_sistemas + core_perfis
+    const { data: vinculos, error: vinculosError } = await supabase
+      .from('core_usuario_sistemas')
+      .select(`
+        id,
+        usuario_id,
+        sistema_id,
+        perfil_id,
+        ativo,
+        core_perfis (id, codigo, nome, ativo)
+      `)
+      .in('usuario_id', subCoreIds)
+      .eq('sistema_id', CORE_CONECTAI_SYSTEM_ID)
+
+    if (vinculosError) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[core-access] Erro técnico ao buscar vínculos da equipe em core_usuario_sistemas:',
+          vinculosError.message,
+        )
+      }
+      return {
+        status: 'technical_error',
+        subordinates: [],
+        managedUserIds: [],
+        managedCoreUserIds: [],
+        detail: vinculosError.message,
+      }
+    }
+
+    // 3. Filtrar apenas subordinados com vínculo ativo e perfil ativo/válido no Conectaí
+    const eligibleSubordinates: CoreSubordinate[] = []
+
+    for (const sub of activeSubs) {
+      const vinculo = (vinculos || []).find((v) => v.usuario_id === sub.id)
+      if (!vinculo || !vinculo.ativo) {
+        // Sem vínculo com Conectaí ou vínculo inativo: descartar
+        continue
+      }
+
+      const perfilRaw = Array.isArray(vinculo.core_perfis)
+        ? vinculo.core_perfis[0]
+        : vinculo.core_perfis
+      if (!perfilRaw || !perfilRaw.ativo) {
+        // Perfil central inativo: descartar
+        continue
+      }
+
+      const normalizedRole = normalizeCoreRole(perfilRaw.codigo)
+      if (!normalizedRole) {
+        // Perfil desconhecido/inválido: descartar
+        continue
+      }
+
+      eligibleSubordinates.push({
+        id: sub.id,
+        authUserId: sub.auth_user_id,
+        nome: sub.nome,
+        email: sub.email,
+        ativo: true,
+        vinculoId: vinculo.id,
+        perfilCodigo: normalizedRole,
+      })
+    }
+
+    // 4. Mapear para legaldesk_usuario_id através da ponte transitória profiles
+    const subAuthUserIds = eligibleSubordinates
+      .map((s) => s.authUserId)
+      .filter((id): id is string => Boolean(id))
+
+    const operationalIds = await bridgeSubordinatesToOperationalIds(subAuthUserIds)
+
+    return {
+      status: 'ok',
+      subordinates: eligibleSubordinates,
+      managedUserIds: operationalIds,
+      managedCoreUserIds: eligibleSubordinates.map((s) => s.id),
+    }
+  } catch (err: any) {
+    if (import.meta.env.DEV) {
+      console.warn('[core-access] Exceção técnica em fetchCoreManagedTeamResult:', err)
+    }
+    return {
+      status: 'technical_error',
+      subordinates: [],
+      managedUserIds: [],
+      managedCoreUserIds: [],
+      detail: err?.message || 'Exceção inesperada na leitura da equipe central',
+    }
+  }
+}
+
+/**
+ * Função utilitária pura para resolver a equipe gerenciada (`managedUserIds`) seguindo core-first com fallback legado:
+ * - Se coreTeamResult tiver status 'ok': utiliza a equipe central (mesmo que vazia).
+ * - Se coreTeamResult for falha técnica ('technical_error') ou null: utiliza a equipe legada de profiles.
+ */
+export function resolveManagedTeam(
+  coreTeamResult: {
+    status: 'ok' | 'technical_error'
+    subordinates: CoreSubordinate[]
+    managedUserIds: string[]
+    managedCoreUserIds: string[]
+    detail?: string
+  } | null,
+  legacyManagedUserIds: string[],
+): ManagedTeamResult {
+  // Se o core retornou status 'ok', o core prevalece categoricamente.
+  // Equipe vazia válida é resultado legítimo, NÃO deve acionar fallback legado.
+  if (coreTeamResult && coreTeamResult.status === 'ok') {
+    return {
+      source: 'core',
+      status: 'ok',
+      coreSubordinates: coreTeamResult.subordinates,
+      managedUserIds: coreTeamResult.managedUserIds,
+      managedCoreUserIds: coreTeamResult.managedCoreUserIds,
+      detail: coreTeamResult.detail,
+    }
+  }
+
+  // Falha técnica: fallback seguro para a equipe legada
+  return {
+    source: 'legacy_fallback',
+    status: 'technical_error',
+    coreSubordinates: [],
+    managedUserIds: legacyManagedUserIds || [],
+    managedCoreUserIds: [],
+    detail: coreTeamResult?.detail || 'Fallback legado por falha técnica no core',
+  }
+}
+
+/**
+ * Registra divergências detectadas entre a equipe apurada via core e a equipe legada.
+ * Somente log em modo de desenvolvimento (DEV), nunca altera dados nem exibe para o usuário.
+ */
+export function auditManagedTeamDiscrepancy(
+  coreManagedUserIds: string[],
+  legacyManagedUserIds: string[],
+  sourceApplied: ManagedTeamSource,
+): void {
+  if (!import.meta.env.DEV) return
+
+  const sortedCore = [...coreManagedUserIds].sort()
+  const sortedLegacy = [...legacyManagedUserIds].sort()
+
+  const isIdentical =
+    sortedCore.length === sortedLegacy.length &&
+    sortedCore.every((val, idx) => val === sortedLegacy[idx])
+
+  if (!isIdentical) {
+    console.warn(
+      `[core-access:managed-team-audit] Divergência na equipe do gestor (fonte aplicada: ${sourceApplied}):`,
+      {
+        coreManagedUserIds,
+        legacyManagedUserIds,
+        inCoreOnly: coreManagedUserIds.filter((id) => !legacyManagedUserIds.includes(id)),
+        inLegacyOnly: legacyManagedUserIds.filter((id) => !coreManagedUserIds.includes(id)),
+      },
+    )
   }
 }
 
