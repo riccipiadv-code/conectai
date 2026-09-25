@@ -382,5 +382,63 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     `Cenário 17 falhou: perfil vazio não pode virar admin, obtido ${JSON.stringify(r17)}`,
   )
 
+  // Teste 18 (Obrigatório - Ajuste Etapa 4):
+  // core = technical_error, profiles.perfil = ''
+  // resultado esperado:
+  // - source = 'legacy_fallback'
+  // - hasSystemAccess = false
+  // - rota interna bloqueada (hasSystemAccess false no contexto / decision.allowed = false com redirectReason 'no_access')
+  // - sem privilégio administrativo (perfil vazio !== 'administrador')
+  // - sem signOut() por esse motivo (shouldSignOut = false)
+  const r18 = resolveEffectiveProfile(
+    {
+      status: 'technical_error',
+      data: null,
+      resolvedPerfil: null,
+      detail: 'Timeout simulado ou falha de conexão com core_*',
+    },
+    '',
+  )
+
+  // Simulação da flag de contexto calculada a partir do profile:
+  // hasSystemAccess = Boolean(user && profile && profile.ativo === true && profile.hasSystemAccess === true)
+  const contextHasSystemAccess18 = Boolean(
+    dummyUser &&
+    {
+      ativo: true,
+      perfil: r18.perfil,
+      hasSystemAccess: r18.hasSystemAccess,
+    }.ativo === true &&
+    r18.hasSystemAccess === true,
+  )
+
+  const d18 = evaluateAccessDecision({
+    user: dummyUser,
+    profile: {
+      ativo: true,
+      perfil: r18.perfil,
+      perfilSource: r18.source,
+      coreStatus: r18.coreStatus,
+      hasSystemAccess: r18.hasSystemAccess,
+    },
+  })
+
+  const isAdmin18: boolean = (r18.perfil as string) === 'administrador'
+
+  assert(
+    r18.source === 'legacy_fallback' &&
+      r18.perfil === '' &&
+      r18.coreStatus === 'technical_error' &&
+      r18.hasSystemAccess === false &&
+      contextHasSystemAccess18 === false &&
+      d18.allowed === false &&
+      d18.redirectReason === 'no_access' &&
+      d18.shouldSignOut === false &&
+      isAdmin18 === false,
+    `Cenário 18 falhou: technical_error com legacy perfil vazio deve ter legacy_fallback, hasSystemAccess=false, rota bloqueada, sem signOut e sem admin. Obtido: ${JSON.stringify(
+      { r18, contextHasSystemAccess18, d18 },
+    )}`,
+  )
+
   return { passed, failed: errors.length, errors }
 }

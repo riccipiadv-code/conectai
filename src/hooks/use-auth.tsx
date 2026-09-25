@@ -50,6 +50,7 @@ export function evaluateAccessDecision(params: {
     perfil: string
     perfilSource?: EffectiveProfileSource
     coreStatus?: CoreAccessStatus
+    hasSystemAccess?: boolean
   } | null
 }): {
   allowed: boolean
@@ -75,10 +76,10 @@ export function evaluateAccessDecision(params: {
     }
   }
 
-  // Acesso negado pelo Gestor de Acessos Ricci:
+  // Se profile possui hasSystemAccess explicitamente falso ou perfilSource === 'core_denied'
   // Bloqueado no Conectaí, MAS NÃO deve encerrar a sessão Supabase Auth
   // (o usuário pode ter acesso a outros sistemas Ricci com a mesma credencial)
-  if (profile?.perfilSource === 'core_denied') {
+  if (profile?.hasSystemAccess === false || profile?.perfilSource === 'core_denied') {
     return {
       allowed: false,
       redirectReason: 'no_access',
@@ -86,7 +87,7 @@ export function evaluateAccessDecision(params: {
     }
   }
 
-  // Se não há perfil carregado ou o perfil está vazio sem ter sido technical_error
+  // Se não há perfil carregado ou o perfil está vazio
   if (!profile || !profile.perfil) {
     return {
       allowed: false,
@@ -118,7 +119,8 @@ interface AuthContextType {
   identity?: AggregatedUserIdentity | null
   /**
    * Flag central indicando se o usuário autenticado tem acesso permitido ao Conectaí.
-   * Verdadeiro apenas se autenticado, profiles.ativo !== false e perfilSource !== 'core_denied'.
+   * Verdadeiro apenas se autenticado, profiles.ativo === true e profile.hasSystemAccess === true
+   * (respeitando a decisão única já produzida por resolveEffectiveProfile).
    */
   hasSystemAccess: boolean
   signIn: (email: string, password: string) => Promise<{ error: any; disabled?: boolean }>
@@ -461,7 +463,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const hasSystemAccess = Boolean(
-    user && profile && profile.ativo !== false && profile.perfilSource !== 'core_denied',
+    user && profile && profile.ativo === true && profile.hasSystemAccess === true,
   )
 
   return (

@@ -36,11 +36,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Bloqueio do Conectaí quando o Gestor de Acessos Ricci negar acesso:
-  // (no_core_user, no_system_link, link_inactive, profile_inactive_or_invalid)
-  // O usuário está autenticado, mas NÃO possui acesso/vínculo válido com o Conectaí.
+  // Bloqueio do Conectaí quando não possuir acesso permitido ao sistema
+  // (hasSystemAccess central false: core_denied, fallback com perfil vazio, etc).
   // NÃO destrói a sessão Supabase (pode ter acesso a outros sistemas Ricci com a mesma identidade).
-  if (profile?.perfilSource === 'core_denied' || !hasSystemAccess) {
+  if (!hasSystemAccess) {
     return <Navigate to="/login?reason=no_access" replace />
   }
 
@@ -77,7 +76,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
     return <Navigate to="/login" replace />
   }
 
-  if (profile?.perfilSource === 'core_denied' || !hasSystemAccess) {
+  if (!hasSystemAccess) {
     return <Navigate to="/login?reason=no_access" replace />
   }
 
