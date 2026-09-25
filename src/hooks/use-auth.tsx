@@ -1,10 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
+import {
+  CoreAccessData,
+  AggregatedUserIdentity,
+  fetchCoreAccess,
+  auditCoreEquivalence,
+} from '@/services/core-access'
 
 export interface UserProfile {
   perfil: string
   ativo: boolean
+  gestor_id?: string | null
   legaldesk_usuario_id?: string | null
   managed_user_ids?: string[]
 }
@@ -14,6 +21,16 @@ interface AuthContextType {
   session: Session | null
   profile: UserProfile | null
   managedUserIds: string[]
+  /**
+   * Dados corporativos centrais lidos de `core_*` (camada preparatória).
+   * Opcional / aditivo para não quebrar consumidores existentes.
+   */
+  coreAccess?: CoreAccessData | null
+  /**
+   * Estrutura agregada consolidando identidade legada, central e resolução efetiva.
+   * Opcional / aditivo.
+   */
+  identity?: AggregatedUserIdentity | null
   signIn: (email: string, password: string) => Promise<{ error: any; disabled?: boolean }>
   signOut: () => Promise<{ error: any }>
   resetPassword: (email: string) => Promise<{ error: any }>
@@ -34,7 +51,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [managedUserIds, setManagedUserIds] = useState<string[]>([])
+  const [coreAccess, setCoreAccess] = useState<CoreAccessData | null>(null)
+  const [identity, setIdentity] = useState<AggregatedUserIdentity | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const loadCoreAccessAsync = (
+    authUserId: string,
+    legacyProfile: {
+      perfil: string
+      ativo: boolean
+      legaldeskUsuarioId: string | null
+      gestorId: string | null
+      managedUserIds: string[]
+    },
+  ) => {
+    // Leitura preparatória assíncrona — NUNCA bloqueia loading de autenticação nem trava a interface
+    fetchCoreAccess(authUserId)
+      .then((coreData) => {
+        setCoreAccess(coreData)
+        auditCoreEquivalence(legacyProfile, coreData)
+        setIdentity({
+          authUserId,
+          legacy: legacyProfile,
+          core: coreData,
+          effective: {
+            source: 'legacy',
+            perfil: legacyProfile.perfil,
+            ativo: legacyProfile.ativo,
+            gestorId: legacyProfile.gestorId,
+            legaldeskUsuarioId: legacyProfile.legaldeskUsuarioId,
+            managedUserIds: legacyProfile.managedUserIds,
+          },
+        })
+      })
+      .catch((err) => {
+        if (import.meta.env.DEV) {
+          console.warn('[use-auth] Falha não impeditiva ao ler core access:', err)
+        }
+      })
+  }
 
   const handleSessionChange = async (currentSession: Session | null) => {
     if (!currentSession?.user) {
@@ -42,6 +97,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null)
       setProfile(null)
       setManagedUserIds([])
+      setCoreAccess(null)
+      setIdentity(null)
       setLoading(false)
       return
     }
@@ -49,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('perfil, ativo, legaldesk_usuario_id')
+        .select('perfil, ativo, legaldesk_usuario_id, gestor_id')
         .eq('id', currentSession.user.id)
         .maybeSingle()
 
@@ -64,18 +121,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null)
         setSession(null)
         setManagedUserIds([])
+        setCoreAccess(null)
+        setIdentity(null)
         await supabase.auth.signOut()
       } else if (profileData.ativo === false) {
         // Usuário inativo: destruir sessão Supabase e manter user e session null
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: false,
+          gestor_id: profileData.gestor_id ?? null,
           legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
           managed_user_ids: [],
         })
         setUser(null)
         setSession(null)
         setManagedUserIds([])
+        setCoreAccess(null)
+        setIdentity(null)
         await supabase.auth.signOut()
       } else {
         let teamUserIds: string[] = []
@@ -95,15 +157,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         }
 
-        setManagedUserIds(teamUserIds)
-        setProfile({
+        const legacyProfileInfo = {
           perfil: profileData.perfil ?? '',
           ativo: Boolean(profileData.ativo),
-          legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
+          legaldeskUsuarioId: profileData.legaldesk_usuario_id ?? null,
+          gestorId: profileData.gestor_id ?? null,
+          managedUserIds: teamUserIds,
+        }
+
+        setManagedUserIds(teamUserIds)
+        setProfile({
+          perfil: legacyProfileInfo.perfil,
+          ativo: legacyProfileInfo.ativo,
+          gestor_id: legacyProfileInfo.gestorId,
+          legaldesk_usuario_id: legacyProfileInfo.legaldeskUsuarioId,
           managed_user_ids: teamUserIds,
         })
         setSession(currentSession)
         setUser(currentSession.user)
+
+        // Inicializar estrutura agregada provisória enquanto core_* é consultado em background
+        setIdentity({
+          authUserId: currentSession.user.id,
+          legacy: legacyProfileInfo,
+          core: null,
+          effective: {
+            source: 'legacy',
+            ...legacyProfileInfo,
+          },
+        })
+
+        // Disparar leitura preparatória única do core_* sem bloquear o fluxo
+        loadCoreAccessAsync(currentSession.user.id, legacyProfileInfo)
       }
     } catch (err) {
       console.error('Exceção ao carregar perfil:', err)
@@ -111,6 +196,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null)
       setProfile(null)
       setManagedUserIds([])
+      setCoreAccess(null)
+      setIdentity(null)
     } finally {
       setLoading(false)
     }
@@ -177,7 +264,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (data.user) {
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('perfil, ativo, legaldesk_usuario_id')
+        .select('perfil, ativo, legaldesk_usuario_id, gestor_id')
         .eq('id', data.user.id)
         .maybeSingle()
 
@@ -186,9 +273,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null)
         setSession(null)
         setManagedUserIds([])
+        setCoreAccess(null)
+        setIdentity(null)
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: false,
+          gestor_id: profileData.gestor_id ?? null,
           legaldesk_usuario_id: profileData.legaldesk_usuario_id ?? null,
           managed_user_ids: [],
         })
@@ -201,6 +291,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     setManagedUserIds([])
+    setCoreAccess(null)
+    setIdentity(null)
     const { error } = await supabase.auth.signOut()
     return { error }
   }
@@ -224,6 +316,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         session,
         profile,
         managedUserIds,
+        coreAccess,
+        identity,
         signIn,
         signOut,
         resetPassword,

@@ -169,6 +169,170 @@ export type Database = {
           },
         ]
       }
+      core_perfis: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          sistema_id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          sistema_id: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          sistema_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'core_perfis_sistema_id_fkey'
+            columns: ['sistema_id']
+            isOneToOne: false
+            referencedRelation: 'core_sistemas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      core_sistemas: {
+        Row: {
+          ativo: boolean
+          codigo: string
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo?: string
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      core_usuario_sistemas: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          id: string
+          perfil_id: string
+          sistema_id: string
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          perfil_id: string
+          sistema_id: string
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          id?: string
+          perfil_id?: string
+          sistema_id?: string
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'core_usuario_sistemas_perfil_sistema_fk'
+            columns: ['perfil_id', 'sistema_id']
+            isOneToOne: false
+            referencedRelation: 'core_perfis'
+            referencedColumns: ['id', 'sistema_id']
+          },
+          {
+            foreignKeyName: 'core_usuario_sistemas_sistema_id_fkey'
+            columns: ['sistema_id']
+            isOneToOne: false
+            referencedRelation: 'core_sistemas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'core_usuario_sistemas_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      core_usuarios: {
+        Row: {
+          ativo: boolean
+          auth_user_id: string | null
+          created_at: string
+          email: string
+          gestor_id: string | null
+          id: string
+          nome: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          email: string
+          gestor_id?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string
+          gestor_id?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'core_usuarios_gestor_id_fkey'
+            columns: ['gestor_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       departamentos: {
         Row: {
           id: string
@@ -1850,6 +2014,139 @@ export type Database = {
           },
         ]
       }
+      task_email_eventos: {
+        Row: {
+          cc_email: string | null
+          created_at: string
+          data_referencia: string | null
+          erro: string | null
+          event_key: string
+          id: string
+          providencia_id: string | null
+          sent_at: string | null
+          status: string
+          tarefa_id: string
+          tipo_evento: string
+          to_email: string | null
+        }
+        Insert: {
+          cc_email?: string | null
+          created_at?: string
+          data_referencia?: string | null
+          erro?: string | null
+          event_key: string
+          id?: string
+          providencia_id?: string | null
+          sent_at?: string | null
+          status?: string
+          tarefa_id: string
+          tipo_evento: string
+          to_email?: string | null
+        }
+        Update: {
+          cc_email?: string | null
+          created_at?: string
+          data_referencia?: string | null
+          erro?: string | null
+          event_key?: string
+          id?: string
+          providencia_id?: string | null
+          sent_at?: string | null
+          status?: string
+          tarefa_id?: string
+          tipo_evento?: string
+          to_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_email_eventos_providencia_fkey'
+            columns: ['providencia_id']
+            isOneToOne: false
+            referencedRelation: 'task_providencias'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_email_eventos_tarefa_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'task_tarefas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      task_email_notificacoes: {
+        Row: {
+          cc_email: string | null
+          created_at: string
+          created_by: string | null
+          error_message: string | null
+          event_key: string
+          executor_usuario_id: string
+          id: string
+          responsavel_usuario_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          tarefa_id: string
+          tipo: string
+          to_email: string
+        }
+        Insert: {
+          cc_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          event_key: string
+          executor_usuario_id: string
+          id?: string
+          responsavel_usuario_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          tarefa_id: string
+          tipo: string
+          to_email: string
+        }
+        Update: {
+          cc_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          error_message?: string | null
+          event_key?: string
+          executor_usuario_id?: string
+          id?: string
+          responsavel_usuario_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          tarefa_id?: string
+          tipo?: string
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_email_notificacoes_executor_fkey'
+            columns: ['executor_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'task_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_email_notificacoes_responsavel_fkey'
+            columns: ['responsavel_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'task_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_email_notificacoes_tarefa_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'task_tarefas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       task_importacao_natura_pendencias: {
         Row: {
           andamentos_origem: string | null
@@ -1958,6 +2255,10 @@ export type Database = {
           data_conclusao: string | null
           deleted_at: string | null
           deleted_by: string | null
+          email_alerta_atraso: boolean
+          email_alerta_atualizacao: boolean
+          email_alerta_inclusao: boolean
+          email_alertas: boolean
           id: string
           ordem: number
           prazo_conclusao: string
@@ -1974,6 +2275,10 @@ export type Database = {
           data_conclusao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          email_alerta_atraso?: boolean
+          email_alerta_atualizacao?: boolean
+          email_alerta_inclusao?: boolean
+          email_alertas?: boolean
           id?: string
           ordem?: number
           prazo_conclusao: string
@@ -1990,6 +2295,10 @@ export type Database = {
           data_conclusao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
+          email_alerta_atraso?: boolean
+          email_alerta_atualizacao?: boolean
+          email_alerta_inclusao?: boolean
+          email_alertas?: boolean
           id?: string
           ordem?: number
           prazo_conclusao?: string
@@ -2262,6 +2571,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      core_atualizar_usuario_acessos: {
+        Args: { p_acessos: Json; p_usuario_id: string }
+        Returns: number
+      }
+      core_is_gestor_acesso_admin: { Args: never; Returns: boolean }
       hard_delete_manychat_contato: {
         Args: { p_contato_id: string }
         Returns: undefined
