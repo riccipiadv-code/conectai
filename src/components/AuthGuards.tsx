@@ -26,17 +26,18 @@ export function AuthGuard({ children }: AuthGuardProps) {
     )
   }
 
-  // Usuário inativo no Gestor de Acessos Ricci (core_usuarios.ativo = false): redirecionar com aviso de desativação
-  if (profile && (profile.ativo === false || profile.coreStatus === 'user_inactive')) {
+  // 1. Usuário inativo no Gestor de Acessos Ricci (core_usuarios.ativo = false / coreStatus = 'user_inactive'):
+  // Redirecionar com aviso de desativação (sem usar profiles.ativo como autoridade)
+  if (profile?.coreStatus === 'user_inactive') {
     return <Navigate to="/login?reason=disabled" replace />
   }
 
-  // Usuário não autenticado
+  // 2. Usuário não autenticado
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Bloqueio do Conectaí quando não possuir acesso permitido ao sistema
+  // 3. Bloqueio do Conectaí quando não possuir acesso permitido ao sistema
   // (hasSystemAccess central false: vínculo inativo, sistema inativo, perfil inativo, core_denied, etc).
   // NÃO destrói a sessão Supabase (pode ter acesso a outros sistemas Ricci com a mesma identidade).
   if (!hasSystemAccess) {
@@ -68,7 +69,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
     )
   }
 
-  if (profile && (profile.ativo === false || profile.coreStatus === 'user_inactive')) {
+  if (profile?.coreStatus === 'user_inactive') {
     return <Navigate to="/login?reason=disabled" replace />
   }
 

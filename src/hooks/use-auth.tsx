@@ -83,8 +83,9 @@ export function evaluateAccessDecision(params: {
   }
 
   // Usuário desativado no Gestor de Acessos Ricci (core_usuarios.ativo = false / coreStatus === 'user_inactive'):
-  // Bloqueado e com encerramento de sessão (redirect para /login?reason=disabled)
-  if (profile && (profile.ativo === false || profile.coreStatus === 'user_inactive')) {
+  // Bloqueado e com encerramento de sessão (redirect para /login?reason=disabled).
+  // profiles.ativo NÃO é mais autoridade de sessão ou de acesso.
+  if (profile && profile.coreStatus === 'user_inactive') {
     return {
       allowed: false,
       redirectReason: 'disabled',
@@ -149,8 +150,8 @@ interface AuthContextType {
   identity?: AggregatedUserIdentity | null
   /**
    * Flag central indicando se o usuário autenticado tem acesso permitido ao Conectaí.
-   * Verdadeiro apenas se autenticado, profiles.ativo === true e profile.hasSystemAccess === true
-   * (respeitando a decisão única já produzida por resolveEffectiveProfile).
+   * Verdadeiro apenas se autenticado, coreStatus !== 'user_inactive' e profile.hasSystemAccess === true
+   * (respeitando a decisão única já produzida por resolveEffectiveProfile e core_usuarios.ativo).
    */
   hasSystemAccess: boolean
   signIn: (
@@ -721,7 +722,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const hasSystemAccess = Boolean(
-    user && profile && profile.ativo === true && profile.hasSystemAccess === true,
+    user && profile && profile.coreStatus !== 'user_inactive' && profile.hasSystemAccess === true,
   )
 
   return (

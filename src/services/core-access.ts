@@ -1011,7 +1011,7 @@ export function auditCoreEquivalence(
 
   const discrepancies: string[] = []
 
-  // 1. Comparar ativo (profiles.ativo continua a fonte de controle na Etapa 4)
+  // 1. Comparar ativo (core_usuarios.ativo é a autoridade central de usuário ativo/inativo)
   if (legacy.ativo !== core.ativo) {
     discrepancies.push(`ativo difere: legacy=${legacy.ativo} vs core=${core.ativo}`)
   }

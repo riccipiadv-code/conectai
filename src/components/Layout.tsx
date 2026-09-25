@@ -66,13 +66,13 @@ export default function Layout() {
 
   useEffect(() => {
     if (!loading) {
-      if (profile && profile.ativo === false) {
+      if (profile?.coreStatus === 'user_inactive') {
         signOut().then(() => {
           navigate('/login?reason=disabled', { replace: true })
         })
       } else if (!user && location.pathname !== '/login') {
         navigate('/login', { replace: true })
-      } else if (profile && profile.ativo && !isAdmin) {
+      } else if (!isAdmin) {
         const restricted = [
           '/dashboard',
           '/administracao/usuarios',
@@ -94,7 +94,7 @@ export default function Layout() {
     )
   }
 
-  if (profile && profile.ativo === false) {
+  if (profile?.coreStatus === 'user_inactive') {
     return null
   }
 

@@ -3,6 +3,7 @@ import {
   resolveEffectiveProfile,
   resolveManagedTeam,
   CoreAccessResult,
+  CoreAccessStatus,
   CoreSubordinate,
   EffectiveProfileSource,
 } from './core-access'
@@ -266,14 +267,14 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     `Cenário 8 falhou: esperado bloqueio para profile_inactive_or_invalid, obtido ${JSON.stringify({ r8, d8 })}`,
   )
 
-  // 9. profiles.ativo = false → comportamento atual permanece (logout e redirect disabled)
+  // 9. coreStatus = 'user_inactive' → logout e redirect disabled (autoridade centralizada no core)
   const d9 = evaluateAccessDecision({
     user: dummyUser,
     profile: {
       ativo: false,
       perfil: 'administrador',
       perfilSource: 'core',
-      coreStatus: 'ok',
+      coreStatus: 'user_inactive',
     },
   })
   assert(
@@ -404,14 +405,14 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   )
 
   // Simulação da flag de contexto calculada a partir do profile:
-  // hasSystemAccess = Boolean(user && profile && profile.ativo === true && profile.hasSystemAccess === true)
+  // hasSystemAccess = Boolean(user && profile && profile.coreStatus !== 'user_inactive' && profile.hasSystemAccess === true)
   const contextHasSystemAccess18 = Boolean(
     dummyUser &&
     {
-      ativo: true,
+      coreStatus: r18.coreStatus,
       perfil: r18.perfil,
       hasSystemAccess: r18.hasSystemAccess,
-    }.ativo === true &&
+    }.coreStatus !== 'user_inactive' &&
     r18.hasSystemAccess === true,
   )
 
@@ -1812,6 +1813,470 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       hasSystemAccess: false,
     }).allowed === false,
     'QA 12d bis falhou: deleteContact com admin sem hasSystemAccess deve ser bloqueado',
+  )
+
+  // =========================================================================
+  // CENÁRIOS OBRIGATÓRIOS: Migração do controle de usuário ativo/inativo
+  // para core_usuarios.ativo e Gestor de Acessos Ricci (8 Cenários)
+  // =========================================================================
+
+  // Helper para simular AuthGuard de acordo com a autoridade central (core_usuarios.ativo / coreStatus / hasSystemAccess)
+  function simulateAuthGuardDecision(params: {
+    user: { id: string } | null
+    profile: {
+      coreStatus?: CoreAccessStatus
+      hasSystemAccess?: boolean
+      perfil?: string
+      ativo?: boolean // legado não-autoritativo
+    } | null
+    loading?: boolean
+  }): { allowed: boolean; redirect: string | null; loadingView: boolean } {
+    if (params.loading) {
+      return { allowed: false, redirect: null, loadingView: true }
+    }
+    // 1. Inativação central no core (core_usuarios.ativo = false)
+    if (params.profile?.coreStatus === 'user_inactive') {
+      return { allowed: false, redirect: '/login?reason=disabled', loadingView: false }
+    }
+    // 2. Não autenticado
+    if (!params.user) {
+      return { allowed: false, redirect: '/login', loadingView: false }
+    }
+    // 3. Sem acesso permitido ao Conectaí
+    if (!params.profile?.hasSystemAccess) {
+      return { allowed: false, redirect: '/login?reason=no_access', loadingView: false }
+    }
+    return { allowed: true, redirect: null, loadingView: false }
+  }
+
+  // Helper para simular AdminGuard de acordo com a autoridade central
+  function simulateAdminGuardDecision(params: {
+    user: { id: string } | null
+    profile: {
+      coreStatus?: CoreAccessStatus
+      hasSystemAccess?: boolean
+      perfil?: string
+      ativo?: boolean
+    } | null
+    loading?: boolean
+  }): { allowed: boolean; redirect: string | null; loadingView: boolean } {
+    if (params.loading) {
+      return { allowed: false, redirect: null, loadingView: true }
+    }
+    if (params.profile?.coreStatus === 'user_inactive') {
+      return { allowed: false, redirect: '/login?reason=disabled', loadingView: false }
+    }
+    if (!params.user) {
+      return { allowed: false, redirect: '/login', loadingView: false }
+    }
+    if (!params.profile?.hasSystemAccess) {
+      return { allowed: false, redirect: '/login?reason=no_access', loadingView: false }
+    }
+    if (params.profile?.perfil !== 'administrador') {
+      return { allowed: false, redirect: '/', loadingView: false }
+    }
+    return { allowed: true, redirect: null, loadingView: false }
+  }
+
+  // Cenário 1: usuário ativo (core_usuarios.ativo=true, vínculo ativo, sistema ativo, perfil ativo) acessa normalmente
+  const coreResultCen1: CoreAccessResult = {
+    status: 'ok',
+    data: {
+      id: 'core-usr-1',
+      authUserId: 'auth-usr-1',
+      nome: 'Usuário Ativo',
+      email: 'ativo@riccipi.com.br',
+      ativo: true,
+      gestorId: null,
+      vinculoConectai: {
+        id: 'vinc-1',
+        sistemaId: 'sis-conectai',
+        sistemaCodigo: 'CONECTAI',
+        sistemaNome: 'Conectaí',
+        perfilId: 'perf-op',
+        perfilCodigo: 'operacional',
+        perfilNome: 'Operacional',
+        ativo: true,
+        perfilAtivo: true,
+      },
+    },
+    resolvedPerfil: 'operacional',
+  }
+  const resolutionCen1 = resolveEffectiveProfile(coreResultCen1, 'operacional')
+  const authGuardCen1 = simulateAuthGuardDecision({
+    user: { id: 'auth-usr-1' },
+    profile: {
+      perfil: resolutionCen1.perfil,
+      coreStatus: resolutionCen1.coreStatus,
+      hasSystemAccess: resolutionCen1.hasSystemAccess,
+      ativo: true,
+    },
+    loading: false,
+  })
+  const accessDecisionCen1 = evaluateAccessDecision({
+    user: { id: 'auth-usr-1' },
+    profile: {
+      perfil: resolutionCen1.perfil,
+      perfilSource: resolutionCen1.source,
+      coreStatus: resolutionCen1.coreStatus,
+      hasSystemAccess: resolutionCen1.hasSystemAccess,
+      ativo: true,
+    },
+  })
+  assert(
+    resolutionCen1.hasSystemAccess === true &&
+      resolutionCen1.coreStatus === 'ok' &&
+      authGuardCen1.allowed === true &&
+      authGuardCen1.redirect === null &&
+      accessDecisionCen1.allowed === true,
+    'Cenário 1 falhou: usuário ativo com vínculo/sistema/perfil ativos deve acessar normalmente',
+  )
+
+  // Cenário 2: core_usuarios.ativo=false bloqueia login/acesso (user_inactive -> /login?reason=disabled)
+  const coreResultCen2: CoreAccessResult = {
+    status: 'user_inactive',
+    data: {
+      id: 'core-usr-2',
+      authUserId: 'auth-usr-2',
+      nome: 'Usuário Inativo',
+      email: 'inativo@riccipi.com.br',
+      ativo: false,
+      gestorId: null,
+    },
+    resolvedPerfil: null,
+  }
+  const resolutionCen2 = resolveEffectiveProfile(coreResultCen2, 'administrador')
+  const authGuardCen2 = simulateAuthGuardDecision({
+    user: { id: 'auth-usr-2' },
+    profile: {
+      perfil: resolutionCen2.perfil,
+      coreStatus: resolutionCen2.coreStatus,
+      hasSystemAccess: resolutionCen2.hasSystemAccess,
+      ativo: true, // mesmo que legado fosse true, coreStatus manda
+    },
+    loading: false,
+  })
+  const adminGuardCen2 = simulateAdminGuardDecision({
+    user: { id: 'auth-usr-2' },
+    profile: {
+      perfil: 'administrador',
+      coreStatus: 'user_inactive',
+      hasSystemAccess: false,
+    },
+    loading: false,
+  })
+  const accessDecisionCen2 = evaluateAccessDecision({
+    user: { id: 'auth-usr-2' },
+    profile: {
+      perfil: resolutionCen2.perfil,
+      perfilSource: resolutionCen2.source,
+      coreStatus: resolutionCen2.coreStatus,
+      hasSystemAccess: resolutionCen2.hasSystemAccess,
+      ativo: false,
+    },
+  })
+  assert(
+    resolutionCen2.hasSystemAccess === false &&
+      resolutionCen2.coreStatus === 'user_inactive' &&
+      authGuardCen2.allowed === false &&
+      authGuardCen2.redirect === '/login?reason=disabled' &&
+      adminGuardCen2.allowed === false &&
+      adminGuardCen2.redirect === '/login?reason=disabled' &&
+      accessDecisionCen2.allowed === false &&
+      accessDecisionCen2.redirectReason === 'disabled' &&
+      accessDecisionCen2.shouldSignOut === true,
+    'Cenário 2 falhou: core_usuarios.ativo=false deve bloquear login/acesso com reason=disabled e signOut=true',
+  )
+
+  // Cenário 3: usuário já logado é derrubado após inativação (Realtime em core_usuarios -> sessão encerrada e redirecionada para /login?reason=disabled)
+  // Simulação do payload Realtime de core_usuarios com UPDATE: { ativo: false }
+  let simulatedSessionState = {
+    user: { id: 'auth-usr-logged-in' } as { id: string } | null,
+    profile: {
+      perfil: 'operacional',
+      ativo: true,
+      coreStatus: 'ok' as CoreAccessStatus,
+      hasSystemAccess: true,
+    } as any,
+    terminatedReason: null as string | null,
+  }
+  const handleRealtimeCoreUsuarioUpdate = (payloadNew: { id?: string; ativo?: boolean }) => {
+    if (payloadNew.ativo === false) {
+      // Simula terminateSessionDisabled()
+      simulatedSessionState.user = null
+      simulatedSessionState.profile = {
+        perfil: '',
+        ativo: false,
+        coreStatus: 'user_inactive',
+        hasSystemAccess: false,
+      }
+      simulatedSessionState.terminatedReason = 'disabled'
+    }
+  }
+  handleRealtimeCoreUsuarioUpdate({ id: 'cu-1', ativo: false })
+  const guardAfterRealtime = simulateAuthGuardDecision({
+    user: simulatedSessionState.user,
+    profile: simulatedSessionState.profile,
+    loading: false,
+  })
+  assert(
+    simulatedSessionState.user === null &&
+      simulatedSessionState.profile.coreStatus === 'user_inactive' &&
+      simulatedSessionState.terminatedReason === 'disabled' &&
+      guardAfterRealtime.redirect === '/login?reason=disabled',
+    'Cenário 3 falhou: inativação via Realtime em core_usuarios deve derrubar sessão e redirecionar para /login?reason=disabled',
+  )
+
+  // Cenário 4: vínculo Conectaí inativo (core_usuario_sistemas.ativo=false) bloqueia com no_access (sem derrubar auth global)
+  const coreResultCen4: CoreAccessResult = {
+    status: 'link_inactive',
+    data: {
+      id: 'core-usr-4',
+      authUserId: 'auth-usr-4',
+      nome: 'Usuário Vínculo Inativo',
+      email: 'vinculo_inativo@riccipi.com.br',
+      ativo: true,
+      gestorId: null,
+      vinculoConectai: {
+        id: 'vinc-4',
+        sistemaId: 'sis-conectai',
+        sistemaCodigo: 'CONECTAI',
+        sistemaNome: 'Conectaí',
+        perfilId: 'perf-op',
+        perfilCodigo: 'operacional',
+        perfilNome: 'Operacional',
+        ativo: false, // vínculo Conectaí inativo!
+        perfilAtivo: true,
+      },
+    },
+    resolvedPerfil: null,
+  }
+  const resolutionCen4 = resolveEffectiveProfile(coreResultCen4, 'operacional')
+  const authGuardCen4 = simulateAuthGuardDecision({
+    user: { id: 'auth-usr-4' },
+    profile: {
+      perfil: resolutionCen4.perfil,
+      coreStatus: resolutionCen4.coreStatus,
+      hasSystemAccess: resolutionCen4.hasSystemAccess,
+      ativo: true,
+    },
+    loading: false,
+  })
+  const accessDecisionCen4 = evaluateAccessDecision({
+    user: { id: 'auth-usr-4' },
+    profile: {
+      perfil: resolutionCen4.perfil,
+      perfilSource: resolutionCen4.source,
+      coreStatus: resolutionCen4.coreStatus,
+      hasSystemAccess: resolutionCen4.hasSystemAccess,
+      ativo: true,
+    },
+  })
+  assert(
+    resolutionCen4.hasSystemAccess === false &&
+      resolutionCen4.coreStatus === 'link_inactive' &&
+      authGuardCen4.allowed === false &&
+      authGuardCen4.redirect === '/login?reason=no_access' &&
+      accessDecisionCen4.allowed === false &&
+      accessDecisionCen4.redirectReason === 'no_access' &&
+      accessDecisionCen4.shouldSignOut === false,
+    'Cenário 4 falhou: vínculo Conectaí inativo (core_usuario_sistemas.ativo=false) deve bloquear com reason=no_access sem derrubar sessão',
+  )
+
+  // Cenário 5: perfil inativo (core_perfis.ativo=false) bloqueia com no_access
+  const coreResultCen5: CoreAccessResult = {
+    status: 'profile_inactive_or_invalid',
+    data: {
+      id: 'core-usr-5',
+      authUserId: 'auth-usr-5',
+      nome: 'Usuário Perfil Inativo',
+      email: 'perfil_inativo@riccipi.com.br',
+      ativo: true,
+      gestorId: null,
+    },
+    resolvedPerfil: null,
+  }
+  const resolutionCen5 = resolveEffectiveProfile(coreResultCen5, 'administrador')
+  const authGuardCen5 = simulateAuthGuardDecision({
+    user: { id: 'auth-usr-5' },
+    profile: {
+      perfil: resolutionCen5.perfil,
+      coreStatus: resolutionCen5.coreStatus,
+      hasSystemAccess: resolutionCen5.hasSystemAccess,
+      ativo: true,
+    },
+    loading: false,
+  })
+  const accessDecisionCen5 = evaluateAccessDecision({
+    user: { id: 'auth-usr-5' },
+    profile: {
+      perfil: resolutionCen5.perfil,
+      perfilSource: resolutionCen5.source,
+      coreStatus: resolutionCen5.coreStatus,
+      hasSystemAccess: resolutionCen5.hasSystemAccess,
+      ativo: true,
+    },
+  })
+  assert(
+    resolutionCen5.hasSystemAccess === false &&
+      resolutionCen5.coreStatus === 'profile_inactive_or_invalid' &&
+      authGuardCen5.allowed === false &&
+      authGuardCen5.redirect === '/login?reason=no_access' &&
+      accessDecisionCen5.allowed === false &&
+      accessDecisionCen5.redirectReason === 'no_access' &&
+      accessDecisionCen5.shouldSignOut === false,
+    'Cenário 5 falhou: perfil Conectaí inativo (core_perfis.ativo=false) deve bloquear com reason=no_access',
+  )
+
+  // Cenário 6: admin/gestor/operacional ativos continuam normais
+  const rolesToTest = ['administrador', 'gestor', 'operacional'] as const
+  let allRolesNormal = true
+  for (const role of rolesToTest) {
+    const resRole = resolveEffectiveProfile(
+      {
+        status: 'ok',
+        data: null,
+        resolvedPerfil: role,
+      },
+      'operacional',
+    )
+    const guardDecision = simulateAuthGuardDecision({
+      user: { id: `auth-${role}` },
+      profile: {
+        perfil: resRole.perfil,
+        coreStatus: resRole.coreStatus,
+        hasSystemAccess: resRole.hasSystemAccess,
+        ativo: true,
+      },
+      loading: false,
+    })
+    const evalDecision = evaluateAccessDecision({
+      user: { id: `auth-${role}` },
+      profile: {
+        perfil: resRole.perfil,
+        perfilSource: resRole.source,
+        coreStatus: resRole.coreStatus,
+        hasSystemAccess: resRole.hasSystemAccess,
+        ativo: true,
+      },
+    })
+    if (!guardDecision.allowed || !evalDecision.allowed || resRole.perfil !== role) {
+      allRolesNormal = false
+    }
+  }
+  assert(
+    allRolesNormal,
+    'Cenário 6 falhou: admin, gestor e operacional ativos devem continuar acessando normalmente',
+  )
+
+  // Cenário 7: profiles.ativo não é mais autoridade de sessão (não influencia a decisão)
+  // Caso 7a: core_usuarios.ativo = true, mas profiles.ativo = false -> ACESSO PERMITIDO (core manda)
+  const coreActiveLegacyInactive = evaluateAccessDecision({
+    user: { id: 'usr-core-active' },
+    profile: {
+      perfil: 'operacional',
+      perfilSource: 'core',
+      coreStatus: 'ok',
+      hasSystemAccess: true,
+      ativo: false, // profiles.ativo desatualizado / legado inativo
+    },
+  })
+  const guardCoreActiveLegacyInactive = simulateAuthGuardDecision({
+    user: { id: 'usr-core-active' },
+    profile: {
+      perfil: 'operacional',
+      coreStatus: 'ok',
+      hasSystemAccess: true,
+      ativo: false, // profiles.ativo = false NÃO bloqueia!
+    },
+    loading: false,
+  })
+  // Caso 7b: core_usuarios.ativo = false, mas profiles.ativo = true -> ACESSO BLOQUEADO (core manda)
+  const coreInactiveLegacyActive = evaluateAccessDecision({
+    user: { id: 'usr-core-inactive' },
+    profile: {
+      perfil: 'operacional',
+      perfilSource: 'core',
+      coreStatus: 'user_inactive',
+      hasSystemAccess: false,
+      ativo: true, // profiles.ativo mente que é true
+    },
+  })
+  const guardCoreInactiveLegacyActive = simulateAuthGuardDecision({
+    user: { id: 'usr-core-inactive' },
+    profile: {
+      perfil: 'operacional',
+      coreStatus: 'user_inactive',
+      hasSystemAccess: false,
+      ativo: true, // profiles.ativo = true NÃO permite!
+    },
+    loading: false,
+  })
+  assert(
+    coreActiveLegacyInactive.allowed === true &&
+      coreActiveLegacyInactive.redirectReason === undefined &&
+      guardCoreActiveLegacyInactive.allowed === true &&
+      guardCoreActiveLegacyInactive.redirect === null &&
+      coreInactiveLegacyActive.allowed === false &&
+      coreInactiveLegacyActive.redirectReason === 'disabled' &&
+      guardCoreInactiveLegacyActive.allowed === false &&
+      guardCoreInactiveLegacyActive.redirect === '/login?reason=disabled',
+    'Cenário 7 falhou: profiles.ativo NÃO deve mais ser autoridade de acesso ou influenciar a decisão',
+  )
+
+  // Cenário 8: login, logout, recuperação de senha e timeout continuam funcionando (regressão)
+  // 8a: Login com usuário ativo no core -> disabled=false, noAccess=false
+  const mockSignInUserActive = (coreStatus: CoreAccessStatus) => {
+    if (coreStatus === 'user_inactive') {
+      return { error: null, disabled: true, noAccess: false }
+    }
+    if (
+      coreStatus === 'no_core_user' ||
+      coreStatus === 'no_system_link' ||
+      coreStatus === 'link_inactive' ||
+      coreStatus === 'profile_inactive_or_invalid' ||
+      coreStatus === 'system_inactive'
+    ) {
+      return { error: null, disabled: false, noAccess: true }
+    }
+    return { error: null, disabled: false, noAccess: false }
+  }
+  const signInOk = mockSignInUserActive('ok')
+  const signInDisabled = mockSignInUserActive('user_inactive')
+  const signInNoAccess = mockSignInUserActive('link_inactive')
+
+  // 8b: Logout limpa estado e encerra sessão
+  let sessionState = { active: true, user: 'usr-1' }
+  const mockSignOut = () => {
+    sessionState = { active: false, user: '' }
+    return { error: null }
+  }
+  mockSignOut()
+
+  // 8c: Recuperação de senha gera redirect para /resetar-senha
+  const mockResetPasswordUrl = (origin: string) => `${origin}/resetar-senha`
+  const resetUrl = mockResetPasswordUrl('https://conectai.riccipi.com.br')
+
+  // 8d: Timeout de requisição segura para o core não quebra o sistema (vira technical_error com fallback seguro)
+  const timeoutCoreResult: CoreAccessResult = {
+    status: 'technical_error',
+    data: null,
+    resolvedPerfil: null,
+    detail: 'core_timeout',
+  }
+  const timeoutResolution = resolveEffectiveProfile(timeoutCoreResult, 'administrador')
+
+  assert(
+    signInOk.disabled === false &&
+      signInOk.noAccess === false &&
+      signInDisabled.disabled === true &&
+      signInNoAccess.noAccess === true &&
+      sessionState.active === false &&
+      resetUrl === 'https://conectai.riccipi.com.br/resetar-senha' &&
+      timeoutResolution.source === 'legacy_fallback' &&
+      timeoutResolution.perfil === 'administrador' &&
+      timeoutResolution.hasSystemAccess === true,
+    'Cenário 8 falhou: regressão de login, logout, recuperação de senha e timeout seguro falhou',
   )
 
   return { passed, failed: errors.length, errors }

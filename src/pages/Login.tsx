@@ -49,12 +49,12 @@ export default function Login() {
   }, [isDisabledParam, isNoAccessParam, toast])
 
   useEffect(() => {
-    // Redireciona para home apenas se autenticado, ativo no core e com acesso liberado ao sistema Conectaí
+    // Redireciona para home apenas se autenticado, ativo no core (coreStatus !== 'user_inactive') e com acesso liberado ao sistema Conectaí
     if (
       !loading &&
       user &&
       profile &&
-      profile.ativo === true &&
+      profile.coreStatus !== 'user_inactive' &&
       profile.hasSystemAccess === true &&
       profile.perfilSource !== 'core_denied'
     ) {
