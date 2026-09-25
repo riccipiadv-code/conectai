@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 import {
@@ -55,6 +55,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [identity, setIdentity] = useState<AggregatedUserIdentity | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Ref de controle de concorrência e sessão para proteger leituras assíncronas de core_*
+  // Evita race condition se a sessão mudar, expirar ou fizer logout enquanto a consulta está em voo
+  const currentAuthUserIdRef = useRef<string | null>(null)
+  const coreAccessRequestIdRef = useRef<number>(0)
+
   const loadCoreAccessAsync = (
     authUserId: string,
     legacyProfile: {
@@ -64,10 +69,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       gestorId: string | null
       managedUserIds: string[]
     },
+    requestId: number,
   ) => {
     // Leitura preparatória assíncrona — NUNCA bloqueia loading de autenticação nem trava a interface
     fetchCoreAccess(authUserId)
       .then((coreData) => {
+        // Validação estrita de sessão: garantir que o usuário ainda é o mesmo e nenhuma requisição mais recente foi disparada
+        if (
+          currentAuthUserIdRef.current !== authUserId ||
+          coreAccessRequestIdRef.current !== requestId
+        ) {
+          // Sessão trocada, encerrada ou sobrescrita enquanto a consulta estava em andamento.
+          // Descartar silenciosamente sem aplicar estado nem emitir alertas ao usuário.
+          return
+        }
+
         setCoreAccess(coreData)
         auditCoreEquivalence(legacyProfile, coreData)
         setIdentity({
@@ -93,6 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleSessionChange = async (currentSession: Session | null) => {
     if (!currentSession?.user) {
+      currentAuthUserIdRef.current = null
+      coreAccessRequestIdRef.current += 1
       setSession(null)
       setUser(null)
       setProfile(null)
@@ -117,6 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Se usuário não tiver perfil ou estiver inativo: não conceder acesso
       if (!profileData) {
         // Perfil inexistente no sistema: encerrar sessão
+        currentAuthUserIdRef.current = null
+        coreAccessRequestIdRef.current += 1
         setProfile(null)
         setUser(null)
         setSession(null)
@@ -126,6 +146,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await supabase.auth.signOut()
       } else if (profileData.ativo === false) {
         // Usuário inativo: destruir sessão Supabase e manter user e session null
+        currentAuthUserIdRef.current = null
+        coreAccessRequestIdRef.current += 1
         setProfile({
           perfil: profileData.perfil ?? '',
           ativo: false,
@@ -188,10 +210,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         })
 
         // Disparar leitura preparatória única do core_* sem bloquear o fluxo
-        loadCoreAccessAsync(currentSession.user.id, legacyProfileInfo)
+        currentAuthUserIdRef.current = currentSession.user.id
+        const requestId = ++coreAccessRequestIdRef.current
+        loadCoreAccessAsync(currentSession.user.id, legacyProfileInfo, requestId)
       }
     } catch (err) {
       console.error('Exceção ao carregar perfil:', err)
+      currentAuthUserIdRef.current = null
+      coreAccessRequestIdRef.current += 1
       setSession(null)
       setUser(null)
       setProfile(null)
@@ -237,9 +263,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         async (payload) => {
           const updatedProfile = payload.new as { perfil?: string; ativo?: boolean }
           if (updatedProfile && updatedProfile.ativo === false) {
+            currentAuthUserIdRef.current = null
+            coreAccessRequestIdRef.current += 1
             await supabase.auth.signOut()
             setUser(null)
             setSession(null)
+            setManagedUserIds([])
+            setCoreAccess(null)
+            setIdentity(null)
             setProfile({
               perfil: updatedProfile.perfil ?? '',
               ativo: false,
@@ -269,6 +300,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle()
 
       if (profileData && profileData.ativo === false) {
+        currentAuthUserIdRef.current = null
+        coreAccessRequestIdRef.current += 1
         await supabase.auth.signOut()
         setUser(null)
         setSession(null)
@@ -290,6 +323,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const signOut = async () => {
+    currentAuthUserIdRef.current = null
+    coreAccessRequestIdRef.current += 1
     setManagedUserIds([])
     setCoreAccess(null)
     setIdentity(null)
