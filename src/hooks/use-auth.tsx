@@ -10,6 +10,7 @@ import {
   CoreSubordinate,
   fetchCoreAccessResult,
   fetchCoreManagedTeamResult,
+  fetchLegacyManagedOperationalIds,
   resolveEffectiveProfile,
   resolveManagedTeam,
   auditCoreEquivalence,
@@ -321,29 +322,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let legacyTeamIds: string[] = []
 
       if (effectiveRole === 'gestor') {
-        // 1. Sempre carregar equipe legada (para permitir fallback em falha técnica e auditoria de equivalência)
-        const { data: teamProfiles, error: teamError } = await supabase
-          .from('profiles')
-          .select('legaldesk_usuario_id')
-          .eq('gestor_id', authUserId)
-
-        if (teamError) {
-          console.error('Erro ao buscar equipe do gestor (legado):', teamError)
-        } else if (teamProfiles) {
-          legacyTeamIds = teamProfiles
-            .map((p) => p.legaldesk_usuario_id)
-            .filter((id): id is string => Boolean(id))
-        }
-
-        // Verificar novamente sessão após a query legada
-        if (
-          currentAuthUserIdRef.current !== authUserId ||
-          coreAccessRequestIdRef.current !== requestId
-        ) {
-          return
-        }
-
-        // 2. Se o core estiver acessível e o usuário tiver coreData.id, consultar subordinados no core_*
+        // Etapa 5.12: Core é a autoridade da hierarquia.
+        // O legado só pode definir a equipe quando houver falha técnica completa na leitura da hierarquia central.
+        // Consulta direta à tabela profiles por gestor_id REMOVIDA. Fallback usa exclusivamente a RPC legacy_managed_operational_ids().
         if (coreData?.id) {
           try {
             const teamResult = await fetchCoreManagedTeamResult(coreData.id)
@@ -356,29 +337,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return
             }
 
-            const teamResolution = resolveManagedTeam(teamResult, legacyTeamIds)
-            finalTeamSource = teamResolution.source
-            finalManagedUserIds = teamResolution.managedUserIds
-            finalManagedCoreUserIds = teamResolution.managedCoreUserIds
-            finalManagedCoreSubs = teamResolution.coreSubordinates
+            // Se o core respondeu com sucesso ('ok'), o core define a equipe e NUNCA usa fallback legado
+            if (teamResult.status === 'ok') {
+              const teamResolution = resolveManagedTeam(teamResult, [])
+              finalTeamSource = teamResolution.source
+              finalManagedUserIds = teamResolution.managedUserIds
+              finalManagedCoreUserIds = teamResolution.managedCoreUserIds
+              finalManagedCoreSubs = teamResolution.coreSubordinates
+            } else {
+              // Falha técnica na leitura da hierarquia central: carregar fallback legado via RPC
+              const legacyRpc = await fetchLegacyManagedOperationalIds()
 
-            auditManagedTeamDiscrepancy(
-              teamResolution.managedUserIds,
-              legacyTeamIds,
-              teamResolution.source,
-            )
+              // Verificar novamente sessão após a RPC legada
+              if (
+                currentAuthUserIdRef.current !== authUserId ||
+                coreAccessRequestIdRef.current !== requestId
+              ) {
+                return
+              }
+
+              legacyTeamIds = legacyRpc.managedUserIds
+              const teamResolution = resolveManagedTeam(teamResult, legacyTeamIds)
+              finalTeamSource = teamResolution.source
+              finalManagedUserIds = teamResolution.managedUserIds
+              finalManagedCoreUserIds = teamResolution.managedCoreUserIds
+              finalManagedCoreSubs = teamResolution.coreSubordinates
+
+              auditManagedTeamDiscrepancy(
+                teamResolution.managedUserIds,
+                legacyTeamIds,
+                teamResolution.source,
+              )
+            }
           } catch (teamErr: any) {
             if (import.meta.env.DEV) {
               console.warn(
-                '[use-auth] Exceção na carga da equipe central, aplicando fallback legado:',
+                '[use-auth] Exceção na carga da equipe central, consultando fallback legado via RPC:',
                 teamErr,
               )
             }
+            // Falha técnica completa: carregar fallback legado via RPC legacy_managed_operational_ids
+            const legacyRpc = await fetchLegacyManagedOperationalIds()
+
+            if (
+              currentAuthUserIdRef.current !== authUserId ||
+              coreAccessRequestIdRef.current !== requestId
+            ) {
+              return
+            }
+
+            legacyTeamIds = legacyRpc.managedUserIds
             finalTeamSource = 'legacy_fallback'
             finalManagedUserIds = legacyTeamIds
           }
         } else {
-          // Usuário sem id no core (ex: core em falha técnica): aplicar fallback legado
+          // Usuário gestor sem dados centrais (ex.: coreAccess com falha técnica completa)
+          const legacyRpc = await fetchLegacyManagedOperationalIds()
+
+          if (
+            currentAuthUserIdRef.current !== authUserId ||
+            coreAccessRequestIdRef.current !== requestId
+          ) {
+            return
+          }
+
+          legacyTeamIds = legacyRpc.managedUserIds
           finalTeamSource = 'legacy_fallback'
           finalManagedUserIds = legacyTeamIds
         }

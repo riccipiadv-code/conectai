@@ -494,11 +494,11 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   }
   const team20 = resolveManagedTeam(coreResult20, ['ld-legacy-sub-1', 'ld-legacy-sub-2'])
   assert(
-    team20.source === 'core' &&
+    (team20.source === 'empty' || team20.source === 'core') &&
       team20.status === 'ok' &&
       team20.managedUserIds.length === 0 &&
       team20.coreSubordinates.length === 0,
-    `Cenário 20 falhou: gestor sem subordinados no core válido deve ter equipe vazia e source 'core' (sem fallback legado), obtido ${JSON.stringify(team20)}`,
+    `Cenário 20 falhou: gestor sem subordinados no core válido deve ter equipe vazia e source 'empty'/'core' (sem fallback legado), obtido ${JSON.stringify(team20)}`,
   )
 
   // Cenário 21: Gestor com core válido e legado divergente → core prevalece categoricamente
@@ -675,40 +675,76 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   }
   const team510_2 = resolveManagedTeam(coreResult510_2, ['ld-legacy-1', 'ld-legacy-2'])
   assert(
-    team510_2.source === 'core' &&
+    (team510_2.source === 'empty' || team510_2.source === 'core') &&
       team510_2.status === 'ok' &&
       team510_2.managedUserIds.length === 0 &&
       team510_2.coreSubordinates.length === 0 &&
       team510_2.rpcDiscrepancy === null,
-    `Cenário 28 (5.10.2) falhou: gestor sem subordinados deve ter managedUserIds=[] e source='core' sem fallback legado, obtido ${JSON.stringify(team510_2)}`,
+    `Cenário 28 (5.10.2) falhou: gestor sem subordinados deve ter managedUserIds=[] e source='empty'/'core' sem fallback legado, obtido ${JSON.stringify(team510_2)}`,
   )
 
-  // Cenário 29 (5.10 - Item 3): equipe central com subordinados + RPC vazia → inconsistente, fallback seguro
-  const coreResult510_3 = {
+  // ==========================================
+  // Testes Obrigatórios da Etapa 5.12:
+  // Regra: O core é a autoridade da hierarquia quando responde com sucesso.
+  // O legado NUNCA sobrescreve uma equipe central válida.
+  // ==========================================
+
+  // Teste 5.12 - Cenário 1: Core com 3 subordinados + ponte retorna 3 → 3 usados (source 'core')
+  const coreResult512_1 = {
     status: 'ok' as const,
-    subordinates: [sub1, sub2],
-    managedUserIds: [], // RPC retornou vazia
-    managedCoreUserIds: ['core-sub-1', 'core-sub-2'],
+    subordinates: [sub1, sub2, sub3],
+    managedUserIds: ['ld-sub-1', 'ld-sub-2', 'ld-sub-3'],
+    managedCoreUserIds: ['core-sub-1', 'core-sub-2', 'core-sub-3'],
+    rpcBridge: {
+      status: 'ok' as const,
+      items: [
+        { auth_user_id: 'auth-sub-1', legaldesk_usuario_id: 'ld-sub-1' },
+        { auth_user_id: 'auth-sub-2', legaldesk_usuario_id: 'ld-sub-2' },
+        { auth_user_id: 'auth-sub-3', legaldesk_usuario_id: 'ld-sub-3' },
+      ],
+    },
+  }
+  const team512_1 = resolveManagedTeam(coreResult512_1, ['ld-legacy-extra'])
+  assert(
+    team512_1.source === 'core' &&
+      team512_1.status === 'ok' &&
+      team512_1.managedUserIds.length === 3 &&
+      team512_1.managedUserIds.includes('ld-sub-1') &&
+      team512_1.managedUserIds.includes('ld-sub-2') &&
+      team512_1.managedUserIds.includes('ld-sub-3') &&
+      !team512_1.managedUserIds.includes('ld-legacy-extra') &&
+      team512_1.rpcDiscrepancy === null,
+    `Etapa 5.12 Cenário 1 falhou: core válido completo deve ter source='core', 3 IDs e sem legado, obtido ${JSON.stringify(team512_1)}`,
+  )
+
+  // Teste 5.12 - Cenário 2: Core vazio → equipe vazia (source 'empty')
+  const coreResult512_2 = {
+    status: 'ok' as const,
+    subordinates: [],
+    managedUserIds: [],
+    managedCoreUserIds: [],
     rpcBridge: {
       status: 'ok' as const,
       items: [],
     },
   }
-  const team510_3 = resolveManagedTeam(coreResult510_3, ['ld-legacy-fallback-1'])
+  const team512_2 = resolveManagedTeam(coreResult512_2, ['ld-legacy-any'])
   assert(
-    team510_3.source === 'legacy_fallback' &&
-      team510_3.status === 'technical_error' &&
-      team510_3.managedUserIds.length === 1 &&
-      team510_3.managedUserIds[0] === 'ld-legacy-fallback-1' &&
-      team510_3.rpcDiscrepancy === 'empty_rpc',
-    `Cenário 29 (5.10.3) falhou: central com subordinados + RPC vazia deve acionar legacy_fallback seguro, obtido ${JSON.stringify(team510_3)}`,
+    team512_2.source === 'empty' &&
+      team512_2.status === 'ok' &&
+      team512_2.managedUserIds.length === 0 &&
+      team512_2.coreSubordinates.length === 0 &&
+      team512_2.rpcDiscrepancy === null,
+    `Etapa 5.12 Cenário 2 falhou: core vazio deve resultar em source='empty' e managedUserIds=[], obtido ${JSON.stringify(team512_2)}`,
   )
 
-  // Cenário 30 (5.10 - Item 4): equipe central com 3 subordinados + RPC retorna 2 (inconsistência parcial) → fallback seguro
-  const coreResult510_4 = {
+  // Teste 5.12 - Cenário 3: Core com 3 subordinados + ponte retorna 2 → apenas os 2 centrais traduzidos (source 'core_partial_bridge')
+  // Regra crítica: NÃO usa toda a equipe legada; NÃO mescla com subordinados que não pertencem ao core;
+  // Mantém apenas os subordinados centrais traduzidos com segurança.
+  const coreResult512_3 = {
     status: 'ok' as const,
     subordinates: [sub1, sub2, sub3],
-    managedUserIds: ['ld-sub-1', 'ld-sub-2'], // Falta o 3º
+    managedUserIds: ['ld-sub-1', 'ld-sub-2'], // Apenas 2 traduzidos
     managedCoreUserIds: ['core-sub-1', 'core-sub-2', 'core-sub-3'],
     rpcBridge: {
       status: 'ok' as const,
@@ -718,36 +754,103 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       ],
     },
   }
-  const team510_4 = resolveManagedTeam(coreResult510_4, ['ld-legacy-gestor-team'])
+  const team512_3 = resolveManagedTeam(coreResult512_3, [
+    'ld-legacy-1',
+    'ld-legacy-2',
+    'ld-legacy-extra',
+  ])
   assert(
-    team510_4.source === 'legacy_fallback' &&
-      team510_4.status === 'technical_error' &&
-      team510_4.managedUserIds.length === 1 &&
-      team510_4.managedUserIds[0] === 'ld-legacy-gestor-team' &&
-      team510_4.rpcDiscrepancy === 'partial_rpc',
-    `Cenário 30 (5.10.4) falhou: RPC parcial (3 core vs 2 rpc) deve acionar fallback seguro, obtido ${JSON.stringify(team510_4)}`,
+    team512_3.source === 'core_partial_bridge' &&
+      team512_3.status === 'ok' &&
+      team512_3.managedUserIds.length === 2 &&
+      team512_3.managedUserIds.includes('ld-sub-1') &&
+      team512_3.managedUserIds.includes('ld-sub-2') &&
+      !team512_3.managedUserIds.includes('ld-legacy-extra') &&
+      team512_3.coreSubordinates.length === 3 &&
+      team512_3.rpcDiscrepancy === 'partial_rpc',
+    `Etapa 5.12 Cenário 3 falhou: ponte parcial deve ter source='core_partial_bridge', manter apenas os 2 traduzidos e NÃO usar legado, obtido ${JSON.stringify(team512_3)}`,
   )
 
-  // Cenário 31 (5.10 - Item 5): erro técnico da RPC com subordinados centrais → fallback legado
-  const coreResult510_5 = {
+  // Teste 5.12 - Cenário 4: Core com 3 subordinados + ponte retorna 0 → equipe operacional vazia, sem legado (source 'core_partial_bridge')
+  // Regra crítica: NÃO usa a hierarquia legada para reconstruir a equipe; resultado operacional fica vazio;
+  // preserva hierarquia central como autoridade; não eleva permissões via legado.
+  const coreResult512_4 = {
     status: 'ok' as const,
-    subordinates: [sub1],
-    managedUserIds: [],
-    managedCoreUserIds: ['core-sub-1'],
+    subordinates: [sub1, sub2, sub3],
+    managedUserIds: [], // 0 IDs traduzidos pela ponte
+    managedCoreUserIds: ['core-sub-1', 'core-sub-2', 'core-sub-3'],
     rpcBridge: {
-      status: 'error' as const,
+      status: 'ok' as const,
       items: [],
-      error: 'connection timeout or function error',
     },
   }
-  const team510_5 = resolveManagedTeam(coreResult510_5, ['ld-legacy-gestor-team-5'])
+  const team512_4 = resolveManagedTeam(coreResult512_4, [
+    'ld-legacy-1',
+    'ld-legacy-2',
+    'ld-legacy-3',
+  ])
   assert(
-    team510_5.source === 'legacy_fallback' &&
-      team510_5.status === 'technical_error' &&
-      team510_5.managedUserIds.length === 1 &&
-      team510_5.managedUserIds[0] === 'ld-legacy-gestor-team-5' &&
-      team510_5.rpcDiscrepancy === 'rpc_error',
-    `Cenário 31 (5.10.5) falhou: erro técnico da RPC deve acionar legacy_fallback seguro, obtido ${JSON.stringify(team510_5)}`,
+    team512_4.source === 'core_partial_bridge' &&
+      team512_4.status === 'ok' &&
+      team512_4.managedUserIds.length === 0 &&
+      team512_4.coreSubordinates.length === 3 &&
+      team512_4.managedCoreUserIds.length === 3 &&
+      team512_4.rpcDiscrepancy === 'empty_rpc',
+    `Etapa 5.12 Cenário 4 falhou: ponte vazia deve manter equipe operacional vazia e NÃO usar hierarquia legada, obtido ${JSON.stringify(team512_4)}`,
+  )
+
+  // Teste 5.12 - Cenário 5: Core com sucesso + legado contém usuário extra → usuário extra NÃO entra
+  const coreResult512_5 = {
+    status: 'ok' as const,
+    subordinates: [sub1, sub2],
+    managedUserIds: ['ld-sub-1', 'ld-sub-2'],
+    managedCoreUserIds: ['core-sub-1', 'core-sub-2'],
+    rpcBridge: {
+      status: 'ok' as const,
+      items: [
+        { auth_user_id: 'auth-sub-1', legaldesk_usuario_id: 'ld-sub-1' },
+        { auth_user_id: 'auth-sub-2', legaldesk_usuario_id: 'ld-sub-2' },
+      ],
+    },
+  }
+  const team512_5 = resolveManagedTeam(coreResult512_5, [
+    'ld-sub-1',
+    'ld-sub-2',
+    'ld-infiltrator-extra',
+  ])
+  assert(
+    team512_5.source === 'core' &&
+      team512_5.managedUserIds.length === 2 &&
+      !team512_5.managedUserIds.includes('ld-infiltrator-extra'),
+    `Etapa 5.12 Cenário 5 falhou: usuário extra do legado NÃO pode entrar quando o core responde com sucesso, obtido ${JSON.stringify(team512_5)}`,
+  )
+
+  // Teste 5.12 - Cenário 6: Falha técnica completa do core → legacy_managed_operational_ids utilizado ('legacy_fallback')
+  const coreResult512_6 = {
+    status: 'technical_error' as const,
+    subordinates: [],
+    managedUserIds: [],
+    managedCoreUserIds: [],
+    detail: 'Falha técnica completa de conexão com core_*',
+  }
+  const legacyFromRpc = ['ld-legacy-from-rpc-1', 'ld-legacy-from-rpc-2']
+  const team512_6 = resolveManagedTeam(coreResult512_6, legacyFromRpc)
+  assert(
+    team512_6.source === 'legacy_fallback' &&
+      team512_6.status === 'technical_error' &&
+      team512_6.managedUserIds.length === 2 &&
+      team512_6.managedUserIds.includes('ld-legacy-from-rpc-1') &&
+      team512_6.managedUserIds.includes('ld-legacy-from-rpc-2'),
+    `Etapa 5.12 Cenário 6 falhou: falha técnica completa do core deve acionar legacy_fallback com IDs da RPC legada, obtido ${JSON.stringify(team512_6)}`,
+  )
+
+  // Teste 5.12 - Cenário 7: Erro também no fallback legado → equipe vazia segura, sem quebrar login
+  const team512_7 = resolveManagedTeam(coreResult512_6, []) // RPC legada falhou ou retornou vazia
+  assert(
+    team512_7.source === 'legacy_fallback' &&
+      team512_7.status === 'technical_error' &&
+      team512_7.managedUserIds.length === 0,
+    `Etapa 5.12 Cenário 7 falhou: erro no fallback legado deve manter equipe vazia segura sem quebrar, obtido ${JSON.stringify(team512_7)}`,
   )
 
   // Cenário 32 (5.10 - Item 6): operacional → não consulta equipe (simulado por verificação de perfil)

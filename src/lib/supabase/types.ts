@@ -2589,6 +2589,13 @@ export type Database = {
         Returns: undefined
       }
       is_socio_gestor: { Args: never; Returns: boolean }
+      legacy_managed_operational_ids: {
+        Args: never
+        Returns: {
+          auth_user_id: string
+          legaldesk_usuario_id: string
+        }[]
+      }
       soft_delete_manychat_contato: {
         Args: { p_contato_id: string }
         Returns: undefined
