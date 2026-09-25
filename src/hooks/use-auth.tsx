@@ -76,80 +76,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const currentAuthUserIdRef = useRef<string | null>(null)
   const coreAccessRequestIdRef = useRef<number>(0)
 
-  const loadCoreAccessAsync = (
-    authUserId: string,
-    legacyProfile: {
-      perfil: string
-      ativo: boolean
-      legaldeskUsuarioId: string | null
-      gestorId: string | null
-      managedUserIds: string[]
-    },
-    requestId: number,
-  ) => {
-    // Leitura assíncrona do core — NUNCA bloqueia loading inicial de autenticação
-    fetchCoreAccessResult(authUserId)
-      .then((result) => {
-        // Validação estrita de sessão: garantir que o usuário ainda é o mesmo e nenhuma requisição mais recente foi disparada
-        if (
-          currentAuthUserIdRef.current !== authUserId ||
-          coreAccessRequestIdRef.current !== requestId
-        ) {
-          // Sessão trocada, encerrada ou sobrescrita enquanto a consulta estava em andamento.
-          // Descartar silenciosamente sem aplicar estado.
-          return
-        }
-
-        const coreData = result.data
-        const resolution = resolveEffectiveProfile(result, legacyProfile.perfil)
-
-        setCoreAccess(coreData)
-        auditCoreEquivalence(legacyProfile, coreData, resolution.perfil, resolution.source)
-
-        // Atualizar o profile com o perfil efetivo resolvido (core-first)
-        setProfile((prev) => {
-          if (!prev) return null
-          return {
-            ...prev,
-            perfil: resolution.perfil,
-            perfilSource: resolution.source,
-            coreStatus: resolution.coreStatus,
-          }
-        })
-
-        setIdentity({
-          authUserId,
-          legacy: legacyProfile,
-          core: coreData,
-          coreStatus: resolution.coreStatus,
-          effective: {
-            source: resolution.source,
-            perfil: resolution.perfil,
-            ativo: legacyProfile.ativo,
-            gestorId: legacyProfile.gestorId,
-            legaldeskUsuarioId: legacyProfile.legaldeskUsuarioId,
-            managedUserIds: legacyProfile.managedUserIds,
-            coreStatus: resolution.coreStatus,
-          },
-        })
-      })
-      .catch((err) => {
-        if (import.meta.env.DEV) {
-          console.warn('[use-auth] Falha não impeditiva ao ler core access:', err)
-        }
-        // Em caso de falha inesperada de promise, manter fallback legado
-        setProfile((prev) => {
-          if (!prev) return null
-          return {
-            ...prev,
-            perfil: legacyProfile.perfil,
-            perfilSource: 'legacy_fallback',
-            coreStatus: 'technical_error',
-          }
-        })
-      })
-  }
-
   const handleSessionChange = async (currentSession: Session | null) => {
     if (!currentSession?.user) {
       currentAuthUserIdRef.current = null
@@ -164,12 +90,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
+    const authUserId = currentSession.user.id
+    currentAuthUserIdRef.current = authUserId
+    const requestId = ++coreAccessRequestIdRef.current
+
     try {
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('perfil, ativo, legaldesk_usuario_id, gestor_id')
-        .eq('id', currentSession.user.id)
+        .eq('id', authUserId)
         .maybeSingle()
+
+      // Verificar se a sessão ainda é a mesma antes de prosseguir
+      if (
+        currentAuthUserIdRef.current !== authUserId ||
+        coreAccessRequestIdRef.current !== requestId
+      ) {
+        return
+      }
 
       if (error) {
         console.error('Erro ao buscar perfil do usuário:', error)
@@ -187,7 +125,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCoreAccess(null)
         setIdentity(null)
         await supabase.auth.signOut()
-      } else if (profileData.ativo === false) {
+        return
+      }
+
+      if (profileData.ativo === false) {
         // Usuário inativo: destruir sessão Supabase e manter user e session null
         currentAuthUserIdRef.current = null
         coreAccessRequestIdRef.current += 1
@@ -204,59 +145,109 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setCoreAccess(null)
         setIdentity(null)
         await supabase.auth.signOut()
-      } else {
-        let teamUserIds: string[] = []
-        if (profileData.perfil === 'gestor') {
-          // Carregar a equipe do gestor: profiles vinculados via gestor_id = auth.uid()
-          const { data: teamProfiles, error: teamError } = await supabase
-            .from('profiles')
-            .select('legaldesk_usuario_id')
-            .eq('gestor_id', currentSession.user.id)
-
-          if (teamError) {
-            console.error('Erro ao buscar equipe do gestor:', teamError)
-          } else if (teamProfiles) {
-            teamUserIds = teamProfiles
-              .map((p) => p.legaldesk_usuario_id)
-              .filter((id): id is string => Boolean(id))
-          }
-        }
-
-        const legacyProfileInfo = {
-          perfil: profileData.perfil ?? '',
-          ativo: Boolean(profileData.ativo),
-          legaldeskUsuarioId: profileData.legaldesk_usuario_id ?? null,
-          gestorId: profileData.gestor_id ?? null,
-          managedUserIds: teamUserIds,
-        }
-
-        setManagedUserIds(teamUserIds)
-        setProfile({
-          perfil: legacyProfileInfo.perfil,
-          ativo: legacyProfileInfo.ativo,
-          gestor_id: legacyProfileInfo.gestorId,
-          legaldesk_usuario_id: legacyProfileInfo.legaldeskUsuarioId,
-          managed_user_ids: teamUserIds,
-        })
-        setSession(currentSession)
-        setUser(currentSession.user)
-
-        // Inicializar estrutura agregada provisória enquanto core_* é consultado em background
-        setIdentity({
-          authUserId: currentSession.user.id,
-          legacy: legacyProfileInfo,
-          core: null,
-          effective: {
-            source: 'legacy_fallback',
-            ...legacyProfileInfo,
-          },
-        })
-
-        // Disparar leitura preparatória única do core_* sem bloquear o fluxo
-        currentAuthUserIdRef.current = currentSession.user.id
-        const requestId = ++coreAccessRequestIdRef.current
-        loadCoreAccessAsync(currentSession.user.id, legacyProfileInfo, requestId)
+        return
       }
+
+      // Carregar dados legados necessários (equipe do gestor se perfil for gestor)
+      let teamUserIds: string[] = []
+      if (profileData.perfil === 'gestor') {
+        const { data: teamProfiles, error: teamError } = await supabase
+          .from('profiles')
+          .select('legaldesk_usuario_id')
+          .eq('gestor_id', authUserId)
+
+        if (teamError) {
+          console.error('Erro ao buscar equipe do gestor:', teamError)
+        } else if (teamProfiles) {
+          teamUserIds = teamProfiles
+            .map((p) => p.legaldesk_usuario_id)
+            .filter((id): id is string => Boolean(id))
+        }
+      }
+
+      // Verificar novamente sessão antes de consultar core
+      if (
+        currentAuthUserIdRef.current !== authUserId ||
+        coreAccessRequestIdRef.current !== requestId
+      ) {
+        return
+      }
+
+      const legacyProfileInfo = {
+        perfil: profileData.perfil ?? '',
+        ativo: Boolean(profileData.ativo),
+        legaldeskUsuarioId: profileData.legaldesk_usuario_id ?? null,
+        gestorId: profileData.gestor_id ?? null,
+        managedUserIds: teamUserIds,
+      }
+
+      // Consultar Gestor de Acessos Ricci (core_*) ANTES de liberar o perfil efetivo e o loading.
+      // Timeout seguro de 10s para evitar qualquer chance de loading infinito em caso de rede travada.
+      let coreResult: Awaited<ReturnType<typeof fetchCoreAccessResult>>
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('core_timeout')), 10000),
+        )
+        coreResult = await Promise.race([fetchCoreAccessResult(authUserId), timeoutPromise])
+      } catch (coreErr: any) {
+        if (import.meta.env.DEV) {
+          console.warn('[use-auth] Falha técnica ou timeout ao consultar core access:', coreErr)
+        }
+        coreResult = {
+          status: 'technical_error',
+          data: null,
+          resolvedPerfil: null,
+          detail: coreErr?.message || 'Erro inesperado ou timeout ao consultar core',
+        }
+      }
+
+      // Verificar se a sessão não mudou enquanto a consulta ao core estava em andamento
+      if (
+        currentAuthUserIdRef.current !== authUserId ||
+        coreAccessRequestIdRef.current !== requestId
+      ) {
+        return
+      }
+
+      // Resolver perfil efetivo:
+      // - ok -> perfil do core
+      // - technical_error -> fallback para profiles.perfil (legacy_fallback)
+      // - no_core_user, no_system_link, link_inactive, profile_inactive_or_invalid -> perfil vazio (core_denied)
+      const resolution = resolveEffectiveProfile(coreResult, legacyProfileInfo.perfil)
+      const coreData = coreResult.data
+
+      auditCoreEquivalence(legacyProfileInfo, coreData, resolution.perfil, resolution.source)
+
+      // Somente agora, com a resolução final do perfil concluída, publicar dados de autenticação e perfil
+      setManagedUserIds(teamUserIds)
+      setCoreAccess(coreData)
+      setProfile({
+        perfil: resolution.perfil,
+        ativo: legacyProfileInfo.ativo,
+        gestor_id: legacyProfileInfo.gestorId,
+        legaldesk_usuario_id: legacyProfileInfo.legaldeskUsuarioId,
+        managed_user_ids: teamUserIds,
+        perfilSource: resolution.source,
+        coreStatus: resolution.coreStatus,
+      })
+      setSession(currentSession)
+      setUser(currentSession.user)
+
+      setIdentity({
+        authUserId,
+        legacy: legacyProfileInfo,
+        core: coreData,
+        coreStatus: resolution.coreStatus,
+        effective: {
+          source: resolution.source,
+          perfil: resolution.perfil,
+          ativo: legacyProfileInfo.ativo,
+          gestorId: legacyProfileInfo.gestorId,
+          legaldeskUsuarioId: legacyProfileInfo.legaldeskUsuarioId,
+          managedUserIds: legacyProfileInfo.managedUserIds,
+          coreStatus: resolution.coreStatus,
+        },
+      })
     } catch (err) {
       console.error('Exceção ao carregar perfil:', err)
       currentAuthUserIdRef.current = null
@@ -268,7 +259,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCoreAccess(null)
       setIdentity(null)
     } finally {
-      setLoading(false)
+      // Liberar loading apenas se esta ainda for a requisição ativa
+      if (coreAccessRequestIdRef.current === requestId) {
+        setLoading(false)
+      }
     }
   }
 

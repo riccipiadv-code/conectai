@@ -14,7 +14,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "preview": "vite preview",
-    "test": "node --loader ts-node/esm -e \"import('./src/services/core-access.test.ts').then(m => { const r = m.runCoreAccessTests(); if (r.failed > 0) { console.error('Testes falharam:', r.errors); process.exit(1); } else { console.log('Todos os ' + r.passed + ' testes passaram com sucesso!'); } })\" 2>/dev/null || node --input-type=module -e \"import('./src/services/core-access.ts').then(() => console.log('Test harness verified'))\"",
+    "test": "node scripts/run-tests.mjs",
     "test:watch": "npm test"
   },
   "dependencies": {
