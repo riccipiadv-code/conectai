@@ -2575,6 +2575,10 @@ export type Database = {
         Args: { p_acessos: Json; p_usuario_id: string }
         Returns: number
       }
+      core_can_update_manychat_contato: {
+        Args: { p_responsavel_id: string }
+        Returns: boolean
+      }
       core_current_user_id: { Args: never; Returns: string }
       core_is_gestor_acesso_admin: { Args: never; Returns: boolean }
       core_managed_operational_ids: {

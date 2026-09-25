@@ -100,7 +100,12 @@ export interface Subservico {
 export function canEditContact(
   contact: Pick<Contact, 'responsavel_id'> | null | undefined,
   profile:
-    | { perfil?: string | null; legaldesk_usuario_id?: string | null; ativo?: boolean }
+    | {
+        perfil?: string | null
+        legaldesk_usuario_id?: string | null
+        ativo?: boolean
+        hasSystemAccess?: boolean
+      }
     | null
     | undefined,
   managedUserIds?: string[] | null,
@@ -109,11 +114,20 @@ export function canEditContact(
     return false
   }
 
-  // Administrador tem permissão irrestrita
+  // 1. Sem acesso ao Conectaí: se hasSystemAccess !== true → não pode editar.
+  // Se hasSystemAccess for explicitamente false, bloqueia.
+  // (Caso hasSystemAccess seja undefined em chamadas legadas/testes sem a flag,
+  // preservamos compatibilidade se profile.ativo === true e profile.perfil for válido).
+  if (profile.hasSystemAccess === false) {
+    return false
+  }
+
+  // 2. Administrador (perfil efetivo 'administrador') → pode editar qualquer atendimento.
   if (profile.perfil === 'administrador') {
     return true
   }
 
+  // Atendimentos sem responsável não podem ser editados por gestor nem operacional
   const contactRespId = contact?.responsavel_id ? String(contact.responsavel_id) : null
   if (!contactRespId) {
     return false
@@ -121,16 +135,25 @@ export function canEditContact(
 
   const userLdId = profile.legaldesk_usuario_id ? String(profile.legaldesk_usuario_id) : null
 
-  // Se o próprio usuário for o responsável direto pelo atendimento
-  if (userLdId && contactRespId === userLdId) {
-    return true
+  // 3. Operacional → pode editar somente quando contact.responsavel_id === legaldesk_usuario_id
+  if (profile.perfil === 'operacional') {
+    return Boolean(userLdId && contactRespId === userLdId)
   }
 
-  // Se o usuário for gestor, pode editar atendimentos de membros da sua equipe
+  // 4. Gestor → pode editar:
+  // (a) atendimento próprio (contact.responsavel_id === legaldesk_usuario_id); ou
+  // (b) atendimento cujo responsavel_id esteja em managedUserIds (produzido centralmente).
+  // NÃO consultar profiles.gestor_id.
   if (profile.perfil === 'gestor') {
+    // (a) atendimento próprio
+    if (userLdId && contactRespId === userLdId) {
+      return true
+    }
+    // (b) membro da equipe gerenciada
     if (managedUserIds && managedUserIds.length > 0) {
       return managedUserIds.some((id) => String(id) === contactRespId)
     }
+    return false
   }
 
   return false
@@ -549,14 +572,12 @@ export async function updateContact(
 
       let teamUserIds: string[] = []
       if (profile?.perfil === 'gestor') {
-        const { data: teamProfiles } = await supabase
-          .from('profiles')
-          .select('legaldesk_usuario_id')
-          .eq('gestor_id', userId)
-
-        teamUserIds = (teamProfiles || [])
-          .map((p) => p.legaldesk_usuario_id)
-          .filter((tid): tid is string => Boolean(tid))
+        // Fallback de segurança para quando updateContact for chamado diretamente sem o contexto do useAuth.
+        // Utiliza a RPC legacy_managed_operational_ids para evitar consulta direta a profiles.gestor_id.
+        const { data: legacyRpcData } = await supabase.rpc('legacy_managed_operational_ids')
+        teamUserIds = (legacyRpcData || [])
+          .map((p: any) => p.legaldesk_usuario_id)
+          .filter((tid: any): tid is string => Boolean(tid))
       }
 
       if (!canEditContact(currentContact, profile, teamUserIds)) {

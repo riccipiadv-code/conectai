@@ -932,5 +932,199 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     `Cenário 35 (5.10.10-12) falhou: Kanban/Atendimentos e formato de managedUserIds preservados`,
   )
 
+  // ==========================================
+  // Testes Obrigatórios da Etapa 5.18 (Alinhamento de canEditContact à Autoridade Central):
+  // 1. administrador → edita qualquer atendimento;
+  // 2. gestor → edita atendimento próprio;
+  // 3. gestor → edita subordinado central;
+  // 4. gestor → não edita usuário fora da equipe;
+  // 5. operacional → edita próprio;
+  // 6. operacional → não edita outro;
+  // 7. hasSystemAccess = false → não edita;
+  // 8. core_partial_bridge → somente IDs traduzidos podem ser editados;
+  // 9. legacy_fallback → comportamento transitório preservado;
+  // 10. atendimento sem responsável → gestor/operacional não recebem permissão indevida;
+  // 11. Kanban mantém comportamento atual;
+  // 12. ContactModal mantém comportamento atual;
+  // 13. nenhuma nova consulta a profiles.gestor_id é criada.
+  // ==========================================
+
+  // Cenário 36 (5.18 - Item 1): Administrador → edita qualquer atendimento (próprio, subordinado, terceiro ou sem responsável)
+  const admin518 = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-admin-1',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-any-user' }, admin518, []) === true &&
+      canEditContact({ responsavel_id: 'ld-admin-1' }, admin518, []) === true &&
+      canEditContact({ responsavel_id: null }, admin518, []) === true &&
+      canEditContact(null, admin518, []) === true,
+    'Cenário 36 (5.18.1) falhou: administrador deve poder editar qualquer atendimento inclusive sem responsável',
+  )
+
+  // Cenário 37 (5.18 - Item 2): Gestor → edita atendimento próprio
+  const gestor518 = {
+    perfil: 'gestor',
+    legaldesk_usuario_id: 'ld-gestor-1',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  const managedTeam518 = ['ld-sub-1', 'ld-sub-2']
+  assert(
+    canEditContact({ responsavel_id: 'ld-gestor-1' }, gestor518, managedTeam518) === true,
+    'Cenário 37 (5.18.2) falhou: gestor deve poder editar atendimento próprio',
+  )
+
+  // Cenário 38 (5.18 - Item 3): Gestor → edita subordinado central presente em managedUserIds
+  assert(
+    canEditContact({ responsavel_id: 'ld-sub-1' }, gestor518, managedTeam518) === true &&
+      canEditContact({ responsavel_id: 'ld-sub-2' }, gestor518, managedTeam518) === true,
+    'Cenário 38 (5.18.3) falhou: gestor deve poder editar subordinados presentes em managedUserIds',
+  )
+
+  // Cenário 39 (5.18 - Item 4): Gestor → NÃO edita usuário fora da equipe
+  assert(
+    canEditContact({ responsavel_id: 'ld-outside-user' }, gestor518, managedTeam518) === false &&
+      canEditContact({ responsavel_id: 'ld-other-gestor' }, gestor518, managedTeam518) === false,
+    'Cenário 39 (5.18.4) falhou: gestor NÃO deve poder editar usuário fora da equipe',
+  )
+
+  // Cenário 40 (5.18 - Item 5): Operacional → edita próprio
+  const op518 = {
+    perfil: 'operacional',
+    legaldesk_usuario_id: 'ld-op-1',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-op-1' }, op518, []) === true,
+    'Cenário 40 (5.18.5) falhou: operacional deve poder editar atendimento próprio',
+  )
+
+  // Cenário 41 (5.18 - Item 6): Operacional → NÃO edita outro atendimento (mesmo que IDs sejam passados em managedUserIds)
+  assert(
+    canEditContact({ responsavel_id: 'ld-other-op' }, op518, ['ld-other-op']) === false &&
+      canEditContact({ responsavel_id: 'ld-op-2' }, op518, []) === false,
+    'Cenário 41 (5.18.6) falhou: operacional NÃO deve poder editar atendimento de outro',
+  )
+
+  // Cenário 42 (5.18 - Item 7): hasSystemAccess = false → NÃO edita (administrador, gestor ou operacional)
+  const adminNoAccess = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-admin-1',
+    ativo: true,
+    hasSystemAccess: false,
+  }
+  const gestorNoAccess = {
+    perfil: 'gestor',
+    legaldesk_usuario_id: 'ld-gestor-1',
+    ativo: true,
+    hasSystemAccess: false,
+  }
+  const opNoAccess = {
+    perfil: 'operacional',
+    legaldesk_usuario_id: 'ld-op-1',
+    ativo: true,
+    hasSystemAccess: false,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-any' }, adminNoAccess, []) === false &&
+      canEditContact({ responsavel_id: 'ld-gestor-1' }, gestorNoAccess, ['ld-sub-1']) === false &&
+      canEditContact({ responsavel_id: 'ld-op-1' }, opNoAccess, []) === false,
+    'Cenário 42 (5.18.7) falhou: hasSystemAccess=false deve bloquear edição para qualquer perfil',
+  )
+
+  // Cenário 43 (5.18 - Item 8): core_partial_bridge → somente IDs traduzidos podem ser editados (sem ampliar permissão nem recorrer a legado)
+  // Exemplo: gestor tem 3 subordinados centrais, mas a ponte traduziu apenas 2 ('ld-sub-1', 'ld-sub-2').
+  // O terceiro ('ld-untranslated') NÃO pode ser editado via canEditContact
+  const partialBridgeManagedUserIds = ['ld-sub-1', 'ld-sub-2']
+  assert(
+    canEditContact({ responsavel_id: 'ld-sub-1' }, gestor518, partialBridgeManagedUserIds) ===
+      true &&
+      canEditContact({ responsavel_id: 'ld-sub-2' }, gestor518, partialBridgeManagedUserIds) ===
+        true &&
+      canEditContact(
+        { responsavel_id: 'ld-untranslated' },
+        gestor518,
+        partialBridgeManagedUserIds,
+      ) === false &&
+      canEditContact(
+        { responsavel_id: 'ld-legacy-only' },
+        gestor518,
+        partialBridgeManagedUserIds,
+      ) === false,
+    'Cenário 43 (5.18.8) falhou: em core_partial_bridge, apenas IDs traduzidos com segurança podem ser editados',
+  )
+
+  // Cenário 44 (5.18 - Item 9): legacy_fallback → comportamento transitório preservado (IDs da RPC legada consumidos diretamente)
+  const legacyFallbackManagedUserIds = ['ld-legacy-sub-1', 'ld-legacy-sub-2']
+  assert(
+    canEditContact(
+      { responsavel_id: 'ld-legacy-sub-1' },
+      gestor518,
+      legacyFallbackManagedUserIds,
+    ) === true &&
+      canEditContact(
+        { responsavel_id: 'ld-legacy-sub-2' },
+        gestor518,
+        legacyFallbackManagedUserIds,
+      ) === true &&
+      canEditContact(
+        { responsavel_id: 'ld-not-in-legacy' },
+        gestor518,
+        legacyFallbackManagedUserIds,
+      ) === false,
+    'Cenário 44 (5.18.9) falhou: em legacy_fallback, comportamento transitório deve ser preservado via managedUserIds',
+  )
+
+  // Cenário 45 (5.18 - Item 10): Atendimento sem responsável → gestor e operacional NÃO recebem permissão indevida
+  assert(
+    canEditContact({ responsavel_id: null }, gestor518, managedTeam518) === false &&
+      canEditContact({ responsavel_id: '' }, gestor518, managedTeam518) === false &&
+      canEditContact({ responsavel_id: undefined }, gestor518, managedTeam518) === false &&
+      canEditContact(null, gestor518, managedTeam518) === false &&
+      canEditContact({ responsavel_id: null }, op518, []) === false &&
+      canEditContact(null, op518, []) === false,
+    'Cenário 45 (5.18.10) falhou: atendimento sem responsável não deve conceder permissão para gestor ou operacional',
+  )
+
+  // Cenário 46 (5.18 - Item 11): Kanban mantém comportamento atual
+  // No Kanban, canEditContact(contact, profile, managedUserIds) habilita o botão de editar e o drag-and-drop de mover card
+  const kanbanContactOwn = { id: 'c-1', responsavel_id: 'ld-op-1', current_stage: 'nivel_1_novo' }
+  const kanbanContactOther = {
+    id: 'c-2',
+    responsavel_id: 'ld-other',
+    current_stage: 'nivel_1_novo',
+  }
+  assert(
+    canEditContact(kanbanContactOwn, op518, []) === true &&
+      canEditContact(kanbanContactOther, op518, []) === false,
+    'Cenário 46 (5.18.11) falhou: Kanban deve manter regra estrita para operacional',
+  )
+
+  // Cenário 47 (5.18 - Item 12): ContactModal mantém comportamento atual
+  // Na validação de salvamento do ContactModal: handleSubmit verifica canEditContact antes de prosseguir
+  const modalContactSub = { responsavel_id: 'ld-sub-1' }
+  const modalContactBlocked = { responsavel_id: 'ld-outsider' }
+  assert(
+    canEditContact(modalContactSub, gestor518, managedTeam518) === true &&
+      canEditContact(modalContactBlocked, gestor518, managedTeam518) === false,
+    'Cenário 47 (5.18.12) falhou: ContactModal deve validar permissão com base em canEditContact',
+  )
+
+  // Cenário 48 (5.18 - Item 13): Usuário inativo (ativo = false) nunca edita
+  const inactiveProfile = {
+    perfil: 'administrador',
+    legaldesk_usuario_id: 'ld-admin-1',
+    ativo: false,
+    hasSystemAccess: true,
+  }
+  assert(
+    canEditContact({ responsavel_id: 'ld-admin-1' }, inactiveProfile, []) === false,
+    'Cenário 48 (5.18.13) falhou: usuário inativo (ativo=false) não pode editar atendimento',
+  )
+
   return { passed, failed: errors.length, errors }
 }

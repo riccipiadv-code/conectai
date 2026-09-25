@@ -93,15 +93,13 @@ export function useKanbanData(
 
           activeProfile = profile
 
-          // Fallback autônomo apenas quando useKanbanData for chamado sem profile/managedUserIds
+          // Fallback autônomo apenas quando useKanbanData for chamado sem profile/managedUserIds.
+          // Utiliza a RPC legacy_managed_operational_ids para evitar consulta a profiles.gestor_id.
           if (profile?.perfil === 'gestor') {
-            const { data: teamProfiles } = await supabase
-              .from('profiles')
-              .select('legaldesk_usuario_id')
-              .eq('gestor_id', authData.user.id)
-            activeTeamIds = (teamProfiles || [])
-              .map((p) => p.legaldesk_usuario_id)
-              .filter((id): id is string => Boolean(id))
+            const { data: legacyRpcData } = await supabase.rpc('legacy_managed_operational_ids')
+            activeTeamIds = (legacyRpcData || [])
+              .map((p: any) => p.legaldesk_usuario_id)
+              .filter((id: any): id is string => Boolean(id))
           }
         }
       }
