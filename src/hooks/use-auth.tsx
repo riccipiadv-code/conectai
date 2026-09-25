@@ -3,17 +3,33 @@ import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 import {
   CoreAccessData,
+  CoreAccessStatus,
+  EffectiveProfileSource,
   AggregatedUserIdentity,
-  fetchCoreAccess,
+  fetchCoreAccessResult,
+  resolveEffectiveProfile,
   auditCoreEquivalence,
 } from '@/services/core-access'
 
 export interface UserProfile {
+  /**
+   * Perfil efetivo do usuário no Conectaí.
+   * Na Etapa 4: resolvido via core-first com fallback legado e menor privilégio.
+   */
   perfil: string
   ativo: boolean
   gestor_id?: string | null
   legaldesk_usuario_id?: string | null
   managed_user_ids?: string[]
+  /**
+   * Fonte efetiva de onde o perfil foi resolvido.
+   * 'core' | 'legacy_fallback' | 'core_denied'
+   */
+  perfilSource?: EffectiveProfileSource
+  /**
+   * Status detalhado da leitura no Gestor de Acessos Ricci (`core_*`).
+   */
+  coreStatus?: CoreAccessStatus
 }
 
 interface AuthContextType {
@@ -71,32 +87,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     },
     requestId: number,
   ) => {
-    // Leitura preparatória assíncrona — NUNCA bloqueia loading de autenticação nem trava a interface
-    fetchCoreAccess(authUserId)
-      .then((coreData) => {
+    // Leitura assíncrona do core — NUNCA bloqueia loading inicial de autenticação
+    fetchCoreAccessResult(authUserId)
+      .then((result) => {
         // Validação estrita de sessão: garantir que o usuário ainda é o mesmo e nenhuma requisição mais recente foi disparada
         if (
           currentAuthUserIdRef.current !== authUserId ||
           coreAccessRequestIdRef.current !== requestId
         ) {
           // Sessão trocada, encerrada ou sobrescrita enquanto a consulta estava em andamento.
-          // Descartar silenciosamente sem aplicar estado nem emitir alertas ao usuário.
+          // Descartar silenciosamente sem aplicar estado.
           return
         }
 
+        const coreData = result.data
+        const resolution = resolveEffectiveProfile(result, legacyProfile.perfil)
+
         setCoreAccess(coreData)
-        auditCoreEquivalence(legacyProfile, coreData)
+        auditCoreEquivalence(legacyProfile, coreData, resolution.perfil, resolution.source)
+
+        // Atualizar o profile com o perfil efetivo resolvido (core-first)
+        setProfile((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            perfil: resolution.perfil,
+            perfilSource: resolution.source,
+            coreStatus: resolution.coreStatus,
+          }
+        })
+
         setIdentity({
           authUserId,
           legacy: legacyProfile,
           core: coreData,
+          coreStatus: resolution.coreStatus,
           effective: {
-            source: 'legacy',
-            perfil: legacyProfile.perfil,
+            source: resolution.source,
+            perfil: resolution.perfil,
             ativo: legacyProfile.ativo,
             gestorId: legacyProfile.gestorId,
             legaldeskUsuarioId: legacyProfile.legaldeskUsuarioId,
             managedUserIds: legacyProfile.managedUserIds,
+            coreStatus: resolution.coreStatus,
           },
         })
       })
@@ -104,6 +137,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (import.meta.env.DEV) {
           console.warn('[use-auth] Falha não impeditiva ao ler core access:', err)
         }
+        // Em caso de falha inesperada de promise, manter fallback legado
+        setProfile((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            perfil: legacyProfile.perfil,
+            perfilSource: 'legacy_fallback',
+            coreStatus: 'technical_error',
+          }
+        })
       })
   }
 
@@ -204,7 +247,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           legacy: legacyProfileInfo,
           core: null,
           effective: {
-            source: 'legacy',
+            source: 'legacy_fallback',
             ...legacyProfileInfo,
           },
         })
