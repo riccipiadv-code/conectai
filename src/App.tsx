@@ -10,7 +10,6 @@ import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import EmailSettings from './pages/EmailSettings'
 import Contacts from './pages/Contacts'
-import UserManagement from './pages/UserManagement'
 import Logs from './pages/Logs'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
@@ -58,14 +57,7 @@ const App = () => (
                 </AdminGuard>
               }
             />
-            <Route
-              path="/administracao/usuarios"
-              element={
-                <AdminGuard>
-                  <UserManagement />
-                </AdminGuard>
-              }
-            />
+            <Route path="/administracao/usuarios" element={<Navigate to="/" replace />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

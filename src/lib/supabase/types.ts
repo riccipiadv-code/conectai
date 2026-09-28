@@ -2552,6 +2552,7 @@ export type Database = {
       task_usuarios: {
         Row: {
           ativo: boolean
+          core_usuario_id: string | null
           created_at: string
           email: string
           id: string
@@ -2560,6 +2561,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          core_usuario_id?: string | null
           created_at?: string
           email: string
           id?: string
@@ -2568,13 +2570,22 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          core_usuario_id?: string | null
           created_at?: string
           email?: string
           id?: string
           nome?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'task_usuarios_core_usuario_id_fkey'
+            columns: ['core_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+        ]
       }
     }
     Views: {
@@ -2586,7 +2597,7 @@ export type Database = {
         Returns: number
       }
       core_can_update_manychat_contato: {
-        Args: { p_responsavel_id: string }
+        Args: { p_responsavel_core_usuario_id: string }
         Returns: boolean
       }
       core_current_user_id: { Args: never; Returns: string }

@@ -54,7 +54,7 @@ interface AdminGuardProps {
 /**
  * AdminGuard:
  * Garante que somente usuários com perfil 'administrador' ativo consigam acessar rotas restritas
- * (Dashboard, Gestão de Usuários, Logs, Configurações de E-mail).
+ * (Dashboard, Logs, Configurações de E-mail).
  * Se o usuário for gestor, operacional ou outro perfil não-admin, redireciona imediatamente para '/'
  * antes de qualquer componente filho ser montado ou dados administrativos serem carregados.
  */
