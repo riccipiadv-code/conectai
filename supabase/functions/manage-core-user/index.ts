@@ -1,9 +1,9 @@
-import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { verifyCoreAdmin, SYSTEM_CODE_CONECTAI } from '../_shared/core-auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
@@ -35,7 +35,6 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // Cliente administrativo com service_role (apenas interno na edge function, nunca exposto ao frontend)
   const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: {
       persistSession: false,
@@ -57,57 +56,25 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Validação estrita da cadeia de administrador:
-    // 1. core_usuarios pelo auth_user_id
-    // 2. core_usuarios.ativo = true
-    // 3. Administrador ativo no sistema GESTOR_ACESSO com perfil ADMINISTRADOR
-    const { data: requesterCoreUser, error: coreUserError } = await adminClient
-      .from('core_usuarios')
-      .select('id, nome, email, ativo')
-      .eq('auth_user_id', user.id)
-      .maybeSingle()
+    const adminCheck = await verifyCoreAdmin(adminClient, user.id, [
+      SYSTEM_CODE_CONECTAI,
+      'GESTOR_ACESSO',
+    ])
 
-    if (coreUserError || !requesterCoreUser) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário corporativo não localizado em core_usuarios.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    if (!requesterCoreUser.ativo) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário corporativo inativo no Gestor de Acesso.' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
-
-    // Verifica se possui o perfil de ADMINISTRADOR no sistema GESTOR_ACESSO
-    const { data: adminPerms, error: adminPermError } = await adminClient
-      .from('core_usuario_sistemas')
-      .select(`
-        id,
-        ativo,
-        core_sistemas!inner(codigo, ativo),
-        core_perfis!inner(codigo, ativo)
-      `)
-      .eq('usuario_id', requesterCoreUser.id)
-      .eq('ativo', true)
-      .eq('core_sistemas.codigo', 'GESTOR_ACESSO')
-      .eq('core_sistemas.ativo', true)
-      .eq('core_perfis.codigo', 'ADMINISTRADOR')
-      .eq('core_perfis.ativo', true)
-
-    if (adminPermError || !adminPerms || adminPerms.length === 0) {
+    if (!adminCheck.allowed || !adminCheck.coreUser) {
       return new Response(
         JSON.stringify({
           error:
-            'Acesso negado: privilégios de administrador do Gestor de Acesso são obrigatórios.',
+            adminCheck.error ||
+            'Acesso negado: privilégios de administrador ativo são obrigatórios.',
         }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        {
+          status: adminCheck.status || 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
       )
     }
 
-    // Leitura do corpo da requisição
     const body = await req.json()
     const { action } = body
 
@@ -118,10 +85,6 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // =========================================================================
-    // HELPER: Validação prévia completa dos pares sistema/perfil
-    // Se houver qualquer par inválido, retorna erro sem tocar no banco
-    // =========================================================================
     async function validateSistemasPairs(
       sistemasInput: unknown,
     ): Promise<{ valid: boolean; error?: string; rows?: SistemaInput[] }> {
@@ -129,7 +92,6 @@ Deno.serve(async (req: Request) => {
         return { valid: true, rows: [] }
       }
 
-      // Buscar todos os sistemas e perfis ativos para validação em memória consistente
       const { data: allSistemas, error: sErr } = await adminClient
         .from('core_sistemas')
         .select('id, codigo, nome, ativo')
@@ -208,17 +170,11 @@ Deno.serve(async (req: Request) => {
       return { valid: true, rows: validatedList }
     }
 
-    // =========================================================================
-    // HELPER: Validação de segurança para garantir ao menos 1 Administrador ativo
-    // no sistema GESTOR_ACESSO com perfil ADMINISTRADOR.
-    // Impede que qualquer operação deixe o Gestor de Acessos sem admin.
-    // =========================================================================
     async function willKeepAtLeastOneGestorAcessoAdmin(
       targetUserId: string,
       prospectiveUserActive: boolean,
       prospectiveSistemas?: SistemaInput[],
     ): Promise<{ safe: boolean; error?: string }> {
-      // 1. Busca todos os administradores ativos atuais do Gestor de Acesso
       const { data: currentAdmins, error: adminQueryErr } = await adminClient
         .from('core_usuario_sistemas')
         .select(`
@@ -243,17 +199,18 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Outros administradores ativos (exceto o usuário alvo)
-      const otherActiveAdmins = (currentAdmins || []).filter((a) => a.usuario_id !== targetUserId)
+      const isTargetCurrentlyGaAdmin = (currentAdmins || []).some(
+        (a) => a.usuario_id === targetUserId,
+      )
+      if (!isTargetCurrentlyGaAdmin) {
+        return { safe: true }
+      }
 
-      // Se houver outro(s) administrador(es) ativo(s), é sempre seguro
+      const otherActiveAdmins = (currentAdmins || []).filter((a) => a.usuario_id !== targetUserId)
       if (otherActiveAdmins.length > 0) {
         return { safe: true }
       }
 
-      // Não há outros administradores ativos.
-      // O usuário alvo é o ÚNICO administrador ativo do Gestor de Acesso.
-      // Se ele estiver sendo inativado: BLOQUEAR!
       if (!prospectiveUserActive) {
         return {
           safe: false,
@@ -262,9 +219,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Se os acessos estiverem sendo redefinidos, checar se ele CONTINUARÁ com perfil ADMINISTRADOR em GESTOR_ACESSO
       if (prospectiveSistemas !== undefined) {
-        // Obter os IDs de sistema e perfil de GESTOR_ACESSO / ADMINISTRADOR
         const { data: gaSistema } = await adminClient
           .from('core_sistemas')
           .select('id')
@@ -294,13 +249,832 @@ Deno.serve(async (req: Request) => {
       return { safe: true }
     }
 
-    // =========================================================================
-    // ACTION: create_user
-    // Cria novo usuário corporativo em core_usuarios e seus acessos em core_usuario_sistemas
-    // Opcionalmente dispara convite Supabase Auth caso send_invite = true
-    // =========================================================================
+    if (action === 'list_users') {
+      const [usersResult, ldResult, profilesResult] = await Promise.all([
+        adminClient
+          .from('core_usuarios')
+          .select(`
+            id,
+            auth_user_id,
+            nome,
+            email,
+            ativo,
+            gestor_id,
+            core_usuario_sistemas(
+              id,
+              ativo,
+              sistema_id,
+              perfil_id,
+              core_sistemas(id, codigo, nome, ativo),
+              core_perfis(id, codigo, nome, ativo)
+            )
+          `)
+          .order('nome', { ascending: true }),
+        adminClient.from('legaldesk_usuarios').select('id, email, sigla, exibir_gestao_usuarios'),
+        adminClient.from('profiles').select('id, legaldesk_usuario_id'),
+      ])
+
+      if (usersResult.error) throw usersResult.error
+      const coreUsers = usersResult.data || []
+
+      // Mapear legaldesk_usuarios por email lower
+      const ldByEmail = new Map<string, { id: string; sigla: string | null; exibir: boolean }>()
+      for (const ld of ldResult.data || []) {
+        if (ld.email) {
+          ldByEmail.set(ld.email.trim().toLowerCase(), {
+            id: ld.id,
+            sigla: ld.sigla || null,
+            exibir: ld.exibir_gestao_usuarios !== false,
+          })
+        }
+      }
+
+      // Mapear ponte profiles por id (auth_user_id)
+      const profByAuthId = new Map<string, string>()
+      for (const p of profilesResult.data || []) {
+        if (p.id && p.legaldesk_usuario_id) {
+          profByAuthId.set(p.id, p.legaldesk_usuario_id)
+        }
+      }
+
+      const gestorMap = new Map<string, string>()
+      for (const u of coreUsers) {
+        gestorMap.set(u.id, u.nome)
+      }
+
+      const usersList = coreUsers
+        .filter((u) => {
+          const ldMatch = ldByEmail.get(u.email.trim().toLowerCase())
+          // Se tiver flag exibir_gestao_usuarios = false no legaldesk_usuarios, respeitar
+          if (ldMatch && ldMatch.exibir === false) {
+            return false
+          }
+          return true
+        })
+        .map((u) => {
+          const conectaiLink = (u.core_usuario_sistemas || []).find(
+            (cus: any) =>
+              cus.core_sistemas?.codigo === SYSTEM_CODE_CONECTAI ||
+              cus.sistema_id === '1b085fa4-a4fa-4490-889a-9fea074f41d7',
+          )
+
+          const temAcesso = Boolean(conectaiLink && conectaiLink.ativo === true && u.ativo === true)
+          const perfilCodigo = conectaiLink?.core_perfis?.codigo || null
+          const perfilNome = conectaiLink?.core_perfis?.nome || null
+          const perfilId = conectaiLink?.perfil_id || null
+
+          let status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
+          if (!conectaiLink) {
+            status = 'sem_acesso'
+          } else if (!u.ativo || !conectaiLink.ativo) {
+            status = 'bloqueado'
+          } else if (u.ativo && conectaiLink.ativo) {
+            status = 'ativo'
+          } else {
+            status = 'inconsistente'
+          }
+
+          const ldMatch = ldByEmail.get(u.email.trim().toLowerCase())
+          const bridgeLdId = u.auth_user_id ? profByAuthId.get(u.auth_user_id) || null : null
+          const resolvedLegaldeskId = ldMatch?.id || bridgeLdId || null
+
+          return {
+            id: u.id,
+            core_usuario_id: u.id,
+            auth_user_id: u.auth_user_id,
+            legaldesk_id: resolvedLegaldeskId,
+            sigla: ldMatch?.sigla || '',
+            nome: u.nome,
+            email: u.email,
+            ativo: u.ativo,
+            ativo_sys: temAcesso,
+            gestor_id: u.gestor_id,
+            gestor_nome: u.gestor_id ? gestorMap.get(u.gestor_id) || null : null,
+            sistemas: (u.core_usuario_sistemas || []).map((s: any) => ({
+              id: s.id,
+              sistema_id: s.sistema_id,
+              sistema_codigo: s.core_sistemas?.codigo,
+              sistema_nome: s.core_sistemas?.nome,
+              perfil_id: s.perfil_id,
+              perfil_codigo: s.core_perfis?.codigo,
+              perfil_nome: s.core_perfis?.nome,
+              ativo: s.ativo,
+            })),
+            conectai: {
+              tem_acesso: temAcesso,
+              ativo: conectaiLink?.ativo ?? false,
+              perfil_id: perfilId,
+              perfil_codigo: perfilCodigo,
+              perfil_nome: perfilNome,
+            },
+            status,
+            tem_acesso: temAcesso,
+            perfil: perfilCodigo ? perfilCodigo.toLowerCase() : null,
+            perfil_codigo: perfilCodigo,
+            perfil_nome: perfilNome,
+          }
+        })
+
+      return new Response(JSON.stringify({ users: usersList }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'list_perfis') {
+      const sistemaCodigo = body.sistema_codigo || SYSTEM_CODE_CONECTAI
+
+      const { data: sistemaData } = await adminClient
+        .from('core_sistemas')
+        .select('id')
+        .eq('codigo', sistemaCodigo)
+        .maybeSingle()
+
+      let perfisQuery = adminClient
+        .from('core_perfis')
+        .select('id, sistema_id, codigo, nome, descricao, ativo')
+        .eq('ativo', true)
+        .order('nome', { ascending: true })
+
+      if (sistemaData?.id) {
+        perfisQuery = perfisQuery.eq('sistema_id', sistemaData.id)
+      }
+
+      const { data: perfis, error: perfisErr } = await perfisQuery
+      if (perfisErr) throw perfisErr
+
+      return new Response(JSON.stringify({ perfis: perfis || [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'list_gestores') {
+      const { data: gestores, error: gestoresErr } = await adminClient
+        .from('core_usuarios')
+        .select('id, auth_user_id, nome, email, ativo')
+        .eq('ativo', true)
+        .order('nome', { ascending: true })
+
+      if (gestoresErr) throw gestoresErr
+
+      const mappedGestores = (gestores || []).map((g) => ({
+        id: g.id,
+        name: g.nome,
+        nome: g.nome,
+        email: g.email,
+        auth_user_id: g.auth_user_id,
+      }))
+
+      return new Response(JSON.stringify({ gestores: mappedGestores }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'hide_from_management') {
+      const targetUserId = body.usuario_id || body.id
+      const targetLegaldeskId = body.legaldesk_id
+
+      if (!targetUserId && !targetLegaldeskId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário ou ID legaldesk ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // 1. Se tem targetUserId, inativa no core_usuarios e revoga acesso Conectaí
+      if (targetUserId) {
+        await adminClient.from('core_usuarios').update({ ativo: false }).eq('id', targetUserId)
+
+        const { data: conectaiSistema } = await adminClient
+          .from('core_sistemas')
+          .select('id')
+          .eq('codigo', SYSTEM_CODE_CONECTAI)
+          .maybeSingle()
+
+        if (conectaiSistema) {
+          const { data: currentAccesses } = await adminClient
+            .from('core_usuario_sistemas')
+            .select('sistema_id, perfil_id, ativo')
+            .eq('usuario_id', targetUserId)
+            .eq('ativo', true)
+
+          const remainingAccesses = (currentAccesses || [])
+            .filter((a) => a.sistema_id !== conectaiSistema.id)
+            .map((a) => ({ sistema_id: a.sistema_id, perfil_id: a.perfil_id }))
+
+          await adminClient.rpc('core_atualizar_usuario_acessos', {
+            p_usuario_id: targetUserId,
+            p_acessos: remainingAccesses,
+          })
+        }
+      }
+
+      // 2. Se tem targetLegaldeskId, marca exibir_gestao_usuarios = false
+      if (targetLegaldeskId) {
+        await adminClient
+          .from('legaldesk_usuarios')
+          .update({ exibir_gestao_usuarios: false })
+          .eq('id', targetLegaldeskId)
+      } else if (targetUserId) {
+        // Tenta achar pelo email do core_usuario
+        const { data: cu } = await adminClient
+          .from('core_usuarios')
+          .select('email')
+          .eq('id', targetUserId)
+          .maybeSingle()
+
+        if (cu?.email) {
+          await adminClient
+            .from('legaldesk_usuarios')
+            .update({ exibir_gestao_usuarios: false })
+            .ilike('email', cu.email.trim())
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'grant_access' || action === 'set_system_access') {
+      const targetUserId = body.usuario_id || body.id
+      const targetPerfilCodigo = body.perfil
+      const targetPerfilId = body.perfil_id
+      const targetGestorId = body.gestor_id !== undefined ? body.gestor_id : undefined
+
+      if (!targetUserId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário corporativo ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: conectaiSistema } = await adminClient
+        .from('core_sistemas')
+        .select('id, codigo, ativo')
+        .eq('codigo', SYSTEM_CODE_CONECTAI)
+        .maybeSingle()
+
+      if (!conectaiSistema || !conectaiSistema.ativo) {
+        return new Response(
+          JSON.stringify({ error: 'Sistema Conectaí não encontrado ou inativo.' }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+
+      let resolvedPerfilId: string | null = null
+      if (targetPerfilId) {
+        resolvedPerfilId = targetPerfilId
+      } else if (targetPerfilCodigo) {
+        const normCodigo = String(targetPerfilCodigo).trim().toUpperCase()
+        const { data: perfilData } = await adminClient
+          .from('core_perfis')
+          .select('id')
+          .eq('sistema_id', conectaiSistema.id)
+          .ilike('codigo', normCodigo)
+          .eq('ativo', true)
+          .maybeSingle()
+
+        if (!perfilData) {
+          return new Response(
+            JSON.stringify({
+              error: `Perfil "${targetPerfilCodigo}" não encontrado para o Conectaí.`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        resolvedPerfilId = perfilData.id
+      } else {
+        return new Response(JSON.stringify({ error: 'Perfil de acesso é obrigatório.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      let validatedGestorId: string | null | undefined = undefined
+      if (targetGestorId !== undefined) {
+        if (
+          targetGestorId &&
+          typeof targetGestorId === 'string' &&
+          targetGestorId.trim() &&
+          targetGestorId !== 'none'
+        ) {
+          const trimmedGId = targetGestorId.trim()
+          if (trimmedGId === targetUserId) {
+            return new Response(
+              JSON.stringify({ error: 'O usuário não pode ser gestor de si mesmo.' }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              },
+            )
+          }
+          const { data: gestorData } = await adminClient
+            .from('core_usuarios')
+            .select('id, ativo')
+            .eq('id', trimmedGId)
+            .maybeSingle()
+
+          if (!gestorData || !gestorData.ativo) {
+            return new Response(
+              JSON.stringify({ error: 'O gestor selecionado precisa estar ativo.' }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              },
+            )
+          }
+          validatedGestorId = gestorData.id
+        } else {
+          validatedGestorId = null
+        }
+      }
+
+      const { data: currentAccesses } = await adminClient
+        .from('core_usuario_sistemas')
+        .select('sistema_id, perfil_id, ativo')
+        .eq('usuario_id', targetUserId)
+        .eq('ativo', true)
+
+      const otherAccesses = (currentAccesses || [])
+        .filter((a) => a.sistema_id !== conectaiSistema.id)
+        .map((a) => ({
+          sistema_id: a.sistema_id,
+          perfil_id: a.perfil_id,
+        }))
+
+      const newAccessesPayload = [
+        ...otherAccesses,
+        {
+          sistema_id: conectaiSistema.id,
+          perfil_id: resolvedPerfilId!,
+        },
+      ]
+
+      const userUpdates: Record<string, any> = { ativo: true }
+      if (validatedGestorId !== undefined) {
+        userUpdates.gestor_id = validatedGestorId
+      }
+
+      const { error: userUpdateErr } = await adminClient
+        .from('core_usuarios')
+        .update(userUpdates)
+        .eq('id', targetUserId)
+
+      if (userUpdateErr) throw userUpdateErr
+
+      const { error: rpcErr } = await adminClient.rpc('core_atualizar_usuario_acessos', {
+        p_usuario_id: targetUserId,
+        p_acessos: newAccessesPayload,
+      })
+
+      if (rpcErr) throw rpcErr
+
+      const { data: targetUser } = await adminClient
+        .from('core_usuarios')
+        .select('id, email, nome, auth_user_id')
+        .eq('id', targetUserId)
+        .single()
+
+      if (targetUser && !targetUser.auth_user_id) {
+        try {
+          const { data: authUsersList } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
+          const existingAuth = (authUsersList?.users || []).find(
+            (u) => u.email?.toLowerCase() === targetUser.email.toLowerCase(),
+          )
+
+          if (existingAuth) {
+            await adminClient
+              .from('core_usuarios')
+              .update({ auth_user_id: existingAuth.id })
+              .eq('id', targetUserId)
+          } else {
+            const appUrlEnv = Deno.env.get('APP_URL')
+            const APP_URL = appUrlEnv ? appUrlEnv.replace(/\/+$/, '') : null
+            const inviteOptions: { data: { nome: string }; redirectTo?: string } = {
+              data: { nome: targetUser.nome },
+            }
+            if (APP_URL) {
+              inviteOptions.redirectTo = `${APP_URL}/login`
+            }
+            const { data: inviteData } = await adminClient.auth.admin.inviteUserByEmail(
+              targetUser.email,
+              inviteOptions,
+            )
+            if (inviteData?.user?.id) {
+              await adminClient
+                .from('core_usuarios')
+                .update({ auth_user_id: inviteData.user.id })
+                .eq('id', targetUserId)
+            }
+          }
+        } catch (inviteErr) {
+          console.warn('Aviso: convite auth não enviado na concessão:', inviteErr)
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          usuario_id: targetUserId,
+          perfil_id: resolvedPerfilId,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    if (action === 'inactivate_user') {
+      const targetUserId = body.usuario_id || body.id
+
+      if (!targetUserId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário corporativo ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const adminSafety = await willKeepAtLeastOneGestorAcessoAdmin(targetUserId, false)
+      if (!adminSafety.safe) {
+        return new Response(JSON.stringify({ error: adminSafety.error }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: updatedUser, error: updateErr } = await adminClient
+        .from('core_usuarios')
+        .update({ ativo: false })
+        .eq('id', targetUserId)
+        .select()
+        .single()
+
+      if (updateErr) throw updateErr
+
+      return new Response(JSON.stringify({ success: true, usuario: updatedUser }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'reactivate_user') {
+      const targetUserId = body.usuario_id || body.id
+
+      if (!targetUserId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário corporativo ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { error: updateErr } = await adminClient
+        .from('core_usuarios')
+        .update({ ativo: true })
+        .eq('id', targetUserId)
+
+      if (updateErr) throw updateErr
+
+      const { data: conectaiSistema } = await adminClient
+        .from('core_sistemas')
+        .select('id')
+        .eq('codigo', SYSTEM_CODE_CONECTAI)
+        .maybeSingle()
+
+      if (conectaiSistema) {
+        const { data: currentAccesses } = await adminClient
+          .from('core_usuario_sistemas')
+          .select('sistema_id, perfil_id, ativo')
+          .eq('usuario_id', targetUserId)
+
+        const existingConectai = (currentAccesses || []).find(
+          (a) => a.sistema_id === conectaiSistema.id,
+        )
+
+        let perfilId = existingConectai?.perfil_id
+        if (!perfilId) {
+          const { data: opPerfil } = await adminClient
+            .from('core_perfis')
+            .select('id')
+            .eq('sistema_id', conectaiSistema.id)
+            .eq('codigo', 'OPERACIONAL')
+            .maybeSingle()
+          perfilId = opPerfil?.id
+        }
+
+        if (perfilId) {
+          const otherAccesses = (currentAccesses || [])
+            .filter((a) => a.sistema_id !== conectaiSistema.id && a.ativo)
+            .map((a) => ({
+              sistema_id: a.sistema_id,
+              perfil_id: a.perfil_id,
+            }))
+
+          const newPayload = [
+            ...otherAccesses,
+            { sistema_id: conectaiSistema.id, perfil_id: perfilId },
+          ]
+
+          await adminClient.rpc('core_atualizar_usuario_acessos', {
+            p_usuario_id: targetUserId,
+            p_acessos: newPayload,
+          })
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'revoke_access') {
+      const targetUserId = body.usuario_id || body.id
+
+      if (!targetUserId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário corporativo ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: conectaiSistema } = await adminClient
+        .from('core_sistemas')
+        .select('id')
+        .eq('codigo', SYSTEM_CODE_CONECTAI)
+        .maybeSingle()
+
+      if (!conectaiSistema) {
+        return new Response(JSON.stringify({ error: 'Sistema Conectaí não encontrado.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: currentAccesses } = await adminClient
+        .from('core_usuario_sistemas')
+        .select('sistema_id, perfil_id, ativo')
+        .eq('usuario_id', targetUserId)
+        .eq('ativo', true)
+
+      const remainingAccesses = (currentAccesses || [])
+        .filter((a) => a.sistema_id !== conectaiSistema.id)
+        .map((a) => ({
+          sistema_id: a.sistema_id,
+          perfil_id: a.perfil_id,
+        }))
+
+      const { error: rpcErr } = await adminClient.rpc('core_atualizar_usuario_acessos', {
+        p_usuario_id: targetUserId,
+        p_acessos: remainingAccesses,
+      })
+
+      if (rpcErr) throw rpcErr
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'set_gestor') {
+      const targetUserId = body.usuario_id || body.id
+      const targetGestorId = body.gestor_id
+
+      if (!targetUserId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário corporativo ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      let validatedGestorId: string | null = null
+      if (
+        targetGestorId &&
+        typeof targetGestorId === 'string' &&
+        targetGestorId.trim() &&
+        targetGestorId !== 'none'
+      ) {
+        const trimmedGId = targetGestorId.trim()
+        if (trimmedGId === targetUserId) {
+          return new Response(
+            JSON.stringify({ error: 'O usuário não pode ser gestor de si mesmo.' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        const { data: gestorData } = await adminClient
+          .from('core_usuarios')
+          .select('id, ativo')
+          .eq('id', trimmedGId)
+          .maybeSingle()
+
+        if (!gestorData || !gestorData.ativo) {
+          return new Response(
+            JSON.stringify({ error: 'O gestor selecionado precisa estar ativo.' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        validatedGestorId = gestorData.id
+      }
+
+      const { error: updateErr } = await adminClient
+        .from('core_usuarios')
+        .update({ gestor_id: validatedGestorId })
+        .eq('id', targetUserId)
+
+      if (updateErr) throw updateErr
+
+      return new Response(JSON.stringify({ success: true, gestor_id: validatedGestorId }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'change_perfil') {
+      const targetUserId = body.usuario_id || body.id
+      const targetPerfilCodigo = body.perfil
+      const targetPerfilId = body.perfil_id
+      const targetEmail = body.email
+      const targetGestorId = body.gestor_id
+
+      if (!targetUserId) {
+        return new Response(JSON.stringify({ error: 'ID do usuário ausente.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      const { data: conectaiSistema } = await adminClient
+        .from('core_sistemas')
+        .select('id')
+        .eq('codigo', SYSTEM_CODE_CONECTAI)
+        .maybeSingle()
+
+      if (!conectaiSistema) {
+        return new Response(JSON.stringify({ error: 'Sistema Conectaí não localizado.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      let resolvedPerfilId: string | null = null
+      if (targetPerfilId) {
+        resolvedPerfilId = targetPerfilId
+      } else if (targetPerfilCodigo) {
+        const normCodigo = String(targetPerfilCodigo).trim().toUpperCase()
+        const { data: perfilData } = await adminClient
+          .from('core_perfis')
+          .select('id')
+          .eq('sistema_id', conectaiSistema.id)
+          .ilike('codigo', normCodigo)
+          .eq('ativo', true)
+          .maybeSingle()
+
+        if (!perfilData) {
+          return new Response(
+            JSON.stringify({
+              error: `Perfil "${targetPerfilCodigo}" não encontrado para o Conectaí.`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        resolvedPerfilId = perfilData.id
+      } else {
+        return new Response(JSON.stringify({ error: 'Perfil de acesso é obrigatório.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      let validatedGestorId: string | null = null
+      if (
+        targetGestorId &&
+        typeof targetGestorId === 'string' &&
+        targetGestorId.trim() &&
+        targetGestorId !== 'none'
+      ) {
+        const trimmedGId = targetGestorId.trim()
+        if (trimmedGId === targetUserId) {
+          return new Response(
+            JSON.stringify({ error: 'O usuário não pode ser gestor de si mesmo.' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        const { data: gestorData } = await adminClient
+          .from('core_usuarios')
+          .select('id, ativo')
+          .eq('id', trimmedGId)
+          .maybeSingle()
+
+        if (!gestorData || !gestorData.ativo) {
+          return new Response(
+            JSON.stringify({ error: 'O gestor selecionado precisa estar ativo.' }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            },
+          )
+        }
+        validatedGestorId = gestorData.id
+      }
+
+      const userUpdates: Record<string, any> = { gestor_id: validatedGestorId }
+      if (targetEmail) {
+        const normEmail = String(targetEmail).trim().toLowerCase()
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(normEmail)) {
+          return new Response(JSON.stringify({ error: 'Formato de e-mail inválido.' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const { data: existingEmailUser } = await adminClient
+          .from('core_usuarios')
+          .select('id')
+          .ilike('email', normEmail)
+          .neq('id', targetUserId)
+          .maybeSingle()
+
+        if (existingEmailUser) {
+          return new Response(
+            JSON.stringify({ error: 'Já existe outro usuário cadastrado com este e-mail.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          )
+        }
+
+        userUpdates.email = normEmail
+
+        const { data: currCoreUser } = await adminClient
+          .from('core_usuarios')
+          .select('auth_user_id')
+          .eq('id', targetUserId)
+          .single()
+
+        if (currCoreUser?.auth_user_id) {
+          try {
+            await adminClient.auth.admin.updateUserById(currCoreUser.auth_user_id, {
+              email: normEmail,
+            })
+          } catch (authErr) {
+            console.warn('Aviso ao sincronizar email no Auth:', authErr)
+          }
+        }
+      }
+
+      const { error: userUpdateErr } = await adminClient
+        .from('core_usuarios')
+        .update(userUpdates)
+        .eq('id', targetUserId)
+
+      if (userUpdateErr) throw userUpdateErr
+
+      const { data: currentAccesses } = await adminClient
+        .from('core_usuario_sistemas')
+        .select('sistema_id, perfil_id, ativo')
+        .eq('usuario_id', targetUserId)
+        .eq('ativo', true)
+
+      const otherAccesses = (currentAccesses || [])
+        .filter((a) => a.sistema_id !== conectaiSistema.id)
+        .map((a) => ({
+          sistema_id: a.sistema_id,
+          perfil_id: a.perfil_id,
+        }))
+
+      const newAccessesPayload = [
+        ...otherAccesses,
+        {
+          sistema_id: conectaiSistema.id,
+          perfil_id: resolvedPerfilId!,
+        },
+      ]
+
+      const { error: rpcErr } = await adminClient.rpc('core_atualizar_usuario_acessos', {
+        p_usuario_id: targetUserId,
+        p_acessos: newAccessesPayload,
+      })
+
+      if (rpcErr) throw rpcErr
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     if (action === 'create_user') {
-      const { nome, email, ativo, gestor_id, sistemas, send_invite } = body
+      const { nome, email, ativo, gestor_id, sistemas, perfil, send_invite } = body
 
       const normNome = String(nome || '').trim()
       const normEmail = String(email || '')
@@ -315,7 +1089,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // Validação de formato de e-mail básico
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(normEmail)) {
         return new Response(JSON.stringify({ error: 'Formato de e-mail inválido.' }), {
@@ -324,7 +1097,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // Verificar unicidade do e-mail em core_usuarios
       const { data: existingUser, error: checkEmailErr } = await adminClient
         .from('core_usuarios')
         .select('id')
@@ -339,9 +1111,8 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Validar gestor_id se fornecido
       let validatedGestorId: string | null = null
-      if (gestor_id && typeof gestor_id === 'string' && gestor_id.trim()) {
+      if (gestor_id && typeof gestor_id === 'string' && gestor_id.trim() && gestor_id !== 'none') {
         const { data: gestorData, error: gestorErr } = await adminClient
           .from('core_usuarios')
           .select('id, ativo')
@@ -366,8 +1137,28 @@ Deno.serve(async (req: Request) => {
         validatedGestorId = gestorData.id
       }
 
-      // Validação prévia completa dos pares sistema/perfil
-      const valSistemas = await validateSistemasPairs(sistemas)
+      let rawSistemas = sistemas
+      if (!rawSistemas && perfil) {
+        const { data: conectaiSistema } = await adminClient
+          .from('core_sistemas')
+          .select('id')
+          .eq('codigo', SYSTEM_CODE_CONECTAI)
+          .maybeSingle()
+
+        const normPerfilCodigo = String(perfil).trim().toUpperCase()
+        const { data: perfilData } = await adminClient
+          .from('core_perfis')
+          .select('id')
+          .eq('sistema_id', conectaiSistema?.id || '')
+          .ilike('codigo', normPerfilCodigo)
+          .maybeSingle()
+
+        if (conectaiSistema && perfilData) {
+          rawSistemas = [{ sistema_id: conectaiSistema.id, perfil_id: perfilData.id }]
+        }
+      }
+
+      const valSistemas = await validateSistemasPairs(rawSistemas)
       if (!valSistemas.valid) {
         return new Response(JSON.stringify({ error: valSistemas.error }), {
           status: 400,
@@ -376,7 +1167,6 @@ Deno.serve(async (req: Request) => {
       }
       const sanitizedSistemas: SistemaInput[] = valSistemas.rows || []
 
-      // 1. Inserir o registro corporativo em core_usuarios (sem vínculo auth inicial)
       const { data: newUsuario, error: insertUserErr } = await adminClient
         .from('core_usuarios')
         .insert({
@@ -393,32 +1183,29 @@ Deno.serve(async (req: Request) => {
         throw insertUserErr || new Error('Falha ao inserir core_usuarios.')
       }
 
-      // 2. Chamar a RPC atômica public.core_atualizar_usuario_acessos
       const acessosPayload = sanitizedSistemas.map((item) => ({
         sistema_id: item.sistema_id,
         perfil_id: item.perfil_id,
       }))
 
-      const { error: rpcAcessosErr } = await adminClient.rpc('core_atualizar_usuario_acessos', {
-        p_usuario_id: newUsuario.id,
-        p_acessos: acessosPayload,
-      })
+      if (acessosPayload.length > 0) {
+        const { error: rpcAcessosErr } = await adminClient.rpc('core_atualizar_usuario_acessos', {
+          p_usuario_id: newUsuario.id,
+          p_acessos: acessosPayload,
+        })
 
-      if (rpcAcessosErr) {
-        // REGRA DE NÃO EXCLUSÃO FÍSICA: NUNCA apagar o usuário.
-        // Deixar o registro sem acessos e inativo, retornar erro claro ao frontend e NÃO disparar convite.
-        await adminClient.from('core_usuarios').update({ ativo: false }).eq('id', newUsuario.id)
-
-        return new Response(
-          JSON.stringify({
-            error: `Falha ao atribuir acessos do usuário: ${rpcAcessosErr.message}. O usuário foi criado inativo e sem acessos. Nenhum convite foi enviado.`,
-            usuario_id: newUsuario.id,
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-        )
+        if (rpcAcessosErr) {
+          await adminClient.from('core_usuarios').update({ ativo: false }).eq('id', newUsuario.id)
+          return new Response(
+            JSON.stringify({
+              error: `Falha ao atribuir acessos do usuário: ${rpcAcessosErr.message}. O usuário foi criado inativo e sem acessos.`,
+              usuario_id: newUsuario.id,
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          )
+        }
       }
 
-      // 3. SOMENTE APÓS cadastro e acessos concluídos com sucesso: disparar convite/associar Auth
       let linkedAuthUserId: string | null = null
       let inviteWarning: string | null = null
 
@@ -434,8 +1221,7 @@ Deno.serve(async (req: Request) => {
             .from('core_usuarios')
             .update({ auth_user_id: linkedAuthUserId })
             .eq('id', newUsuario.id)
-        } else if (send_invite && isAtivo) {
-          // APP_URL seguro vindo de variável de ambiente / segredo (opcional para redirect se existir)
+        } else if ((send_invite ?? true) && isAtivo) {
           const appUrlEnv = Deno.env.get('APP_URL')
           const APP_URL = appUrlEnv ? appUrlEnv.replace(/\/+$/, '') : null
           const inviteOptions: { data: { nome: string }; redirectTo?: string } = {
@@ -450,7 +1236,7 @@ Deno.serve(async (req: Request) => {
 
           if (inviteErr) {
             console.error('Falha ao disparar convite Supabase Auth:', inviteErr)
-            inviteWarning = `Usuário e acessos cadastrados com sucesso, mas o envio do convite falhou: ${inviteErr.message}. Você pode reenviar o convite pela listagem de usuários.`
+            inviteWarning = `Usuário e acessos cadastrados com sucesso, mas o envio do convite falhou: ${inviteErr.message}.`
           } else if (inviteData?.user?.id) {
             linkedAuthUserId = inviteData.user.id
             await adminClient
@@ -462,10 +1248,9 @@ Deno.serve(async (req: Request) => {
       } catch (authErr: unknown) {
         const aErr = authErr as Error
         console.error('Erro na etapa de associação de Auth/convite:', aErr)
-        inviteWarning = `Usuário e acessos cadastrados com sucesso, mas ocorreu um erro no convite: ${aErr?.message}. Você pode reenviar o convite pela listagem de usuários.`
+        inviteWarning = `Usuário cadastrado com sucesso, mas ocorreu um erro no convite: ${aErr?.message}.`
       }
 
-      // Obter o registro atualizado de core_usuarios com auth_user_id vinculado (se houver)
       const { data: finalUsuario } = await adminClient
         .from('core_usuarios')
         .select()
@@ -483,11 +1268,6 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // =========================================================================
-    // ACTION: update_user
-    // Atualiza dados cadastrais, gestor e acessos em core_usuario_sistemas
-    // com validação prévia de todos os pares e proteção do último administrador
-    // =========================================================================
     if (action === 'update_user') {
       const { id, nome, email, ativo, gestor_id, sistemas } = body
 
@@ -511,7 +1291,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // Não permitir que o usuário seja gestor de si mesmo
       if (gestor_id && gestor_id === id) {
         return new Response(
           JSON.stringify({ error: 'O usuário não pode ser gestor de si mesmo.' }),
@@ -519,7 +1298,6 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Verificar unicidade de e-mail em outros registros
       const { data: existingEmailUser } = await adminClient
         .from('core_usuarios')
         .select('id')
@@ -534,9 +1312,8 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Validar gestor_id se fornecido
       let validatedGestorId: string | null = null
-      if (gestor_id && typeof gestor_id === 'string' && gestor_id.trim()) {
+      if (gestor_id && typeof gestor_id === 'string' && gestor_id.trim() && gestor_id !== 'none') {
         const { data: gestorData, error: gestorErr } = await adminClient
           .from('core_usuarios')
           .select('id, ativo')
@@ -561,7 +1338,6 @@ Deno.serve(async (req: Request) => {
         validatedGestorId = gestorData.id
       }
 
-      // Validação prévia de todos os pares sistema/perfil caso sistemas tenha sido enviado
       let validatedSistemas: SistemaInput[] | undefined = undefined
       if (Array.isArray(sistemas)) {
         const valSistemas = await validateSistemasPairs(sistemas)
@@ -574,7 +1350,6 @@ Deno.serve(async (req: Request) => {
         validatedSistemas = valSistemas.rows || []
       }
 
-      // Proteção de segurança: verificar se a operação deixará o Gestor de Acessos sem admin ativo
       const adminSafety = await willKeepAtLeastOneGestorAcessoAdmin(
         id,
         prospectiveAtivo,
@@ -587,7 +1362,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // Atualizar core_usuarios primeiro (mantém dados cadastrais atualizados antes de ajustar acessos)
       const { data: updatedUser, error: updateErr } = await adminClient
         .from('core_usuarios')
         .update({
@@ -602,8 +1376,6 @@ Deno.serve(async (req: Request) => {
 
       if (updateErr) throw updateErr
 
-      // Atualizar acessos atomicamente via RPC pública core_atualizar_usuario_acessos
-      // A RPC é a única responsável pela substituição dos acessos (remove existentes e insere novos em uma só transação).
       if (validatedSistemas !== undefined) {
         const acessosPayload = validatedSistemas.map((item) => ({
           sistema_id: item.sistema_id,
@@ -630,10 +1402,6 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // =========================================================================
-    // ACTION: toggle_status
-    // Ativa ou desativa um usuário corporativo com proteção de último administrador
-    // =========================================================================
     if (action === 'toggle_status') {
       const { id } = body
 
@@ -659,7 +1427,6 @@ Deno.serve(async (req: Request) => {
 
       const novoStatus = !currentUser.ativo
 
-      // Se for desativação, garantir que não deixará o sistema sem administrador ativo
       if (!novoStatus) {
         const adminSafety = await willKeepAtLeastOneGestorAcessoAdmin(id, false)
         if (!adminSafety.safe) {
@@ -687,12 +1454,6 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // =========================================================================
-    // ACTION: invite_user
-    // Envia convite por e-mail ou redefinição de senha com:
-    // 1. Bloqueio para usuário inativo
-    // 2. redirectTo via APP_URL configurado em variável segura
-    // =========================================================================
     if (action === 'invite_user') {
       const { id } = body
 
@@ -716,7 +1477,6 @@ Deno.serve(async (req: Request) => {
         })
       }
 
-      // Bloquear convite ou redefinição para usuário inativo
       if (!usuario.ativo) {
         return new Response(
           JSON.stringify({
@@ -727,7 +1487,6 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // APP_URL seguro vindo de variável de ambiente / segredo (nunca hardcoded nem URL implícita)
       const appUrlEnv = Deno.env.get('APP_URL')
       const APP_URL = appUrlEnv ? appUrlEnv.replace(/\/+$/, '') : null
 
@@ -743,9 +1502,7 @@ Deno.serve(async (req: Request) => {
 
       const resetRedirectUrl = `${APP_URL}/login`
 
-      // Se já tem auth_user_id, envia recuperação de senha ao invés de convite
       if (usuario.auth_user_id) {
-        // Enviar link de redefinição de senha com redirectTo explícito vindo de APP_URL
         const { error: resetErr } = await adminClient.auth.resetPasswordForEmail(usuario.email, {
           redirectTo: resetRedirectUrl,
         })
@@ -760,7 +1517,6 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Verificar se e-mail já existe no Supabase Auth
       const { data: authUsersList } = await adminClient.auth.admin.listUsers({ perPage: 1000 })
       const existingAuth = (authUsersList?.users || []).find(
         (u) => u.email?.toLowerCase() === usuario.email.toLowerCase(),

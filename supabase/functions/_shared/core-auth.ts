@@ -31,6 +31,19 @@ export async function verifyConectaiAdmin(
   supabase: SupabaseClient,
   authUserId: string,
 ): Promise<CoreAdminAuthResult> {
+  return verifyCoreAdmin(supabase, authUserId, [SYSTEM_CODE_CONECTAI])
+}
+
+/**
+ * Validação central estrita para autorização de Administrador em sistemas permitidos:
+ * auth.users.id → core_usuarios.auth_user_id → core_usuario_sistemas → sistema permitido → core_perfis.codigo = 'ADMINISTRADOR'
+ * Valida ativo em core_usuarios, core_usuario_sistemas, core_sistemas e core_perfis.
+ */
+export async function verifyCoreAdmin(
+  supabase: SupabaseClient,
+  authUserId: string,
+  allowedSystems: string[] = [SYSTEM_CODE_CONECTAI, 'GESTOR_ACESSO'],
+): Promise<CoreAdminAuthResult> {
   if (!authUserId) {
     return {
       allowed: false,
@@ -62,7 +75,7 @@ export async function verifyConectaiAdmin(
     }
   }
 
-  // 2. Localizar vínculo com o sistema CONECTAI e perfil ADMINISTRADOR
+  // 2. Localizar vínculo com qualquer um dos sistemas permitidos e perfil ADMINISTRADOR
   const { data: adminLinks, error: linkError } = await supabase
     .from('core_usuario_sistemas')
     .select(`
@@ -73,7 +86,7 @@ export async function verifyConectaiAdmin(
     `)
     .eq('usuario_id', coreUser.id)
     .eq('ativo', true)
-    .eq('core_sistemas.codigo', SYSTEM_CODE_CONECTAI)
+    .in('core_sistemas.codigo', allowedSystems)
     .eq('core_sistemas.ativo', true)
     .eq('core_perfis.codigo', ROLE_CODE_ADMINISTRADOR)
     .eq('core_perfis.ativo', true)
@@ -81,7 +94,7 @@ export async function verifyConectaiAdmin(
   if (linkError || !adminLinks || adminLinks.length === 0) {
     return {
       allowed: false,
-      error: 'Permissão negada: apenas administradores do Conectaí possuem acesso.',
+      error: 'Permissão negada: apenas administradores possuem privilégios para esta operação.',
       status: 403,
     }
   }

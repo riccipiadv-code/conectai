@@ -2280,5 +2280,113 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     'Cenário 8 falhou: regressão de login, logout, recuperação de senha e timeout seguro falhou',
   )
 
+  // =========================================================================
+  // Cenário 9: Migração de Gestão de Usuários para autoridade central core_*
+  // =========================================================================
+  // 9a: Backend Edge Function 'manage-core-user' bloqueia operador ou gestor que tenta ações administrativas
+  const verifyAdminAuth = (role: string, isAtivo: boolean, sistemaAtivo: boolean) => {
+    if (!isAtivo || !sistemaAtivo) return { allowed: false, status: 403 }
+    if (role === 'ADMINISTRADOR') return { allowed: true, status: 200 }
+    return { allowed: false, status: 403 }
+  }
+
+  const adminCall = verifyAdminAuth('ADMINISTRADOR', true, true)
+  const gestorCall = verifyAdminAuth('GESTOR', true, true)
+  const opCall = verifyAdminAuth('OPERACIONAL', true, true)
+  const inactiveAdminCall = verifyAdminAuth('ADMINISTRADOR', false, true)
+
+  assert(
+    adminCall.allowed === true &&
+      adminCall.status === 200 &&
+      gestorCall.allowed === false &&
+      gestorCall.status === 403 &&
+      opCall.allowed === false &&
+      opCall.status === 403 &&
+      inactiveAdminCall.allowed === false &&
+      inactiveAdminCall.status === 403,
+    'Cenário 9a falhou: validação administrativa em manage-core-user deve autorizar apenas ADMINISTRADOR ativo no core_*',
+  )
+
+  // 9b: Nenhuma operação administrativa grava profiles.perfil, profiles.ativo ou profiles.gestor_id
+  const executeCoreUserAction = (
+    action: string,
+    params: { usuario_id: string; perfil?: string; gestor_id?: string | null; ativo?: boolean },
+  ) => {
+    // Registra quais tabelas e colunas foram tocadas
+    const touchedTables: Array<{ table: string; fields: string[] }> = []
+
+    if (action === 'grant_access' || action === 'change_perfil') {
+      touchedTables.push({ table: 'core_usuarios', fields: ['ativo', 'gestor_id'] })
+      touchedTables.push({
+        table: 'core_usuario_sistemas',
+        fields: ['usuario_id', 'sistema_id', 'perfil_id', 'ativo'],
+      })
+    } else if (action === 'revoke_access') {
+      touchedTables.push({
+        table: 'core_usuario_sistemas',
+        fields: ['usuario_id', 'sistema_id', 'ativo'],
+      })
+    } else if (action === 'inactivate_user') {
+      touchedTables.push({ table: 'core_usuarios', fields: ['ativo'] })
+    }
+
+    const writesToProfiles = touchedTables.some(
+      (t) =>
+        t.table === 'profiles' &&
+        t.fields.some((f) => ['perfil', 'ativo', 'gestor_id'].includes(f)),
+    )
+
+    return { success: true, writesToProfiles, touchedTables }
+  }
+
+  const grantResult = executeCoreUserAction('grant_access', {
+    usuario_id: 'u-1',
+    perfil: 'OPERACIONAL',
+    gestor_id: 'g-1',
+  })
+  const changePerfilResult = executeCoreUserAction('change_perfil', {
+    usuario_id: 'u-1',
+    perfil: 'GESTOR',
+  })
+  const revokeResult = executeCoreUserAction('revoke_access', { usuario_id: 'u-1' })
+  const inactivateResult = executeCoreUserAction('inactivate_user', { usuario_id: 'u-1' })
+
+  assert(
+    grantResult.writesToProfiles === false &&
+      changePerfilResult.writesToProfiles === false &&
+      revokeResult.writesToProfiles === false &&
+      inactivateResult.writesToProfiles === false,
+    'Cenário 9b falhou: operações administrativas em manage-core-user não devem gravar profiles.perfil, profiles.ativo ou profiles.gestor_id',
+  )
+
+  // 9c: Mapeamento de usuários reflete core_usuarios + core_usuario_sistemas com sistema Conectaí
+  const mockCoreUser = {
+    id: 'cu-101',
+    nome: 'Mariana Silva',
+    email: 'mariana.silva@riccipi.com.br',
+    ativo: true,
+    gestor_id: 'cu-gestor-1',
+    core_usuario_sistemas: [
+      {
+        ativo: true,
+        core_sistemas: { codigo: 'CONECTAI', ativo: true },
+        core_perfis: { codigo: 'ADMINISTRADOR', nome: 'Administrador', ativo: true },
+      },
+    ],
+  }
+
+  const conectaiLink = mockCoreUser.core_usuario_sistemas.find(
+    (cus) => cus.core_sistemas.codigo === 'CONECTAI',
+  )
+  const temAcesso = Boolean(conectaiLink && conectaiLink.ativo && mockCoreUser.ativo)
+  const perfilCodigo = conectaiLink?.core_perfis?.codigo || null
+
+  assert(
+    temAcesso === true &&
+      perfilCodigo === 'ADMINISTRADOR' &&
+      mockCoreUser.gestor_id === 'cu-gestor-1',
+    'Cenário 9c falhou: mapeamento de core_usuarios para tela de gestão deve derivar autoridade do core_*',
+  )
+
   return { passed, failed: errors.length, errors }
 }

@@ -41,21 +41,28 @@ import {
 } from 'lucide-react'
 
 export type UserRow = {
-  legaldesk_id: string
+  id: string
+  core_usuario_id?: string
+  auth_user_id?: string | null
+  legaldesk_id?: string | null
   nome: string
   sigla: string
   email: string
   profile_id?: string | null
-  perfil: string | null // null quando não tem profile
+  perfil: string | null
+  perfil_codigo?: string | null
+  perfil_nome?: string | null
   ativo_sys: boolean
+  ativo?: boolean
   gestor_id?: string | null
   gestor_nome?: string | null
-  auth_user_exists: boolean
+  auth_user_exists?: boolean
   status: 'sem_acesso' | 'ativo' | 'bloqueado' | 'inconsistente'
   tem_acesso?: boolean
 }
 
 type PerfilOption = {
+  id: string
   codigo: string
   nome: string
 }
@@ -63,6 +70,7 @@ type PerfilOption = {
 type GestorOption = {
   id: string
   name: string
+  nome?: string
   email: string
 }
 
@@ -107,10 +115,12 @@ export default function UserManagement() {
   const [perfisOptions, setPerfisOptions] = useState<PerfilOption[]>([])
   const [gestoresOptions, setGestoresOptions] = useState<GestorOption[]>([])
 
-  const getPerfilLabel = (codigo: string | null): string => {
-    if (!codigo) return ''
-    const match = perfisOptions.find((p) => p.codigo === codigo)
-    return match ? match.nome : codigo
+  const getPerfilLabel = (codigoOrId: string | null): string => {
+    if (!codigoOrId) return ''
+    const match = perfisOptions.find(
+      (p) => p.codigo.toLowerCase() === codigoOrId.toLowerCase() || p.id === codigoOrId,
+    )
+    return match ? match.nome : codigoOrId
   }
 
   // Modal Criar Novo Usuário
@@ -134,7 +144,7 @@ export default function UserManagement() {
   const [revokeModalUser, setRevokeModalUser] = useState<UserRow | null>(null)
 
   const [editModalUser, setEditModalUser] = useState<UserRow | null>(null)
-  const [editPerfil, setEditPerfil] = useState<string>('administrador')
+  const [editPerfil, setEditPerfil] = useState<string>('ADMINISTRADOR')
   const [editEmail, setEditEmail] = useState<string>('')
   const [editGestorId, setEditGestorId] = useState<string>('none')
   const [editErrors, setEditErrors] = useState<Record<string, string>>({})
@@ -144,7 +154,7 @@ export default function UserManagement() {
 
   const loadPerfis = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: { action: 'list_perfis' },
       })
 
@@ -171,7 +181,7 @@ export default function UserManagement() {
 
   const loadGestores = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: { action: 'list_gestores' },
       })
 
@@ -194,7 +204,7 @@ export default function UserManagement() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: { action: 'list_users' },
       })
 
@@ -236,7 +246,7 @@ export default function UserManagement() {
     setCreatePerfil('')
     setCreateGestorId('none')
     setCreateErrors({})
-    loadGestores() // Atualizar lista de gestores frescos ao abrir
+    loadGestores()
     setCreateModalOpen(true)
   }
 
@@ -245,10 +255,6 @@ export default function UserManagement() {
 
     if (!createName.trim()) {
       errors.name = 'Nome é obrigatório.'
-    }
-
-    if (!createSigla.trim()) {
-      errors.sigla = 'Sigla é obrigatória.'
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -270,14 +276,15 @@ export default function UserManagement() {
 
     setCreatingUser(true)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: {
           action: 'create_user',
           nome: createName.trim(),
-          sigla: createSigla.trim().toUpperCase(),
+          sigla: createSigla.trim().toUpperCase() || undefined,
           email: createEmail.trim().toLowerCase(),
           perfil: createPerfil,
           gestor_id: createGestorId !== 'none' ? createGestorId : null,
+          ativo: true,
         },
       })
 
@@ -288,7 +295,7 @@ export default function UserManagement() {
 
       toast({
         title: 'Usuário criado!',
-        description: 'Usuário criado com sucesso.',
+        description: 'Usuário criado com sucesso no Gestor de Acessos.',
       })
       setCreateModalOpen(false)
       await Promise.all([loadData(), loadGestores()])
@@ -308,7 +315,7 @@ export default function UserManagement() {
   const handleOpenGrantAccessModal = (user: UserRow) => {
     setGrantAccessModalUser(user)
     setGrantAccessPerfil('')
-    setGrantAccessGestorId('none')
+    setGrantAccessGestorId(user.gestor_id || 'none')
     loadGestores()
   }
 
@@ -324,12 +331,12 @@ export default function UserManagement() {
     }
     const user = grantAccessModalUser
     setGrantingAccess(true)
-    setActionLoadingId(user.legaldesk_id)
+    setActionLoadingId(user.id)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: {
           action: 'grant_access',
-          legaldesk_usuario_id: user.legaldesk_id,
+          usuario_id: user.id,
           perfil: grantAccessPerfil,
           gestor_id: grantAccessGestorId !== 'none' ? grantAccessGestorId : null,
         },
@@ -363,7 +370,7 @@ export default function UserManagement() {
     }
   }
 
-  // 3. Reativar Acesso Bloqueado (usuário com profile existente desativado)
+  // 3. Reativar Acesso Bloqueado (usuário com vínculo inativado)
   const handleOpenActivateModal = (user: UserRow) => {
     if (!user.tem_acesso) {
       handleOpenGrantAccessModal(user)
@@ -375,15 +382,13 @@ export default function UserManagement() {
   const handleConfirmActivateBlocked = async () => {
     if (!activateModalUser) return
     const user = activateModalUser
-    setActionLoadingId(user.legaldesk_id)
+    setActionLoadingId(user.id)
     try {
-      // Reativação do acesso via autoridade central (admin-user-access grant_access),
-      // mantendo sincronizados core_* e perfis vigentes, em vez de alterar apenas profiles.
-      const perfilToGrant = user.perfil || 'operacional'
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const perfilToGrant = user.perfil_codigo || user.perfil || 'OPERACIONAL'
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: {
           action: 'grant_access',
-          legaldesk_usuario_id: user.legaldesk_id,
+          usuario_id: user.id,
           perfil: perfilToGrant,
           gestor_id: user.gestor_id || null,
         },
@@ -424,14 +429,12 @@ export default function UserManagement() {
   const handleConfirmRevoke = async () => {
     if (!revokeModalUser) return
     const user = revokeModalUser
-    setActionLoadingId(user.legaldesk_id)
+    setActionLoadingId(user.id)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: {
           action: 'revoke_access',
-          legaldesk_id: user.legaldesk_id,
-          email: user.email,
-          name: user.nome,
+          usuario_id: user.id,
         },
       })
 
@@ -442,7 +445,7 @@ export default function UserManagement() {
 
       toast({
         title: 'Acesso desativado',
-        description: `O acesso de ${user.nome} foi bloqueado.`,
+        description: `O acesso de ${user.nome} ao Conectaí foi bloqueado.`,
       })
       setRevokeModalUser(null)
       await loadData()
@@ -461,7 +464,8 @@ export default function UserManagement() {
   // 5. Editar Acesso (change_perfil)
   const handleOpenEditModal = (user: UserRow) => {
     setEditModalUser(user)
-    setEditPerfil(user.perfil || 'administrador')
+    const initialPerfil = (user.perfil_codigo || user.perfil || 'ADMINISTRADOR').toUpperCase()
+    setEditPerfil(initialPerfil)
     setEditEmail(user.email || '')
     setEditGestorId(user.gestor_id || 'none')
     setEditErrors({})
@@ -494,14 +498,13 @@ export default function UserManagement() {
 
     const user = editModalUser
     setEditingUser(true)
-    setActionLoadingId(user.legaldesk_id)
+    setActionLoadingId(user.id)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: {
           action: 'change_perfil',
-          legaldesk_id: user.legaldesk_id,
+          usuario_id: user.id,
           email: trimmedEmail,
-          name: user.nome,
           perfil: editPerfil,
           gestor_id: editGestorId !== 'none' ? editGestorId : null,
         },
@@ -543,14 +546,13 @@ export default function UserManagement() {
   const handleConfirmInactivate = async () => {
     if (!deleteModalUser) return
     const user = deleteModalUser
-    setActionLoadingId(user.legaldesk_id)
+    setActionLoadingId(user.id)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-user-access', {
+      const { data, error } = await supabase.functions.invoke('manage-core-user', {
         body: {
           action: 'hide_from_management',
-          legaldesk_id: user.legaldesk_id,
-          email: user.email,
-          name: user.nome,
+          usuario_id: user.id,
+          legaldesk_id: user.legaldesk_id || undefined,
         },
       })
 
@@ -581,9 +583,9 @@ export default function UserManagement() {
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
       const matchesSearch =
-        u.nome.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase()) ||
-        u.sigla.toLowerCase().includes(search.toLowerCase())
+        (u.nome || '').toLowerCase().includes(search.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
+        (u.sigla || '').toLowerCase().includes(search.toLowerCase())
       if (!matchesSearch) return false
 
       if (filter === 'with_access') return u.tem_acesso === true
@@ -654,10 +656,10 @@ export default function UserManagement() {
                 </TableRow>
               ) : (
                 filteredUsers.map((u) => {
-                  const isOperating = actionLoadingId === u.legaldesk_id
+                  const isOperating = actionLoadingId === u.id
 
                   return (
-                    <TableRow key={u.legaldesk_id}>
+                    <TableRow key={u.id}>
                       {/* 1. Nome */}
                       <TableCell className="font-medium">{u.nome}</TableCell>
 
@@ -729,7 +731,7 @@ export default function UserManagement() {
                             variant="outline"
                             className="bg-slate-50 dark:bg-zinc-800/60 font-medium text-slate-700 dark:text-slate-300"
                           >
-                            {getPerfilLabel(u.perfil) || 'Sem perfil'}
+                            {getPerfilLabel(u.perfil_codigo || u.perfil) || 'Sem perfil'}
                           </Badge>
                         ) : (
                           <span className="text-[13px] text-muted-foreground italic">
@@ -738,7 +740,7 @@ export default function UserManagement() {
                         )}
                       </TableCell>
 
-                      {/* 6. Ações */}
+                      {/* 7. Ações */}
                       <TableCell className="text-right">
                         {isOperating ? (
                           <div className="flex items-center justify-end">
@@ -860,7 +862,7 @@ export default function UserManagement() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">
-                Sigla <span className="text-rose-500">*</span>
+                Sigla <span className="text-xs text-muted-foreground font-normal">(opcional)</span>
               </label>
               <Input
                 placeholder="Ex: BFM"
@@ -932,7 +934,7 @@ export default function UserManagement() {
                   <SelectItem value="none">Nenhum</SelectItem>
                   {gestoresOptions.map((g) => (
                     <SelectItem key={g.id} value={g.id}>
-                      {g.name}
+                      {g.name || g.nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -973,7 +975,7 @@ export default function UserManagement() {
               Conceder Acesso
             </DialogTitle>
             <DialogDescription>
-              Conceda acesso ao sistema reutilizando o colaborador existente.
+              Conceda acesso ao sistema reutilizando o colaborador corporativo.
             </DialogDescription>
           </DialogHeader>
 
@@ -1044,10 +1046,10 @@ export default function UserManagement() {
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
                   {gestoresOptions
-                    .filter((g) => g.id !== grantAccessModalUser?.profile_id)
+                    .filter((g) => g.id !== grantAccessModalUser?.id)
                     .map((g) => (
                       <SelectItem key={g.id} value={g.id}>
-                        {g.name}
+                        {g.name || g.nome}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -1094,15 +1096,15 @@ export default function UserManagement() {
             <Button
               variant="outline"
               onClick={() => setActivateModalUser(null)}
-              disabled={actionLoadingId === activateModalUser?.legaldesk_id}
+              disabled={actionLoadingId === activateModalUser?.id}
             >
               Cancelar
             </Button>
             <Button
               onClick={handleConfirmActivateBlocked}
-              disabled={actionLoadingId === activateModalUser?.legaldesk_id}
+              disabled={actionLoadingId === activateModalUser?.id}
             >
-              {actionLoadingId === activateModalUser?.legaldesk_id && (
+              {actionLoadingId === activateModalUser?.id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
               Confirmar Reativação
@@ -1122,7 +1124,7 @@ export default function UserManagement() {
             <DialogDescription>
               Deseja bloquear o acesso de{' '}
               <strong className="text-foreground">{revokeModalUser?.nome}</strong>? O usuário não
-              conseguirá mais acessar o sistema.
+              conseguirá mais acessar o sistema Conectaí.
             </DialogDescription>
           </DialogHeader>
 
@@ -1130,16 +1132,16 @@ export default function UserManagement() {
             <Button
               variant="outline"
               onClick={() => setRevokeModalUser(null)}
-              disabled={actionLoadingId === revokeModalUser?.legaldesk_id}
+              disabled={actionLoadingId === revokeModalUser?.id}
             >
               Cancelar
             </Button>
             <Button
               variant="destructive"
               onClick={handleConfirmRevoke}
-              disabled={actionLoadingId === revokeModalUser?.legaldesk_id}
+              disabled={actionLoadingId === revokeModalUser?.id}
             >
-              {actionLoadingId === revokeModalUser?.legaldesk_id && (
+              {actionLoadingId === revokeModalUser?.id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
               Confirmar Bloqueio
@@ -1164,7 +1166,7 @@ export default function UserManagement() {
               Editar Usuário
             </DialogTitle>
             <DialogDescription>
-              Atualize as configurações de e-mail e perfil de acesso do usuário.
+              Atualize as configurações de e-mail, perfil e gestor do usuário.
             </DialogDescription>
           </DialogHeader>
 
@@ -1257,10 +1259,10 @@ export default function UserManagement() {
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
                   {gestoresOptions
-                    .filter((g) => g.id !== editModalUser?.profile_id)
+                    .filter((g) => g.id !== editModalUser?.id)
                     .map((g) => (
                       <SelectItem key={g.id} value={g.id}>
-                        {g.name}
+                        {g.name || g.nome}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -1295,7 +1297,7 @@ export default function UserManagement() {
             </DialogTitle>
             <DialogDescription className="space-y-2 text-left pt-2 text-foreground font-normal">
               Deseja remover este usuário da Gestão de Usuários? Ele deixará de aparecer nesta tela
-              e, caso possua acesso ao sistema, esse acesso também será desativado. Nenhum cadastro
+              e, caso possua acesso ao Conectaí, esse acesso também será desativado. Nenhum cadastro
               será excluído do banco de dados.
             </DialogDescription>
           </DialogHeader>
@@ -1315,16 +1317,16 @@ export default function UserManagement() {
             <Button
               variant="outline"
               onClick={() => setDeleteModalUser(null)}
-              disabled={actionLoadingId === deleteModalUser?.legaldesk_id}
+              disabled={actionLoadingId === deleteModalUser?.id}
             >
               Cancelar
             </Button>
             <Button
               variant="destructive"
               onClick={handleConfirmInactivate}
-              disabled={actionLoadingId === deleteModalUser?.legaldesk_id}
+              disabled={actionLoadingId === deleteModalUser?.id}
             >
-              {actionLoadingId === deleteModalUser?.legaldesk_id && (
+              {actionLoadingId === deleteModalUser?.id && (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               )}
               Remover
