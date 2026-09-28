@@ -76,7 +76,9 @@ import { OFFICIAL_STAGES, DEFAULT_STAGES } from '@/constants/stages'
 import { getSafeErrorMessage } from '@/lib/safe-error'
 
 export default function Contacts() {
-  const { user, profile, managedUserIds } = useAuth()
+  const { user, profile, managedUserIds, managedCoreUserIds } = useAuth()
+  const activeTeamIds =
+    managedCoreUserIds && managedCoreUserIds.length > 0 ? managedCoreUserIds : managedUserIds
   const initialFiltersApplied = useRef(false)
   const [data, setData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -102,6 +104,7 @@ export default function Contacts() {
   const [filters, setFilters] = useState<ContactsFilters>({
     stages: DEFAULT_STAGES,
     responsavel_ids: undefined,
+    responsavel_core_usuario_ids: undefined,
     servico_ids: undefined,
     depto_ids: undefined,
     follow_ups: undefined,
@@ -174,18 +177,28 @@ export default function Contacts() {
       responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
       initialFiltersApplied.current = true
     } else {
+      const coreUserId = profile.core_usuario_id
       const legaldeskId = profile.legaldesk_usuario_id
-      if (!legaldeskId) {
-        // sem vínculo com legaldesk_usuarios, inicializa com todos como fallback seguro
+
+      let foundResp: any = null
+      if (coreUserId) {
+        foundResp = meta.responsaveis.find(
+          (r: any) =>
+            String(r.id) === String(coreUserId) || String(r.core_usuario_id) === String(coreUserId),
+        )
+      }
+      if (!foundResp && legaldeskId) {
+        foundResp = meta.responsaveis.find(
+          (r: any) =>
+            String(r.legaldesk_usuario_id) === String(legaldeskId) ||
+            String(r.id) === String(legaldeskId),
+        )
+      }
+
+      if (!foundResp) {
         responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
       } else {
-        const foundResp = meta.responsaveis.find((r: any) => String(r.id) === String(legaldeskId))
-        if (!foundResp) {
-          // responsável não encontrado na lista, inicializa com todos como fallback
-          responsavel_ids = [...meta.responsaveis.map((r: any) => String(r.id)), '__NULL__']
-        } else {
-          responsavel_ids = [String(foundResp.id)]
-        }
+        responsavel_ids = [String(foundResp.id)]
       }
       initialFiltersApplied.current = true
     }
@@ -197,6 +210,7 @@ export default function Contacts() {
       follow_ups: ['today', 'next_7_days', 'overdue', 'none'],
       origem_ids: meta.origens.map((o: any) => o.id),
       responsavel_ids,
+      responsavel_core_usuario_ids: responsavel_ids,
     }))
   }, [meta.responsaveis, meta.servicos, meta.deptos, meta.origens, profile])
 
@@ -364,7 +378,7 @@ export default function Contacts() {
   }
 
   const handleEdit = (c: any) => {
-    if (!canEditContact(c, profile, managedUserIds)) {
+    if (!canEditContact(c, profile, activeTeamIds)) {
       toast({
         title: 'Aviso',
         description:
@@ -446,7 +460,7 @@ export default function Contacts() {
         }
         toast({ title: 'Sucesso', description: 'Contato criado com sucesso.' })
       } else if (modalMode === 'edit' && id) {
-        if (!canEditContact(updatingContact, profile, managedUserIds)) {
+        if (!canEditContact(updatingContact, profile, activeTeamIds)) {
           toast({
             title: 'Aviso',
             description:
@@ -461,13 +475,33 @@ export default function Contacts() {
         // Se perfil operacional, não permitir transferir responsabilidade
         if (profile?.perfil === 'operacional') {
           delete payload.responsavel_id
+          delete payload.responsavel_core_usuario_id
         }
 
-        const previousResponsavelId = updatingContact?.responsavel_id || null
-        const newResponsavelId = payload.responsavel_id || null
+        // Sincronizar responsavel_core_usuario_id e responsavel_id para persistência dupla
+        if (payload.responsavel_core_usuario_id) {
+          const matchedResp = meta.responsaveis?.find(
+            (r: any) =>
+              r.core_usuario_id === payload.responsavel_core_usuario_id ||
+              r.id === payload.responsavel_core_usuario_id,
+          )
+          if (matchedResp?.legaldesk_usuario_id && !payload.responsavel_id) {
+            payload.responsavel_id = matchedResp.legaldesk_usuario_id
+          }
+        }
+
+        const prevCentralId =
+          updatingContact?.responsavel_core_usuario_id || updatingContact?.responsavel_id || null
+        const newCentralId =
+          payload.responsavel_core_usuario_id !== undefined
+            ? payload.responsavel_core_usuario_id
+            : payload.responsavel_id !== undefined
+              ? payload.responsavel_id
+              : prevCentralId
+
         const previousStage = prevStage || updatingContact?.current_stage || null
         const newStage = payload.current_stage !== undefined ? payload.current_stage : previousStage
-        const effectiveResponsavelId = newResponsavelId || previousResponsavelId
+        const effectiveResponsavelId = newCentralId || prevCentralId
 
         await updateContact(id, payload, prevStage, user?.id)
         if (subservicoIds) {
@@ -475,20 +509,24 @@ export default function Contacts() {
         }
         toast({ title: 'Sucesso', description: 'Contato atualizado com sucesso.' })
 
-        if (newResponsavelId && newResponsavelId !== previousResponsavelId) {
-          notifyResponsavelTransfer(id, previousResponsavelId, newResponsavelId).catch(
-            (notifyError) => {
-              console.error(
-                'Erro ao enviar notificação de transferência de responsável:',
-                notifyError,
-              )
-              toast({
-                title: 'Aviso',
-                description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
-                variant: 'default',
-              })
-            },
-          )
+        if (newCentralId && newCentralId !== prevCentralId) {
+          notifyResponsavelTransfer(
+            id,
+            prevCentralId,
+            newCentralId,
+            updatingContact?.responsavel_id,
+            payload.responsavel_id,
+          ).catch((notifyError) => {
+            console.error(
+              'Erro ao enviar notificação de transferência de responsável:',
+              notifyError,
+            )
+            toast({
+              title: 'Aviso',
+              description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
+              variant: 'default',
+            })
+          })
         }
 
         if (
@@ -1141,7 +1179,8 @@ export default function Contacts() {
                       .replace(/\b\w/g, (l: any) => l.toUpperCase())
                   }
 
-                  const responsavelNome = c.legaldesk_usuarios?.nome || c.profiles?.name || '-'
+                  const responsavelNome =
+                    c.core_usuarios?.nome || c.legaldesk_usuarios?.nome || c.profiles?.name || '-'
 
                   return (
                     <TableRow
@@ -1253,7 +1292,7 @@ export default function Contacts() {
                             <TooltipContent>Visualizar</TooltipContent>
                           </Tooltip>
                           {(() => {
-                            const canEdit = canEditContact(c, profile, managedUserIds)
+                            const canEdit = canEditContact(c, profile, activeTeamIds)
 
                             if (!canEdit) return null
 

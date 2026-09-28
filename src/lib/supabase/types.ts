@@ -822,6 +822,7 @@ export type Database = {
           payload_bruto: Json | null
           porte_empresa: string | null
           porte_empresa_id: number | null
+          responsavel_core_usuario_id: string | null
           responsavel_id: string | null
           responsible_user_id: string | null
           servico_id: string | null
@@ -879,6 +880,7 @@ export type Database = {
           payload_bruto?: Json | null
           porte_empresa?: string | null
           porte_empresa_id?: number | null
+          responsavel_core_usuario_id?: string | null
           responsavel_id?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
@@ -936,6 +938,7 @@ export type Database = {
           payload_bruto?: Json | null
           porte_empresa?: string | null
           porte_empresa_id?: number | null
+          responsavel_core_usuario_id?: string | null
           responsavel_id?: string | null
           responsible_user_id?: string | null
           servico_id?: string | null
@@ -976,6 +979,13 @@ export type Database = {
             columns: ['depto_id']
             isOneToOne: false
             referencedRelation: 'manychat_deptos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'manychat_contatos_responsavel_core_usuario_id_fkey'
+            columns: ['responsavel_core_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
             referencedColumns: ['id']
           },
           {

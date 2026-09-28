@@ -16,7 +16,9 @@ import { useAuth } from '@/hooks/use-auth'
 import { getSafeErrorMessage } from '@/lib/safe-error'
 
 export default function Index() {
-  const { user, profile, managedUserIds } = useAuth()
+  const { user, profile, managedUserIds, managedCoreUserIds } = useAuth()
+  const activeTeamIds =
+    managedCoreUserIds && managedCoreUserIds.length > 0 ? managedCoreUserIds : managedUserIds
   const {
     contacts,
     servicos,
@@ -27,7 +29,7 @@ export default function Index() {
     loading,
     moveContact,
     setContacts,
-  } = useKanbanData(profile, managedUserIds)
+  } = useKanbanData(profile, managedUserIds, managedCoreUserIds)
   const { toast } = useToast()
 
   const [search, setSearch] = useState('')
@@ -45,7 +47,7 @@ export default function Index() {
   }
 
   const handleEdit = (contact: Contact) => {
-    if (!canEditContact(contact, profile, managedUserIds)) {
+    if (!canEditContact(contact, profile, activeTeamIds)) {
       toast({
         title: 'Aviso',
         description:
@@ -69,7 +71,7 @@ export default function Index() {
 
       if (id) {
         const previousContact = contacts.find((c) => c.id === id)
-        if (!canEditContact(previousContact, profile, managedUserIds)) {
+        if (!canEditContact(previousContact, profile, activeTeamIds)) {
           toast({
             title: 'Aviso',
             description:
@@ -84,11 +86,30 @@ export default function Index() {
         if (profile?.perfil === 'operacional') {
           // Operacional não pode transferir responsabilidade
           delete payload.responsavel_id
+          delete payload.responsavel_core_usuario_id
         }
 
-        const previousResponsavelId = previousContact?.responsavel_id || null
-        const newResponsavelId =
-          payload.responsavel_id !== undefined ? payload.responsavel_id : previousResponsavelId
+        // Sincronizar responsavel_core_usuario_id e responsavel_id para persistência dupla
+        if (payload.responsavel_core_usuario_id) {
+          const matchedResp = responsaveis?.find(
+            (r) =>
+              r.core_usuario_id === payload.responsavel_core_usuario_id ||
+              r.id === payload.responsavel_core_usuario_id,
+          )
+          if (matchedResp?.legaldesk_usuario_id && !payload.responsavel_id) {
+            payload.responsavel_id = matchedResp.legaldesk_usuario_id
+          }
+        }
+
+        const prevCentralId =
+          previousContact?.responsavel_core_usuario_id || previousContact?.responsavel_id || null
+        const newCentralId =
+          payload.responsavel_core_usuario_id !== undefined
+            ? payload.responsavel_core_usuario_id
+            : payload.responsavel_id !== undefined
+              ? payload.responsavel_id
+              : prevCentralId
+
         const previousStage = prevStage || previousContact?.current_stage || null
         const newStage = payload.current_stage !== undefined ? payload.current_stage : previousStage
 
@@ -97,20 +118,24 @@ export default function Index() {
         toast({ title: 'Sucesso', description: 'Contato atualizado.' })
 
         // 1. Notificação de Nova atribuição (se responsável mudou)
-        if (newResponsavelId && newResponsavelId !== previousResponsavelId) {
-          notifyResponsavelTransfer(id, previousResponsavelId, newResponsavelId).catch(
-            (notifyError) => {
-              console.error(
-                'Erro ao enviar notificação de transferência de responsável:',
-                notifyError,
-              )
-              toast({
-                title: 'Aviso',
-                description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
-                variant: 'default',
-              })
-            },
-          )
+        if (newCentralId && newCentralId !== prevCentralId) {
+          notifyResponsavelTransfer(
+            id,
+            prevCentralId,
+            newCentralId,
+            previousContact?.responsavel_id,
+            payload.responsavel_id,
+          ).catch((notifyError) => {
+            console.error(
+              'Erro ao enviar notificação de transferência de responsável:',
+              notifyError,
+            )
+            toast({
+              title: 'Aviso',
+              description: 'O responsável foi alterado, mas a notificação não pôde ser enviada.',
+              variant: 'default',
+            })
+          })
         }
 
         // 2. Notificação de Reabertura (se cancelado -> outro estágio permitido)
@@ -119,9 +144,9 @@ export default function Index() {
           newStage &&
           newStage !== 'cancelado' &&
           newStage !== 'orcamento_aprovado' &&
-          newResponsavelId
+          newCentralId
         ) {
-          notifyReabertura(id, previousStage, newStage, newResponsavelId).catch((notifyError) => {
+          notifyReabertura(id, previousStage, newStage, newCentralId).catch((notifyError) => {
             console.error('Erro ao enviar notificação de reabertura de atendimento:', notifyError)
             toast({
               title: 'Aviso',
@@ -132,6 +157,17 @@ export default function Index() {
           })
         }
       } else {
+        // Criar contato: preencher responsavel_id legado se responsavel_core_usuario_id fornecido
+        if (payload.responsavel_core_usuario_id && !payload.responsavel_id) {
+          const matchedResp = responsaveis?.find(
+            (r) =>
+              r.core_usuario_id === payload.responsavel_core_usuario_id ||
+              r.id === payload.responsavel_core_usuario_id,
+          )
+          if (matchedResp?.legaldesk_usuario_id) {
+            payload.responsavel_id = matchedResp.legaldesk_usuario_id
+          }
+        }
         const created = await createContact(payload)
         setContacts((prev) => [created, ...prev])
         toast({ title: 'Sucesso', description: 'Contato criado.' })

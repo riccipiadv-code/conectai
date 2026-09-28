@@ -112,46 +112,37 @@ export async function verifyCoreAdmin(
 
 /**
  * Localização de gestor para notificação de transferência/atribuição:
- * 1. responsavel_id (legaldesk_usuario_id) → profiles.legaldesk_usuario_id apenas como ponte temporária para obter auth_user_id
- * 2. localizar o correspondente em core_usuarios (por auth_user_id)
- * 3. usar core_usuarios.gestor_id para determinar quem é o gestor (auto-relacionamento core_usuarios.id)
- * 4. buscar os dados do gestor em core_usuarios (email, nome)
+ * Recebe diretamente o ID central do responsável (`core_usuarios.id`).
  *
- * A hierarquia vem exclusivamente do core_*. profiles.gestor_id NUNCA decide quem é o gestor.
+ * Hierarquia direta no Gestor de Acessos Ricci:
+ * 1. core_usuarios (id = targetCoreUsuarioId) → localiza gestor_id
+ * 2. se possuir gestor_id: busca gestor em core_usuarios (email, nome, ativo)
+ * 3. valida ativo = true e e-mail diferente do destinatário
+ *
+ * NÃO utiliza profiles.legaldesk_usuario_id nem profiles.gestor_id.
  */
 export async function resolveGestorFromCore(
   supabase: SupabaseClient,
-  targetLegaldeskUsuarioId: string,
+  targetCoreUsuarioId: string,
   destEmail: string,
 ): Promise<{ gestorEmail: string | null; gestorNome: string | null }> {
   try {
-    if (!targetLegaldeskUsuarioId) {
+    if (!targetCoreUsuarioId) {
       return { gestorEmail: null, gestorNome: null }
     }
 
-    // 1. Ponte temporária: profiles.legaldesk_usuario_id -> profiles.id (que é o auth_user_id)
-    const { data: bridgeProfile, error: bridgeError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('legaldesk_usuario_id', targetLegaldeskUsuarioId)
-      .maybeSingle()
-
-    if (bridgeError || !bridgeProfile?.id) {
-      return { gestorEmail: null, gestorNome: null }
-    }
-
-    // 2. Localizar usuário correspondente em core_usuarios
+    // 1. Localizar o responsável diretamente em core_usuarios para obter seu gestor_id
     const { data: coreUser, error: coreUserError } = await supabase
       .from('core_usuarios')
       .select('id, gestor_id')
-      .eq('auth_user_id', bridgeProfile.id)
+      .eq('id', targetCoreUsuarioId)
       .maybeSingle()
 
     if (coreUserError || !coreUser?.gestor_id) {
       return { gestorEmail: null, gestorNome: null }
     }
 
-    // 3. Buscar dados do gestor em core_usuarios usando core_usuarios.gestor_id
+    // 2. Buscar dados do gestor em core_usuarios usando core_usuarios.gestor_id
     // O gestor encontrado em core_usuarios deve estar com ativo = true.
     // Se estiver inativo, não enviar CC (comportar como se não houvesse gestor).
     const { data: gestorCore, error: gestorError } = await supabase

@@ -26,6 +26,11 @@ export interface UserProfile {
   ativo: boolean
   gestor_id?: string | null
   legaldesk_usuario_id?: string | null
+  /**
+   * ID central do usuário autenticado (core_usuarios.id).
+   * Identificador corporativo oficial no Gestor de Acessos Ricci.
+   */
+  core_usuario_id?: string | null
   managed_user_ids?: string[]
   managed_core_user_ids?: string[]
   /**
@@ -124,12 +129,15 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   profile: UserProfile | null
+  /**
+   * ID central do usuário autenticado no Gestor de Acessos Ricci (core_usuarios.id).
+   */
+  coreUserId?: string | null
   managedUserIds: string[]
   /**
-   * IDs em core_usuarios da equipe do gestor.
-   * Complementar e opcional / aditivo (Etapa 5.8).
+   * IDs em core_usuarios da equipe do gestor (core_usuarios.id dos subordinados).
    */
-  managedCoreUserIds?: string[]
+  managedCoreUserIds: string[]
   /**
    * Fonte de resolução da equipe gerenciada ('core' | 'legacy_fallback').
    */
@@ -272,8 +280,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ativo: false,
           gestor_id: coreResult.data?.gestorId ?? profileData?.gestor_id ?? null,
           legaldesk_usuario_id: profileData?.legaldesk_usuario_id ?? null,
+          core_usuario_id: coreResult.data?.id ?? null,
           managed_user_ids: [],
           managed_core_user_ids: [],
+          managedCoreUserIds: [],
           coreStatus: 'user_inactive',
           hasSystemAccess: false,
         })
@@ -431,8 +441,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ativo: isUserActive,
         gestor_id: coreData?.gestorId ?? legacyProfileInfo.gestorId,
         legaldesk_usuario_id: legacyProfileInfo.legaldeskUsuarioId,
+        core_usuario_id: coreData?.id ?? null,
         managed_user_ids: finalManagedUserIds,
         managed_core_user_ids: finalManagedCoreUserIds,
+        managedCoreUserIds: finalManagedCoreUserIds,
         managedTeamSource: finalTeamSource,
         perfilSource: resolution.source,
         coreStatus: resolution.coreStatus,
@@ -673,8 +685,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           ativo: false,
           gestor_id: coreResult.data?.gestorId ?? null,
           legaldesk_usuario_id: null,
+          core_usuario_id: coreResult.data?.id ?? null,
           managed_user_ids: [],
           managed_core_user_ids: [],
+          managedCoreUserIds: [],
           coreStatus: 'user_inactive',
           hasSystemAccess: false,
         })
@@ -725,12 +739,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     user && profile && profile.coreStatus !== 'user_inactive' && profile.hasSystemAccess === true,
   )
 
+  const coreUserId = coreAccess?.id ?? profile?.core_usuario_id ?? null
+
   return (
     <AuthContext.Provider
       value={{
         user,
         session,
         profile,
+        coreUserId,
         managedUserIds,
         managedCoreUserIds,
         managedTeamSource,

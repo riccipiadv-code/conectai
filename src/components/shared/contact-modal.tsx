@@ -74,7 +74,9 @@ export function ContactModal({
   portesEmpresa = [],
   responsaveis: initialResponsaveis,
 }: ContactModalProps) {
-  const { profile, managedUserIds } = useAuth()
+  const { profile, managedCoreUserIds, managedUserIds } = useAuth()
+  const activeTeamIds =
+    managedCoreUserIds && managedCoreUserIds.length > 0 ? managedCoreUserIds : managedUserIds
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
@@ -109,6 +111,7 @@ export function ContactModal({
           current_stage: 'nivel_1_novo',
           lead_nome: '',
           responsavel_id: null,
+          responsavel_core_usuario_id: null,
           servico_id: null,
           depto_id: null,
           data_follow_up: null,
@@ -153,7 +156,7 @@ export function ContactModal({
 
   const handleSubmit = async () => {
     if (mode === 'edit' && contact) {
-      if (!canEditContact(contact, profile, managedUserIds)) {
+      if (!canEditContact(contact, profile, activeTeamIds)) {
         return
       }
     }
@@ -166,6 +169,7 @@ export function ContactModal({
         payload.cancel_obs = null
       }
       if (payload.responsavel_id === '') payload.responsavel_id = null
+      if (payload.responsavel_core_usuario_id === '') payload.responsavel_core_usuario_id = null
       if ((payload.origem_id as any) === '') payload.origem_id = null
       if ((payload.origem_id as any) === 'none') payload.origem_id = null
       if (payload.origem_id != null) payload.origem_id = Number(payload.origem_id)
@@ -267,19 +271,51 @@ export function ContactModal({
               <Label>Responsável</Label>
               <Select
                 disabled={isResponsavelDisabled}
-                value={formData.responsavel_id || formData.responsible_user_id || 'none'}
-                onValueChange={(val) => handleChange('responsavel_id', val === 'none' ? null : val)}
+                value={
+                  formData.responsavel_core_usuario_id ||
+                  formData.responsavel_id ||
+                  formData.responsible_user_id ||
+                  'none'
+                }
+                onValueChange={(val) => {
+                  if (val === 'none') {
+                    setFormData((prev) => ({
+                      ...prev,
+                      responsavel_core_usuario_id: null,
+                      responsavel_id: null,
+                    }))
+                  } else {
+                    const selectedResp = responsaveis?.find(
+                      (r) =>
+                        r.id === val || r.core_usuario_id === val || r.legaldesk_usuario_id === val,
+                    )
+                    const centralId = selectedResp?.core_usuario_id || selectedResp?.id || val
+                    const legacyId =
+                      selectedResp?.legaldesk_usuario_id ||
+                      (selectedResp?.id !== centralId ? selectedResp?.id : null)
+
+                    setFormData((prev) => ({
+                      ...prev,
+                      responsavel_core_usuario_id: centralId,
+                      // Preserva responsavel_id em paralelo se mapeado
+                      ...(legacyId ? { responsavel_id: legacyId } : {}),
+                    }))
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Nenhum</SelectItem>
-                  {responsaveis?.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.nome}
-                    </SelectItem>
-                  ))}
+                  {responsaveis?.map((r) => {
+                    const selectKey = r.core_usuario_id || r.id
+                    return (
+                      <SelectItem key={selectKey} value={selectKey}>
+                        {r.nome}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>

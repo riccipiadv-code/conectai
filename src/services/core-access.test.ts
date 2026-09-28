@@ -8,7 +8,7 @@ import {
   EffectiveProfileSource,
 } from './core-access'
 import { evaluateAccessDecision } from '@/hooks/use-auth'
-import { canEditContact } from './contacts'
+import { canEditContact, sanitizeContactPayload } from './contacts'
 
 /**
  * Validação dos cenários de teste da Etapa 4 e da Etapa 5.8:
@@ -2386,6 +2386,222 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       perfilCodigo === 'ADMINISTRADOR' &&
       mockCoreUser.gestor_id === 'cu-gestor-1',
     'Cenário 9c falhou: mapeamento de core_usuarios para tela de gestão deve derivar autoridade do core_*',
+  )
+
+  // =========================================================================
+  // Cenário 10: Migração para responsavel_core_usuario_id (FK core_usuarios.id)
+  // =========================================================================
+  // 10a: canEditContact com responsavel_core_usuario_id (identificador central)
+  const adminCentralProfile = {
+    perfil: 'administrador',
+    core_usuario_id: 'cu-admin-1',
+    legaldesk_usuario_id: 'ld-admin-1',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  const gestorCentralProfile = {
+    perfil: 'gestor',
+    core_usuario_id: 'cu-gestor-10',
+    legaldesk_usuario_id: 'ld-gestor-10',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  const opCentralProfile = {
+    perfil: 'operacional',
+    core_usuario_id: 'cu-op-10',
+    legaldesk_usuario_id: 'ld-op-10',
+    ativo: true,
+    hasSystemAccess: true,
+  }
+  const managedTeamCentral = ['cu-sub-10a', 'cu-sub-10b']
+
+  // Admin edita qualquer atendimento com responsavel_core_usuario_id
+  const adminEditsOwnCentral = canEditContact(
+    { responsavel_core_usuario_id: 'cu-admin-1' },
+    adminCentralProfile,
+    [],
+  )
+  const adminEditsOtherCentral = canEditContact(
+    { responsavel_core_usuario_id: 'cu-random-999' },
+    adminCentralProfile,
+    [],
+  )
+  const adminEditsNullCentral = canEditContact(
+    { responsavel_core_usuario_id: null },
+    adminCentralProfile,
+    [],
+  )
+
+  // Gestor edita próprio atendimento central
+  const gestorEditsOwnCentral = canEditContact(
+    { responsavel_core_usuario_id: 'cu-gestor-10' },
+    gestorCentralProfile,
+    managedTeamCentral,
+  )
+  // Gestor edita subordinado da sua equipe central
+  const gestorEditsSub1Central = canEditContact(
+    { responsavel_core_usuario_id: 'cu-sub-10a' },
+    gestorCentralProfile,
+    managedTeamCentral,
+  )
+  const gestorEditsSub2Central = canEditContact(
+    { responsavel_core_usuario_id: 'cu-sub-10b' },
+    gestorCentralProfile,
+    managedTeamCentral,
+  )
+  // Gestor NÃO edita responsável fora da sua equipe central
+  const gestorEditsOutsideCentral = canEditContact(
+    { responsavel_core_usuario_id: 'cu-outside-99' },
+    gestorCentralProfile,
+    managedTeamCentral,
+  )
+  // Gestor NÃO edita atendimento sem responsável central
+  const gestorEditsNullCentral = canEditContact(
+    { responsavel_core_usuario_id: null },
+    gestorCentralProfile,
+    managedTeamCentral,
+  )
+
+  // Operacional edita somente o próprio atendimento central
+  const opEditsOwnCentral = canEditContact(
+    { responsavel_core_usuario_id: 'cu-op-10' },
+    opCentralProfile,
+    [],
+  )
+  // Operacional NÃO edita atendimento de outro usuário
+  const opEditsOtherCentral = canEditContact(
+    { responsavel_core_usuario_id: 'cu-op-other' },
+    opCentralProfile,
+    [],
+  )
+  // Operacional NÃO edita atendimento sem responsável central
+  const opEditsNullCentral = canEditContact(
+    { responsavel_core_usuario_id: null },
+    opCentralProfile,
+    [],
+  )
+
+  assert(
+    adminEditsOwnCentral === true &&
+      adminEditsOtherCentral === true &&
+      adminEditsNullCentral === true &&
+      gestorEditsOwnCentral === true &&
+      gestorEditsSub1Central === true &&
+      gestorEditsSub2Central === true &&
+      gestorEditsOutsideCentral === false &&
+      gestorEditsNullCentral === false &&
+      opEditsOwnCentral === true &&
+      opEditsOtherCentral === false &&
+      opEditsNullCentral === false,
+    'Cenário 10a falhou: autorização de canEditContact por responsavel_core_usuario_id violou regras de acesso',
+  )
+
+  // 10b: hasSystemAccess !== true bloqueia mesmo com responsavel_core_usuario_id coincidente
+  const opBlockedCentral = { ...opCentralProfile, hasSystemAccess: false }
+  const gestorBlockedCentral = { ...gestorCentralProfile, hasSystemAccess: false }
+  const adminBlockedCentral = { ...adminCentralProfile, hasSystemAccess: false }
+
+  assert(
+    canEditContact({ responsavel_core_usuario_id: 'cu-op-10' }, opBlockedCentral, []) === false &&
+      canEditContact(
+        { responsavel_core_usuario_id: 'cu-gestor-10' },
+        gestorBlockedCentral,
+        managedTeamCentral,
+      ) === false &&
+      canEditContact({ responsavel_core_usuario_id: 'cu-admin-1' }, adminBlockedCentral, []) ===
+        false,
+    'Cenário 10b falhou: hasSystemAccess !== true deve bloquear edição em qualquer perfil com responsavel_core_usuario_id',
+  )
+
+  // 10c: Transferência e sanitização persistem responsavel_core_usuario_id
+  const payloadWithCentral = sanitizeContactPayload({
+    lead_nome: 'Teste Lead Central',
+    responsavel_core_usuario_id: 'cu-target-42',
+    responsavel_id: 'ld-target-42',
+    current_stage: 'nivel_1_novo',
+  })
+
+  assert(
+    payloadWithCentral.responsavel_core_usuario_id === 'cu-target-42' &&
+      payloadWithCentral.responsavel_id === 'ld-target-42',
+    'Cenário 10c falhou: sanitizeContactPayload deve manter responsavel_core_usuario_id e responsavel_id',
+  )
+
+  // 10d: Notificação de transferência utiliza contrato central sem profiles.legaldesk_usuario_id
+  const mockResolveGestorDirectCore = (
+    coreUsers: Array<{
+      id: string
+      nome: string
+      email: string
+      gestor_id: string | null
+      ativo: boolean
+    }>,
+    targetCoreId: string,
+    destEmail: string,
+  ) => {
+    const user = coreUsers.find((u) => u.id === targetCoreId)
+    if (!user || !user.gestor_id) return { gestorEmail: null, gestorNome: null }
+    const gestor = coreUsers.find((u) => u.id === user.gestor_id)
+    if (!gestor || gestor.ativo !== true) return { gestorEmail: null, gestorNome: null }
+    if (gestor.email.toLowerCase() === destEmail.toLowerCase()) {
+      return { gestorEmail: null, gestorNome: null }
+    }
+    return { gestorEmail: gestor.email, gestorNome: gestor.nome }
+  }
+
+  const mockCoreTable = [
+    {
+      id: 'cu-gestor-direct',
+      nome: 'Gestor Central Direct',
+      email: 'gestor.direct@riccipi.com.br',
+      gestor_id: null,
+      ativo: true,
+    },
+    {
+      id: 'cu-sub-direct',
+      nome: 'Subordinado Direct',
+      email: 'sub.direct@riccipi.com.br',
+      gestor_id: 'cu-gestor-direct',
+      ativo: true,
+    },
+    {
+      id: 'cu-inactive-gestor',
+      nome: 'Gestor Inativo',
+      email: 'inativo@riccipi.com.br',
+      gestor_id: null,
+      ativo: false,
+    },
+    {
+      id: 'cu-sub-inactive-gestor',
+      nome: 'Subordinado com gestor inativo',
+      email: 'sub.inativo@riccipi.com.br',
+      gestor_id: 'cu-inactive-gestor',
+      ativo: true,
+    },
+  ]
+
+  const resolvedGestor = mockResolveGestorDirectCore(
+    mockCoreTable,
+    'cu-sub-direct',
+    'sub.direct@riccipi.com.br',
+  )
+  const resolvedInactive = mockResolveGestorDirectCore(
+    mockCoreTable,
+    'cu-sub-inactive-gestor',
+    'sub.inativo@riccipi.com.br',
+  )
+  const resolvedSameEmail = mockResolveGestorDirectCore(
+    mockCoreTable,
+    'cu-sub-direct',
+    'gestor.direct@riccipi.com.br',
+  )
+
+  assert(
+    resolvedGestor.gestorEmail === 'gestor.direct@riccipi.com.br' &&
+      resolvedGestor.gestorNome === 'Gestor Central Direct' &&
+      resolvedInactive.gestorEmail === null &&
+      resolvedSameEmail.gestorEmail === null,
+    'Cenário 10d falhou: resolução direta de gestor em core_usuarios sem depender de profiles.legaldesk_usuario_id falhou',
   )
 
   return { passed, failed: errors.length, errors }

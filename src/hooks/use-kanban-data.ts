@@ -22,11 +22,13 @@ import { useToast } from '@/hooks/use-toast'
 export function useKanbanData(
   currentUserProfile?: {
     perfil?: string | null
+    core_usuario_id?: string | null
     legaldesk_usuario_id?: string | null
     ativo?: boolean
     hasSystemAccess?: boolean
   } | null,
   currentManagedUserIds?: string[] | null,
+  currentManagedCoreUserIds?: string[] | null,
 ) {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [servicos, setServicos] = useState<Servico[]>([])
@@ -83,7 +85,11 @@ export function useKanbanData(
       // Se chamado sem contexto central de autorização: comportamento seguro (menor privilégio),
       // impedindo a operação frontend sem consultar profiles.perfil nem chamar legacy_managed_operational_ids().
       const activeProfile = currentUserProfile
-      const activeTeamIds = currentManagedUserIds
+      // Prioriza a lista de IDs centrais da equipe do gestor
+      const activeTeamIds =
+        currentManagedCoreUserIds && currentManagedCoreUserIds.length > 0
+          ? currentManagedCoreUserIds
+          : currentManagedUserIds
 
       if (!activeProfile || activeProfile.hasSystemAccess !== true) {
         toast({
@@ -146,23 +152,22 @@ export function useKanbanData(
         await updateContactStage(id, newStage)
         toast({ title: 'Sucesso', description: 'Status atualizado.' })
 
+        const targetRespId = contact.responsavel_core_usuario_id || contact.responsavel_id
         if (
           previousStage === 'cancelado' &&
           newStage !== 'cancelado' &&
           newStage !== 'orcamento_aprovado' &&
-          contact.responsavel_id
+          targetRespId
         ) {
-          notifyReabertura(id, previousStage, newStage, contact.responsavel_id).catch(
-            (notifyError) => {
-              console.error('Erro ao enviar notificação de reabertura de atendimento:', notifyError)
-              toast({
-                title: 'Aviso',
-                description:
-                  'O atendimento foi reaberto, mas a notificação por e-mail não pôde ser enviada.',
-                variant: 'default',
-              })
-            },
-          )
+          notifyReabertura(id, previousStage, newStage, targetRespId).catch((notifyError) => {
+            console.error('Erro ao enviar notificação de reabertura de atendimento:', notifyError)
+            toast({
+              title: 'Aviso',
+              description:
+                'O atendimento foi reaberto, mas a notificação por e-mail não pôde ser enviada.',
+              variant: 'default',
+            })
+          })
         }
       } catch (error: any) {
         setContacts((prev) =>
@@ -187,7 +192,7 @@ export function useKanbanData(
         })
       }
     },
-    [toast, currentUserProfile, currentManagedUserIds],
+    [toast, currentUserProfile, currentManagedUserIds, currentManagedCoreUserIds],
   )
 
   return {

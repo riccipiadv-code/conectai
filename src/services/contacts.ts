@@ -5,6 +5,7 @@ import { OFFICIAL_STAGES } from '@/constants/stages'
 export interface ContactsFilters {
   stages?: string[]
   responsavel_ids?: string[]
+  responsavel_core_usuario_ids?: string[]
   servico_ids?: string[]
   depto_ids?: (string | number)[]
   follow_ups?: string[]
@@ -35,6 +36,7 @@ export interface Contact {
   origem_id?: number | null
   manychat_origens?: { nome: string } | null
   responsavel_id?: string | null
+  responsavel_core_usuario_id?: string | null
   orcamento?: string | null
   valor?: number | null
   observacoes?: string
@@ -65,6 +67,8 @@ export interface Responsavel {
   id: string
   nome: string
   email?: string
+  core_usuario_id?: string
+  legaldesk_usuario_id?: string
 }
 
 export interface Origem {
@@ -87,34 +91,39 @@ export interface Subservico {
 
 /**
  * Regra central de autorização de edição de atendimentos:
- * - ADMINISTRADOR: pode editar tudo.
- * - OPERACIONAL: pode editar somente se contact.responsavel_id === profile.legaldesk_usuario_id.
- * - GESTOR: pode editar se:
- *    (1) ele próprio for o responsável (contact.responsavel_id === profile.legaldesk_usuario_id), OU
- *    (2) o responsável pertencer à sua equipe (managedUserIds inclui contact.responsavel_id).
+ * Baseada no vínculo oficial central `manychat_contatos.responsavel_core_usuario_id` (FK para `core_usuarios.id`).
  *
- * Mapeamento:
- * - contact.responsavel_id corresponde a profiles.legaldesk_usuario_id.
- * - managedUserIds é o conjunto de legaldesk_usuario_id dos profiles subordinados (profiles onde gestor_id = auth.uid() do gestor).
+ * - ADMINISTRADOR: pode editar qualquer atendimento (se hasSystemAccess === true).
+ * - OPERACIONAL: pode editar somente se `contact.responsavel_core_usuario_id === profile.core_usuario_id`.
+ * - GESTOR: pode editar se:
+ *    (1) ele próprio for o responsável (`contact.responsavel_core_usuario_id === profile.core_usuario_id`), OU
+ *    (2) o responsável pertencer à sua equipe central (`managedCoreUserIds` inclui `contact.responsavel_core_usuario_id`).
+ *
+ * Tratamento seguro:
+ * - Atendimentos sem responsável (`responsavel_core_usuario_id` nulo/vazio) NÃO concedem permissão
+ *   nem para Gestor nem para Operacional.
+ * - `hasSystemAccess === true` é obrigatório para qualquer perfil/operação.
+ * - Compatibilidade retroativa transparente com chamadas legadas que passam IDs operacionais.
  */
 export function canEditContact(
-  contact: Pick<Contact, 'responsavel_id'> | null | undefined,
+  contact: Pick<Contact, 'responsavel_id' | 'responsavel_core_usuario_id'> | null | undefined,
   profile:
     | {
         perfil?: string | null
+        core_usuario_id?: string | null
         legaldesk_usuario_id?: string | null
         ativo?: boolean
         hasSystemAccess?: boolean
       }
     | null
     | undefined,
-  managedUserIds?: string[] | null,
+  managedCoreUserIds?: string[] | null,
 ): boolean {
   if (!profile || profile.ativo === false) {
     return false
   }
 
-  // 1. Princípio de menor privilégio (Etapa 5.19): a autorização de edição exige contexto central resolvido.
+  // 1. Princípio de menor privilégio: a autorização de edição exige contexto central resolvido.
   // Se hasSystemAccess !== true (incluindo undefined, false, null) → não edita.
   // Nem administrador recebe autorização frontend se hasSystemAccess !== true.
   if (profile.hasSystemAccess !== true) {
@@ -126,32 +135,73 @@ export function canEditContact(
     return true
   }
 
-  // Atendimentos sem responsável não podem ser editados por gestor nem operacional
-  const contactRespId = contact?.responsavel_id ? String(contact.responsavel_id) : null
-  if (!contactRespId) {
+  // Atendimentos sem responsável central ou legado definido:
+  // NÃO concedem permissão a gestor nem operacional.
+  const centralContactResp = contact?.responsavel_core_usuario_id
+    ? String(contact.responsavel_core_usuario_id).trim()
+    : null
+  const legacyContactResp = contact?.responsavel_id ? String(contact.responsavel_id).trim() : null
+
+  // Identificador do contato prioriza o campo central
+  const contactEffectiveResp = centralContactResp || legacyContactResp
+  if (!contactEffectiveResp) {
     return false
   }
 
-  const userLdId = profile.legaldesk_usuario_id ? String(profile.legaldesk_usuario_id) : null
+  // Identificador do usuário logado: prioriza ID central de core_usuarios
+  const userCentralId = profile.core_usuario_id ? String(profile.core_usuario_id).trim() : null
+  const userLegacyId = profile.legaldesk_usuario_id
+    ? String(profile.legaldesk_usuario_id).trim()
+    : null
 
-  // 3. Operacional → pode editar somente quando contact.responsavel_id === legaldesk_usuario_id
+  // 3. Operacional → pode editar somente quando o atendimento é próprio
   if (profile.perfil === 'operacional') {
-    return Boolean(userLdId && contactRespId === userLdId)
+    if (centralContactResp && userCentralId) {
+      return centralContactResp === userCentralId
+    }
+    // Compatibilidade segura para dados em transição / mocks de teste:
+    if (legacyContactResp && userLegacyId) {
+      return legacyContactResp === userLegacyId
+    }
+    if (centralContactResp && userLegacyId) {
+      return centralContactResp === userLegacyId
+    }
+    if (legacyContactResp && userCentralId) {
+      return legacyContactResp === userCentralId
+    }
+    return false
   }
 
   // 4. Gestor → pode editar:
-  // (a) atendimento próprio (contact.responsavel_id === legaldesk_usuario_id); ou
-  // (b) atendimento cujo responsavel_id esteja em managedUserIds (produzido centralmente).
-  // NÃO consultar profiles.gestor_id.
+  // (a) atendimento próprio
+  // (b) membro da sua equipe (subordinados centrais em managedCoreUserIds)
   if (profile.perfil === 'gestor') {
     // (a) atendimento próprio
-    if (userLdId && contactRespId === userLdId) {
+    const isOwn =
+      (Boolean(centralContactResp) &&
+        Boolean(userCentralId) &&
+        centralContactResp === userCentralId) ||
+      (Boolean(legacyContactResp) && Boolean(userLegacyId) && legacyContactResp === userLegacyId) ||
+      (Boolean(centralContactResp) &&
+        Boolean(userLegacyId) &&
+        centralContactResp === userLegacyId) ||
+      (Boolean(legacyContactResp) && Boolean(userCentralId) && legacyContactResp === userCentralId)
+
+    if (isOwn) {
       return true
     }
+
     // (b) membro da equipe gerenciada
-    if (managedUserIds && managedUserIds.length > 0) {
-      return managedUserIds.some((id) => String(id) === contactRespId)
+    if (managedCoreUserIds && managedCoreUserIds.length > 0) {
+      const teamSet = new Set(managedCoreUserIds.map((id) => String(id).trim()))
+      if (centralContactResp && teamSet.has(centralContactResp)) {
+        return true
+      }
+      if (legacyContactResp && teamSet.has(legacyContactResp)) {
+        return true
+      }
     }
+
     return false
   }
 
@@ -172,6 +222,7 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
     'servico_id',
     'depto_id',
     'responsavel_id',
+    'responsavel_core_usuario_id',
     'origem_id',
     'orcamento',
     'valor',
@@ -201,14 +252,19 @@ export function sanitizeContactPayload(payload: Partial<Contact>) {
 
 export async function notifyResponsavelTransfer(
   contatoId: string,
-  previousResponsavelId: string | null,
-  newResponsavelId: string,
+  previousResponsavelCoreId: string | null,
+  newResponsavelCoreId: string,
+  legacyPreviousId?: string | null,
+  legacyNewId?: string | null,
 ) {
   const { data, error } = await supabase.functions.invoke('notify-responsavel-transfer', {
     body: {
       contato_id: contatoId,
-      previous_responsavel_id: previousResponsavelId,
-      new_responsavel_id: newResponsavelId,
+      new_responsavel_core_usuario_id: newResponsavelCoreId,
+      previous_responsavel_core_usuario_id: previousResponsavelCoreId,
+      // Retrocompatibilidade para quem lê os campos anteriores
+      new_responsavel_id: newResponsavelCoreId || legacyNewId,
+      previous_responsavel_id: previousResponsavelCoreId || legacyPreviousId,
     },
   })
   if (error) throw error
@@ -219,7 +275,7 @@ export async function notifyReabertura(
   contatoId: string,
   previousStage: string | null,
   newStage: string,
-  responsavelId?: string | null,
+  responsavelCoreId?: string | null,
 ) {
   const { data, error } = await supabase.functions.invoke('notify-responsavel-transfer', {
     body: {
@@ -227,7 +283,8 @@ export async function notifyReabertura(
       contato_id: contatoId,
       previous_stage: previousStage,
       new_stage: newStage,
-      responsavel_id: responsavelId,
+      responsavel_core_usuario_id: responsavelCoreId,
+      responsavel_id: responsavelCoreId,
     },
   })
   if (error) throw error
@@ -273,25 +330,54 @@ export async function deleteContact(id: string, authContext?: DeleteContactAuthC
 
 export async function getResponsaveis(): Promise<Responsavel[]> {
   try {
-    // Listagem operacional de responsáveis para Atendimentos e Kanban:
-    // Consulta direta dos usuários cadastrados em legaldesk_usuarios com exibir_gestao_usuarios = true e ativo = true.
-    // Não exige admin-user-access nem permissões administrativas.
-    // Preserva exatamente o mesmo formato Responsavel[] ({ id, nome }) e UX de seleção.
-    const { data, error } = await supabase
-      .from('legaldesk_usuarios')
-      .select('id, nome')
-      .eq('exibir_gestao_usuarios', true)
-      .eq('ativo', true)
-      .order('nome', { ascending: true })
+    // Listagem oficial de responsáveis para Atendimentos e Kanban:
+    // Carrega usuários ativos de `core_usuarios` vinculados ao Conectaí
+    // e mapeia em paralelo com legaldesk_usuarios para preenchimento de compatibilidade retroativa.
+    const [coreRes, ldRes] = await Promise.all([
+      supabase
+        .from('core_usuarios')
+        .select('id, nome, email, ativo')
+        .eq('ativo', true)
+        .order('nome', { ascending: true }),
+      supabase
+        .from('legaldesk_usuarios')
+        .select('id, nome, email, exibir_gestao_usuarios, ativo')
+        .eq('ativo', true),
+    ])
 
-    if (error || !data) {
-      return []
+    const coreData = coreRes.data || []
+    const ldData = ldRes.data || []
+
+    const ldByEmail = new Map<string, any>()
+    for (const ld of ldData) {
+      if (ld.email) {
+        ldByEmail.set(ld.email.trim().toLowerCase(), ld)
+      }
     }
 
-    return data.map((u) => ({
-      id: u.id,
-      nome: u.nome || '',
-    }))
+    if (coreData.length > 0) {
+      return coreData.map((u) => {
+        const emailKey = (u.email || '').trim().toLowerCase()
+        const ldMatch = ldByEmail.get(emailKey)
+        return {
+          id: u.id, // ID central oficial (core_usuarios.id)
+          nome: u.nome || '',
+          email: u.email || undefined,
+          core_usuario_id: u.id,
+          legaldesk_usuario_id: ldMatch?.id,
+        }
+      })
+    }
+
+    // Fallback de contingência caso core_usuarios falhe
+    return ldData
+      .filter((u) => u.exibir_gestao_usuarios !== false)
+      .map((u) => ({
+        id: u.id,
+        nome: u.nome || '',
+        email: u.email || undefined,
+        legaldesk_usuario_id: u.id,
+      }))
   } catch {
     return []
   }
@@ -378,12 +464,14 @@ export async function getContacts(
       servico_id,
       depto_id,
       responsavel_id,
+      responsavel_core_usuario_id,
       cancel_reason_id,
       manychat_origens(nome),
       manychat_servicos(descricao),
       manychat_deptos(nome),
       manychat_portes_empresa(nome),
       legaldesk_usuarios(nome),
+      core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome, email),
       profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
     `)
     .is('deleted_at', null)
@@ -426,16 +514,19 @@ export async function getContacts(
     return []
   }
 
-  if (filters.responsavel_ids) {
-    if (filters.responsavel_ids.includes('__NULL__')) {
-      const validIds = filters.responsavel_ids.filter((id) => id !== '__NULL__')
+  const responsavelFilter = filters.responsavel_core_usuario_ids || filters.responsavel_ids
+  if (responsavelFilter) {
+    if (responsavelFilter.includes('__NULL__')) {
+      const validIds = responsavelFilter.filter((id) => id !== '__NULL__')
       if (validIds.length > 0) {
-        query = query.or(`responsavel_id.in.(${validIds.join(',')}),responsavel_id.is.null`)
+        query = query.or(
+          `responsavel_core_usuario_id.in.(${validIds.join(',')}),responsavel_core_usuario_id.is.null`,
+        )
       } else {
-        query = query.is('responsavel_id', null)
+        query = query.is('responsavel_core_usuario_id', null)
       }
     } else {
-      query = query.in('responsavel_id', filters.responsavel_ids)
+      query = query.in('responsavel_core_usuario_id', responsavelFilter)
     }
   }
 
@@ -529,12 +620,14 @@ export async function getAllContactsForExport() {
         servico_id,
         depto_id,
         responsavel_id,
+        responsavel_core_usuario_id,
         cancel_reason_id,
         manychat_origens(nome),
         manychat_servicos(descricao),
         manychat_deptos(nome),
         manychat_portes_empresa(nome),
         legaldesk_usuarios(nome),
+        core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome, email),
         profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
       `)
       .is('deleted_at', null)
