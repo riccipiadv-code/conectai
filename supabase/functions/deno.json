@@ -1,14 +1,14 @@
 {
   "_versions": {
-    "sync-manychat": 216,
-    "manychat-webhook": 216,
-    "send-test-email": 20,
-    "save-email-settings": 18,
+    "sync-manychat": 220,
+    "manychat-webhook": 220,
+    "send-test-email": 24,
+    "save-email-settings": 22,
     "admin-user-access": 30,
-    "test-gmail-connection": 18,
-    "save-email-reading-settings": 12,
-    "search-conectai-email": 14,
-    "notify-responsavel-transfer": 18,
+    "test-gmail-connection": 22,
+    "save-email-reading-settings": 16,
+    "search-conectai-email": 18,
+    "notify-responsavel-transfer": 22,
     "notify-task-assignment": 4,
     "notify-task-overdue": 3,
     "manage-core-user": 5

@@ -125,7 +125,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     `Cenário 3 falhou: esperado acesso normal operacional, obtido ${JSON.stringify({ r3, d3 })}`,
   )
 
-  // 4. technical_error → fallback legado e acesso normal
+  // 4. technical_error → bloqueio seguro: perfil vazio, hasSystemAccess=false, sem elevação pelo legado
   const r4 = resolveEffectiveProfile(
     {
       status: 'technical_error',
@@ -145,13 +145,14 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     },
   })
   assert(
-    r4.perfil === 'administrador' &&
-      r4.source === 'legacy_fallback' &&
+    r4.perfil === '' &&
+      r4.source === 'technical_error' &&
       r4.coreStatus === 'technical_error' &&
-      r4.hasSystemAccess === true &&
-      d4.allowed === true &&
+      r4.hasSystemAccess === false &&
+      d4.allowed === false &&
+      d4.redirectReason === 'no_access' &&
       d4.shouldSignOut === false,
-    `Cenário 4 falhou: esperado fallback técnico e acesso permitido, obtido ${JSON.stringify({ r4, d4 })}`,
+    `Cenário 4 falhou: esperado technical_error com perfil vazio e hasSystemAccess=false, obtido ${JSON.stringify({ r4, d4 })}`,
   )
 
   // 5. no_core_user → rota interna bloqueada
@@ -369,14 +370,14 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   assert(normalizeCoreRole('operacional') === 'operacional', 'Cenário 15c falhou')
   assert(normalizeCoreRole(null) === null, 'Cenário 15d falhou')
 
-  // Teste 16: coreResult null trata como technical_error -> fallback legado seguro
+  // Teste 16: coreResult null trata como technical_error -> perfil vazio, hasSystemAccess=false
   const r16 = resolveEffectiveProfile(null, 'operacional')
   assert(
-    r16.perfil === 'operacional' &&
-      r16.source === 'legacy_fallback' &&
+    r16.perfil === '' &&
+      r16.source === 'technical_error' &&
       r16.coreStatus === 'technical_error' &&
-      r16.hasSystemAccess === true,
-    `Cenário 16 falhou: esperado fallback técnico com acesso permitido, obtido ${JSON.stringify(r16)}`,
+      r16.hasSystemAccess === false,
+    `Cenário 16 falhou: esperado technical_error seguro com perfil vazio e hasSystemAccess=false, obtido ${JSON.stringify(r16)}`,
   )
 
   // Teste 17: menor privilégio estrito: perfil desconhecido no fallback também não vira admin
@@ -389,7 +390,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   // Teste 18 (Obrigatório - Ajuste Etapa 4):
   // core = technical_error, profiles.perfil = ''
   // resultado esperado:
-  // - source = 'legacy_fallback'
+  // - source = 'technical_error'
   // - hasSystemAccess = false
   // - rota interna bloqueada (hasSystemAccess false no contexto / decision.allowed = false com redirectReason 'no_access')
   // - sem privilégio administrativo (perfil vazio !== 'administrador')
@@ -430,7 +431,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   const isAdmin18: boolean = (r18.perfil as string) === 'administrador'
 
   assert(
-    r18.source === 'legacy_fallback' &&
+    r18.source === 'technical_error' &&
       r18.perfil === '' &&
       r18.coreStatus === 'technical_error' &&
       r18.hasSystemAccess === false &&
@@ -439,7 +440,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       d18.redirectReason === 'no_access' &&
       d18.shouldSignOut === false &&
       isAdmin18 === false,
-    `Cenário 18 falhou: technical_error com legacy perfil vazio deve ter legacy_fallback, hasSystemAccess=false, rota bloqueada, sem signOut e sem admin. Obtido: ${JSON.stringify(
+    `Cenário 18 falhou: technical_error com legacy perfil vazio deve ter source='technical_error', hasSystemAccess=false, rota bloqueada, sem signOut e sem admin. Obtido: ${JSON.stringify(
       { r18, contextHasSystemAccess18, d18 },
     )}`,
   )
@@ -2257,7 +2258,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   const mockResetPasswordUrl = (origin: string) => `${origin}/resetar-senha`
   const resetUrl = mockResetPasswordUrl('https://conectai.riccipi.com.br')
 
-  // 8d: Timeout de requisição segura para o core não quebra o sistema (vira technical_error com fallback seguro)
+  // 8d: Timeout de requisição segura para o core não quebra o sistema (vira technical_error sem conceder perfil)
   const timeoutCoreResult: CoreAccessResult = {
     status: 'technical_error',
     data: null,
@@ -2273,9 +2274,9 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       signInNoAccess.noAccess === true &&
       sessionState.active === false &&
       resetUrl === 'https://conectai.riccipi.com.br/resetar-senha' &&
-      timeoutResolution.source === 'legacy_fallback' &&
-      timeoutResolution.perfil === 'administrador' &&
-      timeoutResolution.hasSystemAccess === true,
+      timeoutResolution.source === 'technical_error' &&
+      timeoutResolution.perfil === '' &&
+      timeoutResolution.hasSystemAccess === false,
     'Cenário 8 falhou: regressão de login, logout, recuperação de senha e timeout seguro falhou',
   )
 

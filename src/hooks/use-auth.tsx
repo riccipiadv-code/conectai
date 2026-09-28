@@ -20,25 +20,26 @@ import {
 export interface UserProfile {
   /**
    * Perfil efetivo do usuário no Conectaí.
-   * Na Etapa 4: resolvido via core-first com fallback legado e menor privilégio.
+   * Resolvido exclusivamente via Gestor de Acessos Ricci (`core_*`).
    */
   perfil: string
   ativo: boolean
   gestor_id?: string | null
   legaldesk_usuario_id?: string | null
   managed_user_ids?: string[]
+  managed_core_user_ids?: string[]
   /**
    * IDs em core_usuarios dos subordinados diretos da equipe.
    * Estrutura complementar aditiva (Etapa 5.8).
    */
-  managed_core_user_ids?: string[]
+  managedCoreUserIds?: string[]
   /**
    * Fonte de onde a equipe gerenciada foi resolvida ('core' ou 'legacy_fallback').
    */
   managedTeamSource?: ManagedTeamSource
   /**
    * Fonte efetiva de onde o perfil foi resolvido.
-   * 'core' | 'legacy_fallback' | 'core_denied'
+   * 'core' | 'technical_error' | 'core_denied'
    */
   perfilSource?: EffectiveProfileSource
   /**
@@ -48,11 +49,10 @@ export interface UserProfile {
   /**
    * Indica se o usuário possui acesso permitido ao sistema Conectaí.
    * Falso quando core_denied ('no_core_user', 'no_system_link', 'link_inactive', 'profile_inactive_or_invalid')
-   * ou quando o cadastro legado estiver inativo (ativo = false).
+   * ou quando houver technical_error sem autoridade válida.
    */
   hasSystemAccess?: boolean
 }
-
 /**
  * Função utilitária pura para avaliar se uma tentativa de acesso deve ser permitida ou bloqueada
  * e se a sessão Supabase Auth deve ser preservada ou encerrada.
@@ -291,7 +291,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Resolver perfil efetivo via camada central:
       // - ok -> perfil do core
-      // - technical_error -> fallback para profiles.perfil (legacy_fallback)
+      // - technical_error -> perfil vazio sem fallback de perfil pelo legado (source: 'technical_error', hasSystemAccess: false)
       // - no_core_user, user_inactive, system_inactive, no_system_link, link_inactive, profile_inactive_or_invalid -> perfil vazio (core_denied)
       const resolution = resolveEffectiveProfile(coreResult, profileData?.perfil ?? '')
       const coreData = coreResult.data

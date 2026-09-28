@@ -100,7 +100,7 @@ export interface CoreAccessData {
 /**
  * Resolução da fonte efetiva do perfil.
  */
-export type EffectiveProfileSource = 'core' | 'legacy_fallback' | 'core_denied'
+export type EffectiveProfileSource = 'core' | 'technical_error' | 'core_denied'
 
 /**
  * Estrutura agregada expondo identidade legada, central e resolução efetiva.
@@ -440,13 +440,13 @@ export async function fetchCoreAccess(authUserId: string): Promise<CoreAccessDat
  * Regra: NUNCA exibe erro ao usuário nem bloqueia login. Apenas log em dev caso haja divergência.
  */
 /**
- * Resolve o perfil efetivo seguindo a estratégia core-first com fallback legado e menor privilégio:
+ * Resolve o perfil efetivo com base estrita no CORE (core_* é a única autoridade):
  * - Se coreStatus === 'ok' e resolvedPerfil for válido: perfil vem do CORE (`source: 'core'`).
  * - Se coreStatus for ausência de acesso central ('no_core_user', 'no_system_link', 'link_inactive', 'profile_inactive_or_invalid'):
- *   NÃO faz fallback para profiles. Trata como acesso negado no core (`source: 'core_denied'`),
- *   atribuindo perfil vazio ('') para aplicar menor privilégio (sem permissões de administrador/gestor).
+ *   Acesso negado no core (`source: 'core_denied'`), atribuindo perfil vazio ('') para menor privilégio.
  * - Se coreStatus for erro técnico ('technical_error') ou leitura indisponível temporariamente:
- *   aplica fallback para `profiles.perfil` (`source: 'legacy_fallback'`).
+ *   NÃO concede perfil nem elevação via `profiles.perfil` (`source: 'technical_error'`), atribuindo perfil vazio ('')
+ *   e hasSystemAccess = false de forma segura.
  */
 export function resolveEffectiveProfile(
   coreResult: CoreAccessResult | null,
@@ -459,10 +459,10 @@ export function resolveEffectiveProfile(
 } {
   if (!coreResult) {
     return {
-      perfil: legacyPerfil || '',
-      source: 'legacy_fallback',
+      perfil: '',
+      source: 'technical_error',
       coreStatus: 'technical_error',
-      hasSystemAccess: Boolean(legacyPerfil),
+      hasSystemAccess: false,
     }
   }
 
@@ -477,13 +477,13 @@ export function resolveEffectiveProfile(
     }
   }
 
-  // Falha técnica: permite fallback de transição
+  // Falha técnica: não concede autorização nem eleva permissão pelo legado
   if (status === 'technical_error') {
     return {
-      perfil: legacyPerfil || '',
-      source: 'legacy_fallback',
+      perfil: '',
+      source: 'technical_error',
       coreStatus: 'technical_error',
-      hasSystemAccess: Boolean(legacyPerfil),
+      hasSystemAccess: false,
     }
   }
 
