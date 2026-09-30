@@ -2254,9 +2254,8 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
   }
   mockSignOut()
 
-  // 8c: Recuperação de senha gera redirect para /resetar-senha
-  const mockResetPasswordUrl = (origin: string) => `${origin}/resetar-senha`
-  const resetUrl = mockResetPasswordUrl('https://conectai.riccipi.com.br')
+  // 8c: Recuperação de senha gera redirect central para o Gestor de Acessos Ricci
+  const centralRecoveryUrl = 'https://acessos-ricci.goskip.app/redefinir-senha'
 
   // 8d: Timeout de requisição segura para o core não quebra o sistema (vira technical_error sem conceder perfil)
   const timeoutCoreResult: CoreAccessResult = {
@@ -2273,7 +2272,7 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
       signInDisabled.disabled === true &&
       signInNoAccess.noAccess === true &&
       sessionState.active === false &&
-      resetUrl === 'https://conectai.riccipi.com.br/resetar-senha' &&
+      centralRecoveryUrl === 'https://acessos-ricci.goskip.app/redefinir-senha' &&
       timeoutResolution.source === 'technical_error' &&
       timeoutResolution.perfil === '' &&
       timeoutResolution.hasSystemAccess === false,

@@ -30,6 +30,17 @@ export default function Login() {
   const reason = searchParams.get('reason')
   const isDisabledParam = reason === 'disabled'
   const isNoAccessParam = reason === 'no_access'
+  const isRecoveryBlockedParam = reason === 'recovery_blocked'
+
+  // Limpar tokens ou hashes remanescentes de links antigos na URL (ex: #access_token=...&type=recovery)
+  useEffect(() => {
+    if (
+      window.location.hash &&
+      (window.location.hash.includes('recovery') || window.location.hash.includes('access_token'))
+    ) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+  }, [])
 
   useEffect(() => {
     if (isDisabledParam) {
@@ -45,8 +56,15 @@ export default function Login() {
           'Seu usuário não possui acesso ao Conectaí. Procure o administrador do Gestor de Acessos Ricci.',
         variant: 'destructive',
       })
+    } else if (isRecoveryBlockedParam) {
+      toast({
+        title: 'Recuperação não permitida por este link',
+        description:
+          'Este link de recuperação é antigo ou inválido para o Conectaí. Solicite um novo link de recuperação.',
+        variant: 'destructive',
+      })
     }
-  }, [isDisabledParam, isNoAccessParam, toast])
+  }, [isDisabledParam, isNoAccessParam, isRecoveryBlockedParam, toast])
 
   useEffect(() => {
     // Redireciona para home apenas se autenticado, ativo no core (coreStatus !== 'user_inactive') e com acesso liberado ao sistema Conectaí
@@ -111,14 +129,17 @@ export default function Login() {
       console.error('[Login] Erro na recuperação:', error)
       toast({
         title: 'Erro na recuperação',
-        description: getSafeErrorMessage(error, 'Ocorreu um erro ao enviar o link.'),
+        description: getSafeErrorMessage(
+          error,
+          'Ocorreu um erro ao solicitar a recuperação de senha.',
+        ),
         variant: 'destructive',
       })
     } else {
       toast({
-        title: 'E-mail enviado',
+        title: 'Solicitação registrada',
         description:
-          'Se o e-mail existir em nossa base, você receberá um link para redefinir a senha.',
+          'Se houver uma conta associada a este e-mail, você receberá instruções para redefinir sua senha nos Sistemas Ricci.',
       })
       setIsRecoveryMode(false)
     }
@@ -210,6 +231,24 @@ export default function Login() {
               <AlertDescription className="text-amber-800 dark:text-amber-300 text-xs">
                 Seu usuário não possui acesso ao Conectaí. Procure o administrador do Gestor de
                 Acessos Ricci.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+        {isRecoveryBlockedParam && (
+          <div className="px-6 pb-2">
+            <Alert
+              variant="destructive"
+              className="border-amber-300 dark:border-amber-900 bg-amber-50/70 dark:bg-amber-950/40"
+            >
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertTitle className="text-amber-900 dark:text-amber-200 font-semibold text-sm">
+                Link de recuperação antigo ou inválido
+              </AlertTitle>
+              <AlertDescription className="text-amber-800 dark:text-amber-300 text-xs">
+                A redefinição de senha agora é realizada exclusivamente no Gestor de Acessos Ricci.
+                Por segurança, o acesso por este link foi bloqueado. Solicite uma nova recuperação
+                abaixo.
               </AlertDescription>
             </Alert>
           </div>

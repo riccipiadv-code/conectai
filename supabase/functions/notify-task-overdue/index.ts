@@ -1,6 +1,12 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import nodemailer from 'npm:nodemailer'
+import {
+  verifyRicciTaskAdmin,
+  resolveValidatedRecipientByCoreId,
+  RecipientResolutionResult,
+  escapeHtml,
+} from '../_shared/core-auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -100,7 +106,7 @@ Deno.serve(async (req: Request) => {
     //    Comparada exclusivamente com TASK_OVERDUE_CRON_SECRET (deve estar configurado).
     // B) Execução manual de teste:
     //    Permitida somente para usuário autenticado com perfil administrativo
-    //    validado no backend (tabela profiles / task_usuarios perfil admin). Usuário comum autenticado recebe 403.
+    //    validado no backend (core_usuarios e vínculo RICCI_TASK com perfil ADMINISTRADOR). Usuário comum autenticado recebe 403.
     const cronSecretHeader = req.headers.get('x-task-cron-secret')
     const authHeader = req.headers.get('Authorization')
 
@@ -168,45 +174,25 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // Validar no backend se o usuário possui perfil administrativo.
-      // 1. Consulta em profiles por id = user.id
-      let isAdmin = false
-      const { data: profileData, error: profileErr } = await supabase
-        .from('profiles')
-        .select('id, perfil, ativo')
-        .eq('id', user.id)
-        .maybeSingle()
+      // Validar no backend se o usuário possui perfil ADMINISTRADOR central de RICCI_TASK:
+      // auth.users.id → core_usuarios.auth_user_id → core_usuario_sistemas → sistema RICCI_TASK → core_perfis.codigo = 'ADMINISTRADOR'
+      // Valida ativo em core_usuarios, core_usuario_sistemas, core_sistemas e core_perfis.
+      // Substitui integralmente a autorização legada local/profiles.
+      const adminCheck = await verifyRicciTaskAdmin(supabase, user.id)
 
-      if (profileErr) {
-        console.warn('Aviso ao consultar perfil em profiles para autorização manual:', profileErr)
-      }
-
-      if (profileData && profileData.ativo && profileData.perfil === 'administrador') {
-        isAdmin = true
-      } else if (user.email) {
-        // Fallback por e-mail em profiles
-        const { data: profileByEmail } = await supabase
-          .from('profiles')
-          .select('id, perfil, ativo')
-          .ilike('email', user.email.trim())
-          .maybeSingle()
-
-        if (profileByEmail && profileByEmail.ativo && profileByEmail.perfil === 'administrador') {
-          isAdmin = true
-        }
-      }
-
-      if (!isAdmin) {
+      if (!adminCheck.allowed || !adminCheck.coreUser) {
         console.warn(
-          `Acesso proibido: usuário ${user.id} (${user.email}) não possui perfil administrativo para execução manual de atrasos.`,
+          `Acesso proibido: usuário ${user.id} (${user.email}) não possui perfil central ADMINISTRADOR em RICCI_TASK.`,
+          adminCheck.error,
         )
         return new Response(
           JSON.stringify({
             error:
-              'Permissão negada. Apenas usuários administradores podem disparar manualmente a rotina de alertas de atraso.',
+              adminCheck.error ||
+              'Permissão negada. Apenas usuários com perfil ADMINISTRADOR do Ricci Task podem disparar manualmente a rotina de atrasos.',
           }),
           {
-            status: 403,
+            status: adminCheck.status || 403,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           },
         )
@@ -330,6 +316,8 @@ Deno.serve(async (req: Request) => {
     const senderName = 'Ricci Task'
 
     // 5. Coletar IDs de tarefas únicas para buscar dados dos casos
+    // NOTA DE MIGRAÇÃO: Preparado para funcionar após o DROP das colunas legadas executor_usuario_id / responsavel_usuario_id.
+    // Nenhuma consulta (SELECT) ou gravação referencia essas colunas.
     const tarefaIds = Array.from(new Set(providenciasAbertas.map((p) => p.tarefa_id)))
 
     const { data: tarefasList, error: tarefasError } = await supabase
@@ -339,8 +327,8 @@ Deno.serve(async (req: Request) => {
         numero_caso,
         identificacao_caso,
         nome_controle_id,
-        executor_usuario_id,
-        responsavel_usuario_id,
+        executor_core_usuario_id,
+        responsavel_core_usuario_id,
         deleted_at,
         nome_controle:task_nomes_controle(nome)
       `)
@@ -356,32 +344,23 @@ Deno.serve(async (req: Request) => {
       tarefasMap.set(t.id, t)
     }
 
-    // 6. Coletar IDs de usuários para buscar em task_usuarios
-    const userIdsSet = new Set<string>()
-    for (const t of tarefasList || []) {
-      if (t.executor_usuario_id) userIdsSet.add(t.executor_usuario_id)
-      if (t.responsavel_usuario_id) userIdsSet.add(t.responsavel_usuario_id)
-    }
+    // 6. Cache de resoluções de destinatários no Gestor de Acessos para otimizar chamadas
+    // Resolução ocorre exclusivamente via core_usuarios (sem consultar task_usuarios).
+    const recipientResolutionCache = new Map<string, RecipientResolutionResult>()
 
-    const usuariosMap = new Map<
-      string,
-      { id: string; nome: string | null; email: string | null; ativo: boolean | null }
-    >()
-
-    if (userIdsSet.size > 0) {
-      const { data: usersList, error: usersError } = await supabase
-        .from('task_usuarios')
-        .select('id, nome, email, ativo')
-        .in('id', Array.from(userIdsSet))
-
-      if (usersError) {
-        console.error('Erro ao consultar task_usuarios:', usersError)
-        throw new Error(`Erro ao consultar usuários: ${usersError.message}`)
+    const getRecipientResolution = async (
+      coreUsuarioId?: string | null,
+    ): Promise<RecipientResolutionResult> => {
+      if (coreUsuarioId) {
+        if (recipientResolutionCache.has(coreUsuarioId)) {
+          return recipientResolutionCache.get(coreUsuarioId)!
+        }
+        const resolved = await resolveValidatedRecipientByCoreId(supabase, coreUsuarioId)
+        recipientResolutionCache.set(coreUsuarioId, resolved)
+        return resolved
       }
 
-      for (const u of usersList || []) {
-        usuariosMap.set(u.id, u)
-      }
+      return { status: 'missing_user_id', recipient: null }
     }
 
     // 7. Processar cada providência atrasada
@@ -389,6 +368,9 @@ Deno.serve(async (req: Request) => {
     let totalSent = 0
     let totalSkipped = 0
     let totalErrors = 0
+
+    const INTERVALO_REENVIO_HORAS = 72
+    const INTERVALO_REENVIO_MS = INTERVALO_REENVIO_HORAS * 60 * 60 * 1000
 
     for (const prov of providenciasAbertas) {
       const tarefa = tarefasMap.get(prov.tarefa_id)
@@ -406,9 +388,64 @@ Deno.serve(async (req: Request) => {
         continue
       }
 
-      // Idempotência: chave diária exata
+      // REGRA DE REPETIÇÃO A CADA 72 HORAS:
+      // - Mantém o primeiro envio quando a providência entrar em atraso.
+      // - Depois, só permitir novo envio quando tiverem transcorrido 72 horas do sent_at do último envio BEM-SUCEDIDO daquela providência.
+      // - Repetir a cada 72 horas enquanto continuar atrasada e com alertas ativos.
+      // - Consulta o último evento BEM-SUCEDIDO (status = 'success' AND sent_at IS NOT NULL) desta providência.
+      // Idempotência do ciclo diário para proteção contra disparos repetidos/concorrentes no mesmo dia
       // providencia_atraso:{providencia_id}:{AAAA-MM-DD}
       const eventKey = `providencia_atraso:${prov.id}:${todayStr}`
+
+      const { data: ultimoEnvioSucesso, error: checkUltimoSucessoError } = await supabase
+        .from('task_email_eventos')
+        .select('id, sent_at')
+        .eq('providencia_id', prov.id)
+        .eq('tipo_evento', 'providencia_atraso')
+        .eq('status', 'success')
+        .not('sent_at', 'is', null)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (checkUltimoSucessoError) {
+        console.error(
+          `Falha técnica ao consultar último envio de sucesso para providência ${prov.id}:`,
+          checkUltimoSucessoError,
+        )
+        const errMsg =
+          checkUltimoSucessoError.message || 'Falha técnica ao consultar histórico de envios'
+
+        results.push({
+          providencia_id: prov.id,
+          tarefa_id: tarefa.id,
+          event_key: eventKey,
+          status: 'error',
+          reason: 'falha_consulta_central',
+          error: errMsg,
+        })
+        totalErrors++
+        continue
+      }
+
+      if (ultimoEnvioSucesso && ultimoEnvioSucesso.sent_at) {
+        const sentAtMs = new Date(ultimoEnvioSucesso.sent_at).getTime()
+        const agoraMs = Date.now()
+        const diferencaMs = agoraMs - sentAtMs
+
+        if (diferencaMs < INTERVALO_REENVIO_MS) {
+          const horasRestantes = Math.ceil((INTERVALO_REENVIO_MS - diferencaMs) / (60 * 60 * 1000))
+          results.push({
+            providencia_id: prov.id,
+            tarefa_id: tarefa.id,
+            event_key: eventKey,
+            status: 'skipped',
+            reason: 'intervalo_72h_nao_atingido',
+          })
+          totalSkipped++
+          continue
+        }
+      }
 
       // Verificar se o evento deste dia já foi enviado com sucesso
       const { data: existingEvent, error: checkEventError } = await supabase
@@ -418,7 +455,22 @@ Deno.serve(async (req: Request) => {
         .maybeSingle()
 
       if (checkEventError) {
-        console.warn('Aviso ao consultar task_email_eventos para chave', eventKey, checkEventError)
+        console.error(
+          `Falha técnica ao consultar task_email_eventos para chave ${eventKey}:`,
+          checkEventError,
+        )
+        const errMsg = checkEventError.message || 'Falha técnica ao consultar chave de idempotência'
+
+        results.push({
+          providencia_id: prov.id,
+          tarefa_id: tarefa.id,
+          event_key: eventKey,
+          status: 'error',
+          reason: 'falha_consulta_central',
+          error: errMsg,
+        })
+        totalErrors++
+        continue
       }
 
       if (existingEvent && existingEvent.status === 'success') {
@@ -433,37 +485,77 @@ Deno.serve(async (req: Request) => {
         continue
       }
 
-      // Obter dados atuais de Executor e Responsável em task_usuarios
-      const executorUser = tarefa.executor_usuario_id
-        ? usuariosMap.get(tarefa.executor_usuario_id) || null
-        : null
-      const responsavelUser = tarefa.responsavel_usuario_id
-        ? usuariosMap.get(tarefa.responsavel_usuario_id) || null
-        : null
+      // Obter resolução do Executor validada no Gestor de Acessos
+      // Autoridade central: usa exclusivamente o executor_core_usuario_id gravado na tarefa.
+      // Validando usuário, vínculo com RICCI_TASK, sistema e perfil ativos.
+      // Diferenciação estrita: falha técnica vs vínculo comprovadamente inválido.
+      const execResolution = await getRecipientResolution(tarefa.executor_core_usuario_id)
 
-      // REGRA ÚNICA DO RICCI TASK:
-      // TO = Executor; CC = Responsável;
-      // Normalizar com trim().toLowerCase() antes de comparar/enviar;
-      // Se TO e CC forem iguais, CC = vazio;
-      // Executor sem e-mail válido -> não enviar (motivo controlado).
-      const toEmail = executorUser?.email?.trim().toLowerCase() || ''
-
-      if (!isValidEmail(toEmail)) {
-        console.warn(
-          `Alerta de atraso ignorado: Executor sem e-mail válido para providência ${prov.id} (caso ${tarefa.numero_caso})`,
+      // Se falhou tecnicamente na consulta central do Executor:
+      // Registra como 'error' com erro 'falha_consulta_central' (permite retry, não marca skipped/sucesso)
+      if (execResolution.status === 'technical_failure') {
+        console.error(
+          `Falha técnica na consulta central do Executor para caso ${tarefa.numero_caso}, providência ${prov.id}:`,
+          execResolution.error,
         )
 
-        // Registrar em task_email_eventos com status 'skipped' para evitar reprocessamentos inúteis no dia
+        const errMsg = execResolution.error || 'Falha técnica ao consultar Gestor de Acessos'
+
         if (!existingEvent) {
           await supabase.from('task_email_eventos').insert({
             tarefa_id: tarefa.id,
             providencia_id: prov.id,
             tipo_evento: 'providencia_atraso',
             event_key: eventKey,
-            to_email: toEmail || null,
+            to_email: null,
+            cc_email: null,
+            status: 'error',
+            erro: 'falha_consulta_central',
+            data_referencia: todayStr,
+          })
+        } else if (existingEvent.status === 'pending') {
+          await supabase
+            .from('task_email_eventos')
+            .update({
+              status: 'error',
+              erro: 'falha_consulta_central',
+            })
+            .eq('id', existingEvent.id)
+        }
+
+        results.push({
+          providencia_id: prov.id,
+          tarefa_id: tarefa.id,
+          event_key: eventKey,
+          status: 'error',
+          reason: 'falha_consulta_central',
+          error: errMsg,
+        })
+        totalErrors++
+        continue
+      }
+
+      const validatedExec = execResolution.recipient
+
+      if (
+        execResolution.status !== 'valid' ||
+        !validatedExec ||
+        !isValidEmail(validatedExec.email)
+      ) {
+        console.warn(
+          `Alerta de atraso ignorado: Executor sem vínculo central ativo válido para RICCI_TASK ou sem e-mail (caso ${tarefa.numero_caso}, providência ${prov.id})`,
+        )
+
+        if (!existingEvent) {
+          await supabase.from('task_email_eventos').insert({
+            tarefa_id: tarefa.id,
+            providencia_id: prov.id,
+            tipo_evento: 'providencia_atraso',
+            event_key: eventKey,
+            to_email: null,
             cc_email: null,
             status: 'skipped',
-            erro: 'executor_sem_email_valido',
+            erro: 'executor_sem_vinculo_central_valido',
             data_referencia: todayStr,
           })
         }
@@ -473,20 +565,91 @@ Deno.serve(async (req: Request) => {
           tarefa_id: tarefa.id,
           event_key: eventKey,
           status: 'skipped',
-          reason: 'executor_sem_email_valido',
+          reason: 'executor_sem_vinculo_central_valido',
         })
         totalSkipped++
         continue
       }
 
-      const respEmailRaw = responsavelUser?.email?.trim().toLowerCase() || ''
+      const toEmail = validatedExec.email.trim().toLowerCase()
+
+      // Obter dados do Responsável validados centralmente
+      // Autoridade central: usa exclusivamente o responsavel_core_usuario_id gravado na tarefa.
+      const respResolution = await getRecipientResolution(tarefa.responsavel_core_usuario_id)
+
+      // Se falhou tecnicamente na consulta do Responsável:
+      if (respResolution.status === 'technical_failure') {
+        console.error(
+          `Falha técnica na consulta central do Responsável para caso ${tarefa.numero_caso}, providência ${prov.id}:`,
+          respResolution.error,
+        )
+
+        const errMsg =
+          respResolution.error || 'Falha técnica ao consultar Responsável no Gestor de Acessos'
+
+        if (!existingEvent) {
+          await supabase.from('task_email_eventos').insert({
+            tarefa_id: tarefa.id,
+            providencia_id: prov.id,
+            tipo_evento: 'providencia_atraso',
+            event_key: eventKey,
+            to_email: toEmail,
+            cc_email: null,
+            status: 'error',
+            erro: 'falha_consulta_central',
+            data_referencia: todayStr,
+          })
+        } else if (existingEvent.status === 'pending') {
+          await supabase
+            .from('task_email_eventos')
+            .update({
+              status: 'error',
+              erro: 'falha_consulta_central',
+            })
+            .eq('id', existingEvent.id)
+        }
+
+        results.push({
+          providencia_id: prov.id,
+          tarefa_id: tarefa.id,
+          event_key: eventKey,
+          status: 'error',
+          reason: 'falha_consulta_central',
+          error: errMsg,
+        })
+        totalErrors++
+        continue
+      }
+
+      const validatedResp = respResolution.recipient
+      const respEmailRaw = validatedResp?.email?.trim().toLowerCase() || ''
       let ccEmail: string | null = null
       if (isValidEmail(respEmailRaw) && respEmailRaw !== toEmail) {
         ccEmail = respEmailRaw
       }
 
-      // Inserir registro com status 'pending' antes de disparar o e-mail (lock de idempotência)
-      let eventoId = existingEvent?.id
+      // PONTOS 5 E 6: Aquisição atômica com token de posse (owner_token)
+      // Se estiver em estado 'uncertain' ou 'pending_reconciliation', bloquear retry automático
+      if (
+        existingEvent &&
+        (existingEvent.status === 'uncertain' || existingEvent.status === 'pending_reconciliation')
+      ) {
+        results.push({
+          providencia_id: prov.id,
+          tarefa_id: tarefa.id,
+          event_key: eventKey,
+          status: 'skipped',
+          reason: 'uncertain_status_reconciliation_required',
+        })
+        totalSkipped++
+        continue
+      }
+
+      const overdueOwnerToken = crypto.randomUUID()
+      const nowIso = new Date().toISOString()
+      const lockCutoffIso = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      let acquiredEvent: any = null
+
       if (!existingEvent) {
         const { data: insertedEvent, error: insertEventError } = await supabase
           .from('task_email_eventos')
@@ -498,42 +661,103 @@ Deno.serve(async (req: Request) => {
             to_email: toEmail,
             cc_email: ccEmail,
             status: 'pending',
+            owner_token: overdueOwnerToken,
+            locked_at: nowIso,
             data_referencia: todayStr,
           })
-          .select('id')
+          .select('id, owner_token, status')
           .maybeSingle()
 
         if (insertEventError) {
-          // Em caso de concorrência simultânea (unique violation 23505)
           if (insertEventError.code === '23505' || insertEventError.message?.includes('23505')) {
-            const { data: raceEvent } = await supabase
+            const { data: raceAcquired } = await supabase
               .from('task_email_eventos')
-              .select('id, status')
+              .update({
+                status: 'pending',
+                owner_token: overdueOwnerToken,
+                locked_at: nowIso,
+                to_email: toEmail,
+                cc_email: ccEmail,
+              })
               .eq('event_key', eventKey)
+              .in('status', ['error'])
+              .select('id, owner_token, status')
               .maybeSingle()
 
-            if (raceEvent && raceEvent.status === 'success') {
+            if (!raceAcquired) {
               results.push({
                 providencia_id: prov.id,
                 tarefa_id: tarefa.id,
                 event_key: eventKey,
                 status: 'skipped',
-                reason: 'already_sent_today',
+                reason: 'in_progress_or_already_sent',
               })
               totalSkipped++
               continue
             }
-            eventoId = raceEvent?.id
+            acquiredEvent = raceAcquired
           } else {
-            console.warn(
-              `Aviso ao registrar evento pendente para chave ${eventKey}:`,
-              insertEventError,
-            )
+            console.error(`Erro ao registrar evento pendente para ${eventKey}:`, insertEventError)
+            results.push({
+              providencia_id: prov.id,
+              tarefa_id: tarefa.id,
+              event_key: eventKey,
+              status: 'error',
+              error: 'Falha técnica ao registrar evento.',
+            })
+            totalErrors++
+            continue
           }
-        } else if (insertedEvent) {
-          eventoId = insertedEvent.id
+        } else {
+          acquiredEvent = insertedEvent
         }
+      } else {
+        // Re-tentativa em evento existente
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from('task_email_eventos')
+          .update({
+            status: 'pending',
+            owner_token: overdueOwnerToken,
+            locked_at: nowIso,
+            to_email: toEmail,
+            cc_email: ccEmail,
+            data_referencia: todayStr,
+          })
+          .eq('id', existingEvent.id)
+          .neq('status', 'success')
+          .neq('status', 'uncertain')
+          .neq('status', 'pending_reconciliation')
+          .or(`status.eq.error,locked_at.is.null,locked_at.lt.${lockCutoffIso}`)
+          .select('id, owner_token, status')
+
+        if (updateErr || !updatedRows || updatedRows.length === 0) {
+          results.push({
+            providencia_id: prov.id,
+            tarefa_id: tarefa.id,
+            event_key: eventKey,
+            status: 'skipped',
+            reason: 'lock_acquisition_failed_or_already_sent',
+          })
+          totalSkipped++
+          continue
+        }
+
+        acquiredEvent = updatedRows[0]
       }
+
+      if (!acquiredEvent || acquiredEvent.owner_token !== overdueOwnerToken) {
+        results.push({
+          providencia_id: prov.id,
+          tarefa_id: tarefa.id,
+          event_key: eventKey,
+          status: 'skipped',
+          reason: 'owner_token_mismatch',
+        })
+        totalSkipped++
+        continue
+      }
+
+      const eventoId = acquiredEvent.id
 
       // Resolver nome do controle
       let nomeControle = ''
@@ -549,10 +773,11 @@ Deno.serve(async (req: Request) => {
         nomeControle = (ncData?.nome || '').trim()
       }
 
-      // Montar conteúdo do e-mail
-      const execNomeFull = (executorUser?.nome || '').trim()
+      // Montar conteúdo do e-mail: resolução exclusiva a partir dos registros validados no Gestor de Acessos (core_usuarios)
+      // SEM qualquer consulta a task_usuarios.
+      const execNomeFull = (validatedExec.nome || '').trim()
       const execFirstName = execNomeFull ? execNomeFull.split(/\s+/)[0] : 'Executor'
-      const respNomeFull = (responsavelUser?.nome || '').trim()
+      const respNomeFull = (validatedResp?.nome || '').trim()
       const numeroCasoStr = tarefa.numero_caso != null ? String(tarefa.numero_caso) : ''
       const identificacaoCasoStr = (tarefa.identificacao_caso || '').trim()
       const provDescricao = (prov.providencia || '').trim()
@@ -576,7 +801,30 @@ Deno.serve(async (req: Request) => {
       if (prazoFormatado) bodyLines.push(`Prazo Vencido: ${prazoFormatado}`)
       bodyLines.push('')
       bodyLines.push('Acesse o Ricci Task para consultar e atualizar a providência.')
-      bodyLines.push('https://riccitask.goskip.app/')
+      bodyLines.push('https://ricci-task.goskip.app/')
+
+      const escapedSubject = escapeHtml(subject)
+      const emailHtml = `
+      <div style="font-family: sans-serif; color: #1e293b; line-height: 1.6; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #b91c1c; margin-bottom: 16px;">${escapedSubject}</h2>
+        <div style="background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+          ${bodyLines
+            .filter((line) => line !== 'https://ricci-task.goskip.app/')
+            .map((line) =>
+              line === '' ? '<br/>' : `<p style="margin: 4px 0;">${escapeHtml(line)}</p>`,
+            )
+            .join('')}
+        </div>
+        <p style="margin-top: 24px;">
+          <a href="https://ricci-task.goskip.app/" style="background-color: #dc2626; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 500; display: inline-block;">
+            Acessar o Ricci Task
+          </a>
+        </p>
+        <p style="margin-top: 16px; font-size: 13px; color: #64748b;">
+          Link direto: <a href="https://ricci-task.goskip.app/" style="color: #dc2626;">https://ricci-task.goskip.app/</a>
+        </p>
+      </div>
+    `
 
       const emailText = bodyLines.join('\n')
 
@@ -587,6 +835,7 @@ Deno.serve(async (req: Request) => {
         replyTo?: string
         subject: string
         text: string
+        html: string
       } = {
         from: `"${senderName}" <${setting.sender_email}>`,
         to: toEmail,
@@ -594,16 +843,19 @@ Deno.serve(async (req: Request) => {
         replyTo: setting.reply_to || undefined,
         subject,
         text: emailText,
+        html: emailHtml,
       }
 
-      // Disparar envio via transporter SMTP
+      // Disparar envio via transporter SMTP com tratamento de incerteza e persistência
       try {
         await transporter.sendMail(mailOptions)
 
-        // Atualizar evento para 'success' com sent_at
+        // Sucesso no SMTP: atualizar task_email_eventos como dono exclusivo
         const agoraIso = new Date().toISOString()
+        let persFailed = false
+
         if (eventoId) {
-          await supabase
+          const { data: updatedSuccessRows, error: updateSuccessErr } = await supabase
             .from('task_email_eventos')
             .update({
               status: 'success',
@@ -611,6 +863,25 @@ Deno.serve(async (req: Request) => {
               erro: null,
             })
             .eq('id', eventoId)
+            .eq('owner_token', overdueOwnerToken)
+            .select('id, status')
+
+          if (updateSuccessErr || !updatedSuccessRows || updatedSuccessRows.length === 0) {
+            persFailed = true
+            console.error(
+              'Falha de persistência pós-SMTP em notify-task-overdue:',
+              updateSuccessErr,
+            )
+            await supabase
+              .from('task_email_eventos')
+              .update({
+                status: 'uncertain',
+                sent_at: agoraIso,
+                erro: `Enviado via SMTP mas falha na persistência de sucesso: ${updateSuccessErr?.message || '0 linhas atualizadas'}`,
+              })
+              .eq('id', eventoId)
+              .eq('owner_token', overdueOwnerToken)
+          }
         }
 
         // Registrar em email_send_logs com type próprio do Ricci Task
@@ -618,24 +889,40 @@ Deno.serve(async (req: Request) => {
           type: 'ricci_task_providencia_atraso',
           to_email: toEmail,
           subject: mailOptions.subject,
-          status: 'success',
+          status: persFailed ? 'uncertain' : 'success',
           created_by: callerUserId,
           created_at: agoraIso,
+          error_message: persFailed
+            ? 'Enviado via SMTP mas falha ao atualizar registro de evento.'
+            : null,
         })
 
         if (logError) {
           console.error('Erro ao inserir email_send_logs de atraso:', logError)
         }
 
-        results.push({
-          providencia_id: prov.id,
-          tarefa_id: tarefa.id,
-          event_key: eventKey,
-          status: 'sent',
-          to: toEmail,
-          cc: ccEmail,
-        })
-        totalSent++
+        if (persFailed) {
+          results.push({
+            providencia_id: prov.id,
+            tarefa_id: tarefa.id,
+            event_key: eventKey,
+            status: 'uncertain',
+            error: 'Enviado via SMTP porém persistência falhou; marcado como incerto.',
+            to: toEmail,
+            cc: ccEmail,
+          })
+          totalErrors++
+        } else {
+          results.push({
+            providencia_id: prov.id,
+            tarefa_id: tarefa.id,
+            event_key: eventKey,
+            status: 'sent',
+            to: toEmail,
+            cc: ccEmail,
+          })
+          totalSent++
+        }
       } catch (sendError: any) {
         console.error(
           `Erro no transporte SMTP ao enviar alerta de atraso para providência ${prov.id}:`,
@@ -643,16 +930,23 @@ Deno.serve(async (req: Request) => {
         )
 
         const errMsg = sendError.message || String(sendError)
+        const isTimeoutOrNetwork =
+          sendError.code === 'ETIMEDOUT' ||
+          sendError.code === 'ESOCKET' ||
+          sendError.code === 'ECONNRESET' ||
+          /timeout/i.test(errMsg)
+        const errorStatus = isTimeoutOrNetwork ? 'uncertain' : 'error'
 
-        // Registrar status 'error' em task_email_eventos
+        // Registrar status 'error' ou 'uncertain' em task_email_eventos
         if (eventoId) {
           await supabase
             .from('task_email_eventos')
             .update({
-              status: 'error',
+              status: errorStatus,
               erro: errMsg,
             })
             .eq('id', eventoId)
+            .eq('owner_token', overdueOwnerToken)
         }
 
         // Registrar em email_send_logs
@@ -660,7 +954,7 @@ Deno.serve(async (req: Request) => {
           type: 'ricci_task_providencia_atraso',
           to_email: toEmail,
           subject: mailOptions.subject,
-          status: 'error',
+          status: errorStatus,
           error_message: errMsg,
           created_by: callerUserId,
           created_at: new Date().toISOString(),
@@ -670,7 +964,7 @@ Deno.serve(async (req: Request) => {
           providencia_id: prov.id,
           tarefa_id: tarefa.id,
           event_key: eventKey,
-          status: 'error',
+          status: errorStatus,
           error: errMsg,
           to: toEmail,
           cc: ccEmail,
@@ -679,10 +973,16 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const hasTechnicalOrProcessingErrors = totalErrors > 0
+    const message = hasTechnicalOrProcessingErrors
+      ? `Processamento de providências atrasadas concluído com falhas (${totalErrors} erro(s), ${totalSent} enviado(s), ${totalSkipped} ignorado(s)).`
+      : `Processamento diário de providências atrasadas concluído com sucesso.`
+
     return new Response(
       JSON.stringify({
-        success: true,
-        message: `Processamento diário de providências atrasadas concluído.`,
+        success: !hasTechnicalOrProcessingErrors,
+        partial: hasTechnicalOrProcessingErrors && totalSent > 0,
+        message,
         today: todayStr,
         processed: providenciasAbertas.length,
         sent: totalSent,
@@ -691,7 +991,10 @@ Deno.serve(async (req: Request) => {
         details: results,
       }),
       {
-        status: 200,
+        // 207 Multi-Status quando há sucesso parcial ou falhas parciais tratadas,
+        // garantindo que os clientes e orquestradores não interpretem como 100% bem-sucedido
+        // enquanto preservam o payload detalhado dos envios que já deram certo.
+        status: hasTechnicalOrProcessingErrors ? 207 : 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       },
     )

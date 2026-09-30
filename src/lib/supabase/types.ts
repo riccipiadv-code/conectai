@@ -2032,6 +2032,8 @@ export type Database = {
           erro: string | null
           event_key: string
           id: string
+          locked_at: string | null
+          owner_token: string | null
           providencia_id: string | null
           sent_at: string | null
           status: string
@@ -2046,6 +2048,8 @@ export type Database = {
           erro?: string | null
           event_key: string
           id?: string
+          locked_at?: string | null
+          owner_token?: string | null
           providencia_id?: string | null
           sent_at?: string | null
           status?: string
@@ -2060,6 +2064,8 @@ export type Database = {
           erro?: string | null
           event_key?: string
           id?: string
+          locked_at?: string | null
+          owner_token?: string | null
           providencia_id?: string | null
           sent_at?: string | null
           status?: string
@@ -2429,7 +2435,8 @@ export type Database = {
           data_autorizacao: string | null
           deleted_at: string | null
           deleted_by: string | null
-          executor_usuario_id: string
+          executor_core_usuario_id: string
+          executor_usuario_id: string | null
           id: string
           identificacao_caso: string
           nome_controle_id: string
@@ -2437,7 +2444,8 @@ export type Database = {
           pasta_cliente: string | null
           pasta_ricci: string | null
           prazo_conclusao: string | null
-          responsavel_usuario_id: string
+          responsavel_core_usuario_id: string
+          responsavel_usuario_id: string | null
           status_id: string
           updated_at: string
           updated_by: string | null
@@ -2449,7 +2457,8 @@ export type Database = {
           data_autorizacao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
-          executor_usuario_id: string
+          executor_core_usuario_id: string
+          executor_usuario_id?: string | null
           id?: string
           identificacao_caso: string
           nome_controle_id: string
@@ -2457,7 +2466,8 @@ export type Database = {
           pasta_cliente?: string | null
           pasta_ricci?: string | null
           prazo_conclusao?: string | null
-          responsavel_usuario_id: string
+          responsavel_core_usuario_id: string
+          responsavel_usuario_id?: string | null
           status_id?: string
           updated_at?: string
           updated_by?: string | null
@@ -2469,7 +2479,8 @@ export type Database = {
           data_autorizacao?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
-          executor_usuario_id?: string
+          executor_core_usuario_id?: string
+          executor_usuario_id?: string | null
           id?: string
           identificacao_caso?: string
           nome_controle_id?: string
@@ -2477,12 +2488,20 @@ export type Database = {
           pasta_cliente?: string | null
           pasta_ricci?: string | null
           prazo_conclusao?: string | null
-          responsavel_usuario_id?: string
+          responsavel_core_usuario_id?: string
+          responsavel_usuario_id?: string | null
           status_id?: string
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'task_tarefas_executor_core_usuario_id_fkey'
+            columns: ['executor_core_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'task_tarefas_executor_task_usuario_fkey'
             columns: ['executor_usuario_id']
@@ -2495,6 +2514,13 @@ export type Database = {
             columns: ['nome_controle_id']
             isOneToOne: false
             referencedRelation: 'task_nomes_controle'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_tarefas_responsavel_core_usuario_id_fkey'
+            columns: ['responsavel_core_usuario_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
             referencedColumns: ['id']
           },
           {
@@ -2548,6 +2574,159 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: []
+      }
+      task_transacao_providencias_eventos: {
+        Row: {
+          autor_core_id: string
+          created_at: string
+          id: string
+          providencia_id: string
+          tarefa_id: string
+          tipo_evento: string
+          transacao_id: string | null
+          versao_updated_at: string
+        }
+        Insert: {
+          autor_core_id: string
+          created_at?: string
+          id?: string
+          providencia_id: string
+          tarefa_id: string
+          tipo_evento: string
+          transacao_id?: string | null
+          versao_updated_at: string
+        }
+        Update: {
+          autor_core_id?: string
+          created_at?: string
+          id?: string
+          providencia_id?: string
+          tarefa_id?: string
+          tipo_evento?: string
+          transacao_id?: string | null
+          versao_updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_transacao_providencias_eventos_autor_core_id_fkey'
+            columns: ['autor_core_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transacao_providencias_eventos_providencia_id_fkey'
+            columns: ['providencia_id']
+            isOneToOne: false
+            referencedRelation: 'task_providencias'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transacao_providencias_eventos_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'task_tarefas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transacao_providencias_eventos_transacao_id_fkey'
+            columns: ['transacao_id']
+            isOneToOne: false
+            referencedRelation: 'task_transicoes_atribuicao'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      task_transicoes_atribuicao: {
+        Row: {
+          autor_core_id: string
+          autor_perfil: string
+          created_at: string
+          executor_anterior_core_id: string | null
+          id: string
+          motivo: string | null
+          novo_executor_core_id: string
+          novo_responsavel_core_id: string
+          perda_acesso_autor: boolean
+          responsavel_anterior_core_id: string | null
+          tarefa_id: string
+          versao_anterior_updated_at: string | null
+          versao_resultante_updated_at: string | null
+        }
+        Insert: {
+          autor_core_id: string
+          autor_perfil: string
+          created_at?: string
+          executor_anterior_core_id?: string | null
+          id?: string
+          motivo?: string | null
+          novo_executor_core_id: string
+          novo_responsavel_core_id: string
+          perda_acesso_autor?: boolean
+          responsavel_anterior_core_id?: string | null
+          tarefa_id: string
+          versao_anterior_updated_at?: string | null
+          versao_resultante_updated_at?: string | null
+        }
+        Update: {
+          autor_core_id?: string
+          autor_perfil?: string
+          created_at?: string
+          executor_anterior_core_id?: string | null
+          id?: string
+          motivo?: string | null
+          novo_executor_core_id?: string
+          novo_responsavel_core_id?: string
+          perda_acesso_autor?: boolean
+          responsavel_anterior_core_id?: string | null
+          tarefa_id?: string
+          versao_anterior_updated_at?: string | null
+          versao_resultante_updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'task_transicoes_atribuicao_autor_core_id_fkey'
+            columns: ['autor_core_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transicoes_atribuicao_executor_anterior_core_id_fkey'
+            columns: ['executor_anterior_core_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transicoes_atribuicao_novo_executor_core_id_fkey'
+            columns: ['novo_executor_core_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transicoes_atribuicao_novo_responsavel_core_id_fkey'
+            columns: ['novo_responsavel_core_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transicoes_atribuicao_responsavel_anterior_core_id_fkey'
+            columns: ['responsavel_anterior_core_id']
+            isOneToOne: false
+            referencedRelation: 'core_usuarios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'task_transicoes_atribuicao_tarefa_id_fkey'
+            columns: ['tarefa_id']
+            isOneToOne: false
+            referencedRelation: 'task_tarefas'
+            referencedColumns: ['id']
+          },
+        ]
       }
       task_usuarios: {
         Row: {
@@ -2626,6 +2805,10 @@ export type Database = {
         Args: { p_contato_id: string }
         Returns: undefined
       }
+      task_current_core_perfil: { Args: never; Returns: string }
+      task_current_core_user_id: { Args: never; Returns: string }
+      task_has_core_access: { Args: never; Returns: boolean }
+      task_is_admin: { Args: never; Returns: boolean }
       task_listar_usuarios_ativos: {
         Args: never
         Returns: {
@@ -2633,9 +2816,45 @@ export type Database = {
           nome: string
         }[]
       }
+      task_listar_usuarios_core_elegiveis: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          email: string
+          id: string
+          nome: string
+        }[]
+      }
+      task_listar_usuarios_elegiveis: {
+        Args: never
+        Returns: {
+          ativo: boolean
+          email: string
+          id: string
+          nome: string
+        }[]
+      }
       task_normalizar_nome: { Args: { p_valor: string }; Returns: string }
+      task_salvar_controle_transacional: {
+        Args: {
+          p_dados_caso?: Json
+          p_motivo?: string
+          p_providencias?: Json
+          p_tarefa_id?: string
+        }
+        Returns: Json
+      }
       task_status_padrao_id: { Args: never; Returns: string }
       task_status_providencia_padrao_id: { Args: never; Returns: string }
+      task_transferir_atribuicao: {
+        Args: {
+          p_motivo?: string
+          p_novo_executor_core_id: string
+          p_novo_responsavel_core_id: string
+          p_tarefa_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       perfil_type: 'socio_gestor' | 'gestor_area' | 'advogado' | 'estagiario' | 'administrativo'

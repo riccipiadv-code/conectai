@@ -497,7 +497,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // Bloqueio de segurança: Sessão temporária de recuperação (PASSWORD_RECOVERY)
+      // NUNCA deve ser promovida a login normal nem liberar telas internas no Conectaí.
+      // A redefinição de senha foi centralizada no Gestor de Acessos Ricci.
+      if (event === 'PASSWORD_RECOVERY') {
+        currentAuthUserIdRef.current = null
+        coreAccessRequestIdRef.current += 1
+        setSession(null)
+        setUser(null)
+        setProfile(null)
+        setManagedUserIds([])
+        setManagedCoreUserIds([])
+        setManagedTeamSource(undefined)
+        setManagedCoreSubordinates([])
+        setCoreAccess(null)
+        setIdentity(null)
+        setLoading(false)
+        // Encerrar sessão temporária e redirecionar para login com aviso
+        supabase.auth.signOut().finally(() => {
+          window.location.href = '/login?reason=recovery_blocked'
+        })
+        return
+      }
+
       // Regra de integração: não colocar async/await direto dentro do callback síncrono, delegar para a função async
       handleSessionChange(newSession)
     })
@@ -725,7 +748,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${import.meta.env.VITE_APP_URL || window.location.origin}/resetar-senha`,
+      redirectTo: 'https://acessos-ricci.goskip.app/redefinir-senha',
     })
     return { error }
   }
