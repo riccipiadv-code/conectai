@@ -39,6 +39,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { OFFICIAL_STAGES } from '@/constants/stages'
 import { useAuth } from '@/hooks/use-auth'
 import { canEditContact } from '@/services/contacts'
+import { useToast } from '@/hooks/use-toast'
 
 export interface ContactModalProps {
   contact: Contact | null
@@ -75,12 +76,20 @@ export function ContactModal({
   responsaveis: initialResponsaveis,
 }: ContactModalProps) {
   const { profile, managedCoreUserIds, managedUserIds } = useAuth()
+  const { toast } = useToast()
   const activeTeamIds =
     managedCoreUserIds && managedCoreUserIds.length > 0 ? managedCoreUserIds : managedUserIds
   const [formData, setFormData] = useState<Partial<Contact>>({})
   const [selectedSubservicos, setSelectedSubservicos] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>(initialResponsaveis || [])
+  const [validationErrors, setValidationErrors] = useState<{
+    lead_nome?: boolean
+    origem_id?: boolean
+    servico_id?: boolean
+    depto_id?: boolean
+    current_stage?: boolean
+  }>({})
 
   useEffect(() => {
     if (!initialResponsaveis || initialResponsaveis.length === 0) {
@@ -92,6 +101,7 @@ export function ContactModal({
 
   useEffect(() => {
     if (isOpen) {
+      setValidationErrors({})
       if (contact && mode !== 'create') {
         setFormData({
           ...contact,
@@ -130,10 +140,13 @@ export function ContactModal({
         })
       }
     }
-  }, [isOpen, contact, mode])
+  }, [isOpen, contact, mode, origens])
 
   const handleChange = (field: keyof Contact, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
+    if (validationErrors[field as keyof typeof validationErrors]) {
+      setValidationErrors((prev) => ({ ...prev, [field]: false }))
+    }
   }
 
   const formatCurrency = (value: number | string | null | undefined) => {
@@ -161,9 +174,76 @@ export function ContactModal({
       }
     }
 
+    if (mode === 'create') {
+      const errors: {
+        lead_nome?: boolean
+        origem_id?: boolean
+        servico_id?: boolean
+        depto_id?: boolean
+        current_stage?: boolean
+      } = {}
+
+      const cleanNome = (formData.lead_nome || '').trim()
+      if (!cleanNome) {
+        errors.lead_nome = true
+      }
+
+      const rawOrigem = formData.origem_id as any
+      if (
+        rawOrigem == null ||
+        rawOrigem === '' ||
+        rawOrigem === 'none' ||
+        isNaN(Number(rawOrigem)) ||
+        Number(rawOrigem) <= 0
+      ) {
+        errors.origem_id = true
+      }
+
+      const rawServico = formData.servico_id as any
+      if (
+        !rawServico ||
+        rawServico === 'none' ||
+        typeof rawServico !== 'string' ||
+        !rawServico.trim()
+      ) {
+        errors.servico_id = true
+      }
+
+      const rawDepto = formData.depto_id as any
+      if (
+        rawDepto == null ||
+        rawDepto === '' ||
+        rawDepto === 'none' ||
+        isNaN(Number(rawDepto)) ||
+        Number(rawDepto) <= 0
+      ) {
+        errors.depto_id = true
+      }
+
+      const rawStage = (formData.current_stage || '').trim()
+      const isStageValid = OFFICIAL_STAGES.some((s) => s.id === rawStage)
+      if (!rawStage || !isStageValid) {
+        errors.current_stage = true
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setValidationErrors(errors)
+        toast({
+          title: 'Campos obrigatórios ausentes',
+          description: 'Preencha os campos obrigatórios antes de salvar.',
+          variant: 'destructive',
+        })
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const payload = { ...formData }
+      if (mode === 'create') {
+        payload.lead_nome = (payload.lead_nome || '').trim()
+        payload.nome = payload.lead_nome
+      }
       if (payload.current_stage !== 'cancelado') {
         payload.cancel_reason_id = null
         payload.cancel_obs = null
@@ -216,7 +296,9 @@ export function ContactModal({
           {/* Row 1: Origem, Nº Cliente, Data Entrada, Responsável */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="grid gap-2">
-              <Label>Origem</Label>
+              <Label className={cn(validationErrors.origem_id && 'text-destructive')}>
+                Origem {mode === 'create' && <span className="text-destructive">*</span>}
+              </Label>
               <Select
                 disabled={isView}
                 value={formData.origem_id != null ? String(formData.origem_id) : 'none'}
@@ -224,7 +306,12 @@ export function ContactModal({
                   handleChange('origem_id', val === 'none' ? null : Number(val))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  className={cn(
+                    validationErrors.origem_id &&
+                      'border-destructive ring-1 ring-destructive focus:ring-destructive',
+                  )}
+                >
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -236,6 +323,9 @@ export function ContactModal({
                   ))}
                 </SelectContent>
               </Select>
+              {validationErrors.origem_id && (
+                <span className="text-xs text-destructive">Selecione uma origem válida.</span>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Nº Cliente</Label>
@@ -324,12 +414,22 @@ export function ContactModal({
           {/* Row 2: Nome, Empresa / PF, E-mail, Telefone */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="grid gap-2">
-              <Label>Nome do Contato</Label>
+              <Label className={cn(validationErrors.lead_nome && 'text-destructive')}>
+                Nome do Contato {mode === 'create' && <span className="text-destructive">*</span>}
+              </Label>
               <Input
                 value={formData.lead_nome || ''}
                 onChange={(e) => handleChange('lead_nome', e.target.value)}
                 disabled={isView}
+                placeholder="Nome completo do contato"
+                className={cn(
+                  validationErrors.lead_nome &&
+                    'border-destructive ring-1 ring-destructive focus-visible:ring-destructive',
+                )}
               />
+              {validationErrors.lead_nome && (
+                <span className="text-xs text-destructive">O nome do contato é obrigatório.</span>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Empresa / PF</Label>
@@ -361,7 +461,10 @@ export function ContactModal({
           {/* Row 3: Serviço Selecionado, Departamento, Orçamento, Valor */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="grid gap-2">
-              <Label>Serviço Selecionado</Label>
+              <Label className={cn(validationErrors.servico_id && 'text-destructive')}>
+                Serviço Selecionado{' '}
+                {mode === 'create' && <span className="text-destructive">*</span>}
+              </Label>
               <Select
                 disabled={isView}
                 value={formData.servico_id || 'none'}
@@ -377,9 +480,26 @@ export function ContactModal({
                     }
                     return next
                   })
+                  if (newServicoId) {
+                    setValidationErrors((prev) => {
+                      const selectedService = servicos?.find((s) => s.id === newServicoId)
+                      return {
+                        ...prev,
+                        servico_id: false,
+                        ...(selectedService && selectedService.depto_id != null
+                          ? { depto_id: false }
+                          : {}),
+                      }
+                    })
+                  }
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  className={cn(
+                    validationErrors.servico_id &&
+                      'border-destructive ring-1 ring-destructive focus:ring-destructive',
+                  )}
+                >
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -391,9 +511,14 @@ export function ContactModal({
                   ))}
                 </SelectContent>
               </Select>
+              {validationErrors.servico_id && (
+                <span className="text-xs text-destructive">Selecione um serviço.</span>
+              )}
             </div>
             <div className="grid gap-2">
-              <Label>Departamento</Label>
+              <Label className={cn(validationErrors.depto_id && 'text-destructive')}>
+                Departamento {mode === 'create' && <span className="text-destructive">*</span>}
+              </Label>
               <Select
                 disabled={isView}
                 value={formData.depto_id != null ? String(formData.depto_id) : 'none'}
@@ -401,7 +526,12 @@ export function ContactModal({
                   handleChange('depto_id', val === 'none' ? null : Number(val))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  className={cn(
+                    validationErrors.depto_id &&
+                      'border-destructive ring-1 ring-destructive focus:ring-destructive',
+                  )}
+                >
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -413,6 +543,9 @@ export function ContactModal({
                   ))}
                 </SelectContent>
               </Select>
+              {validationErrors.depto_id && (
+                <span className="text-xs text-destructive">Selecione um departamento.</span>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Porte Empresa</Label>
@@ -487,13 +620,20 @@ export function ContactModal({
           {/* Row 5: Status, Data Follow Up */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="grid gap-2">
-              <Label>Status</Label>
+              <Label className={cn(validationErrors.current_stage && 'text-destructive')}>
+                Status {mode === 'create' && <span className="text-destructive">*</span>}
+              </Label>
               <Select
                 disabled={isView}
-                value={formData.current_stage || 'nivel_1_novo'}
+                value={formData.current_stage || 'none'}
                 onValueChange={(val) => handleChange('current_stage', val === 'none' ? null : val)}
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  className={cn(
+                    validationErrors.current_stage &&
+                      'border-destructive ring-1 ring-destructive focus:ring-destructive',
+                  )}
+                >
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -505,6 +645,9 @@ export function ContactModal({
                   ))}
                 </SelectContent>
               </Select>
+              {validationErrors.current_stage && (
+                <span className="text-xs text-destructive">Selecione um status válido.</span>
+              )}
             </div>
             <div className="grid gap-2">
               <Label>Data Follow Up</Label>

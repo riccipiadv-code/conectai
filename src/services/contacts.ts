@@ -296,6 +296,38 @@ export async function createContact(payload: Partial<Contact>) {
   if (!sanitized.manychat_id) {
     sanitized.manychat_id = 'manual_' + new Date().getTime()
   }
+
+  // Se for criação manual (manychat_id começando com 'manual_'), valida campos obrigatórios essenciais
+  if (sanitized.manychat_id.startsWith('manual_')) {
+    const cleanNome = (sanitized.lead_nome || sanitized.nome || '').trim()
+    if (!cleanNome) {
+      throw new Error('O campo Nome do Contato é obrigatório.')
+    }
+    sanitized.lead_nome = cleanNome
+    sanitized.nome = cleanNome
+
+    const origemId = sanitized.origem_id
+    if (origemId == null || isNaN(Number(origemId)) || Number(origemId) <= 0) {
+      throw new Error('O campo Origem é obrigatório.')
+    }
+
+    const servicoId = sanitized.servico_id
+    if (!servicoId || typeof servicoId !== 'string' || !servicoId.trim()) {
+      throw new Error('O campo Serviço Selecionado é obrigatório.')
+    }
+
+    const deptoId = sanitized.depto_id
+    if (deptoId == null || isNaN(Number(deptoId)) || Number(deptoId) <= 0) {
+      throw new Error('O campo Departamento é obrigatório.')
+    }
+
+    const currentStage = (sanitized.current_stage || '').trim()
+    const isStageValid = OFFICIAL_STAGES.some((s) => s.id === currentStage)
+    if (!currentStage || !isStageValid) {
+      throw new Error('O campo Status é obrigatório e deve ser válido.')
+    }
+  }
+
   const { data, error } = await supabase
     .from('manychat_contatos')
     .insert([sanitized as any])

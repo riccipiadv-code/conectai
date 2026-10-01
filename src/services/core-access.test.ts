@@ -2603,5 +2603,248 @@ export function runCoreAccessTests(): { passed: number; failed: number; errors: 
     'Cenário 10d falhou: resolução direta de gestor em core_usuarios sem depender de profiles.legaldesk_usuario_id falhou',
   )
 
+  // ==========================================
+  // Testes Obrigatórios: Validação de Campos Obrigatórios na Criação Manual de Atendimento
+  // Regras:
+  // - Nome do Contato (obrigatório, trim)
+  // - Origem (obrigatório, select válido)
+  // - Serviço Selecionado (obrigatório, select válido)
+  // - Departamento (obrigatório, select válido)
+  // - Status (obrigatório, estágio oficial válido)
+  // - Opcionais: Responsável, E-mail, Telefone, Empresa/PF, etc.
+  // ==========================================
+
+  // Função auxiliar simulando a validação aplicada na criação manual do ContactModal
+  function validateManualCreation(data: any): { valid: boolean; errors: string[] } {
+    const fieldErrors: string[] = []
+    const cleanNome = (data.lead_nome || '').trim()
+    if (!cleanNome) {
+      fieldErrors.push('lead_nome')
+    }
+    const rawOrigem = data.origem_id
+    if (
+      rawOrigem == null ||
+      rawOrigem === '' ||
+      rawOrigem === 'none' ||
+      isNaN(Number(rawOrigem)) ||
+      Number(rawOrigem) <= 0
+    ) {
+      fieldErrors.push('origem_id')
+    }
+    const rawServico = data.servico_id
+    if (
+      !rawServico ||
+      rawServico === 'none' ||
+      typeof rawServico !== 'string' ||
+      !rawServico.trim()
+    ) {
+      fieldErrors.push('servico_id')
+    }
+    const rawDepto = data.depto_id
+    if (
+      rawDepto == null ||
+      rawDepto === '' ||
+      rawDepto === 'none' ||
+      isNaN(Number(rawDepto)) ||
+      Number(rawDepto) <= 0
+    ) {
+      fieldErrors.push('depto_id')
+    }
+    const rawStage = (data.current_stage || '').trim()
+    const validStages = [
+      'nivel_1_novo',
+      'nivel_2_especialista',
+      'nivel_3_especial',
+      'reuniao_consulta_agendada',
+      'enviado_orcamento_ag_retorno',
+      'orcamento_aprovado',
+      'cancelado',
+    ]
+    if (!rawStage || !validStages.includes(rawStage)) {
+      fieldErrors.push('current_stage')
+    }
+    return { valid: fieldErrors.length === 0, errors: fieldErrors }
+  }
+
+  // A) criar sem Nome → bloquear
+  const testA1 = validateManualCreation({
+    lead_nome: '',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+  })
+  const testA2 = validateManualCreation({
+    lead_nome: '     ',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+  })
+  assert(
+    testA1.valid === false &&
+      testA1.errors.includes('lead_nome') &&
+      testA2.valid === false &&
+      testA2.errors.includes('lead_nome'),
+    'Teste A falhou: criar sem Nome ou apenas com espaços deve bloquear',
+  )
+
+  // B) criar sem Origem → bloquear
+  const testB1 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: null,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+  })
+  const testB2 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 'none',
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+  })
+  assert(
+    testB1.valid === false &&
+      testB1.errors.includes('origem_id') &&
+      testB2.valid === false &&
+      testB2.errors.includes('origem_id'),
+    'Teste B falhou: criar sem Origem ou com "none" deve bloquear',
+  )
+
+  // C) criar sem Serviço → bloquear
+  const testC1 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: null,
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+  })
+  const testC2 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'none',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+  })
+  assert(
+    testC1.valid === false &&
+      testC1.errors.includes('servico_id') &&
+      testC2.valid === false &&
+      testC2.errors.includes('servico_id'),
+    'Teste C falhou: criar sem Serviço Selecionado deve bloquear',
+  )
+
+  // D) criar sem Departamento → bloquear
+  const testD1 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: null,
+    current_stage: 'nivel_1_novo',
+  })
+  const testD2 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 'none',
+    current_stage: 'nivel_1_novo',
+  })
+  assert(
+    testD1.valid === false &&
+      testD1.errors.includes('depto_id') &&
+      testD2.valid === false &&
+      testD2.errors.includes('depto_id'),
+    'Teste D falhou: criar sem Departamento deve bloquear',
+  )
+
+  // E) criar com Status inválido/vazio → bloquear
+  const testE1 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: null,
+  })
+  const testE2 = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'invalid_stage_xyz',
+  })
+  assert(
+    testE1.valid === false &&
+      testE1.errors.includes('current_stage') &&
+      testE2.valid === false &&
+      testE2.errors.includes('current_stage'),
+    'Teste E falhou: criar com Status inválido ou vazio deve bloquear',
+  )
+
+  // F) criar sem Responsável → permitir (deve continuar opcional)
+  const testF = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+    responsavel_id: null,
+    responsavel_core_usuario_id: null,
+  })
+  assert(testF.valid === true, 'Teste F falhou: criar sem Responsável deve ser PERMITIDO')
+
+  // G) criar sem E-mail/Telefone → permitir (devem continuar opcionais)
+  const testG = validateManualCreation({
+    lead_nome: 'João da Silva',
+    origem_id: 1,
+    servico_id: 'serv-1',
+    depto_id: 10,
+    current_stage: 'nivel_1_novo',
+    lead_email: '',
+    telefone: '',
+    lead_empresa_pf: '',
+    numero_cliente: null,
+    porte_empresa_id: null,
+    valor: null,
+    lead_resumo: '',
+    observacoes: '',
+    data_follow_up: null,
+  })
+  assert(
+    testG.valid === true,
+    'Teste G falhou: criar sem E-mail, Telefone e demais opcionais deve ser PERMITIDO',
+  )
+
+  // H) criar com todos os obrigatórios → salvar normalmente
+  const testH = validateManualCreation({
+    lead_nome: '   Ana Paula Souza   ',
+    origem_id: 2,
+    servico_id: 'serv-patente',
+    depto_id: 5,
+    current_stage: 'nivel_1_novo',
+  })
+  assert(
+    testH.valid === true,
+    'Teste H falhou: criar com todos os campos obrigatórios válidos deve ser aceito',
+  )
+
+  // I) edição de registro antigo incompleto continua funcionando
+  // O modo de edição no ContactModal NÃO bloqueia campos incompletos já salvos previamente
+  const mockOldIncompleteContact = {
+    id: 'contato-antigo-123',
+    lead_nome: 'Contato Histórico Antigo',
+    origem_id: null, // Antigo sem origem
+    servico_id: null, // Antigo sem serviço
+    depto_id: null, // Antigo sem depto
+    responsavel_id: null,
+    responsavel_core_usuario_id: null,
+    current_stage: 'nivel_1_novo',
+  }
+  const editAllowed = canEditContact(mockOldIncompleteContact, adminCentralProfile, [])
+  assert(
+    editAllowed === true,
+    'Teste I falhou: edição de registro antigo incompleto continua permitida',
+  )
+
   return { passed, failed: errors.length, errors }
 }
