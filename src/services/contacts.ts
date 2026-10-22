@@ -363,53 +363,19 @@ export async function deleteContact(id: string, authContext?: DeleteContactAuthC
 export async function getResponsaveis(): Promise<Responsavel[]> {
   try {
     // Listagem oficial de responsáveis para Atendimentos e Kanban:
-    // Carrega usuários ativos de `core_usuarios` vinculados ao Conectaí
-    // e mapeia em paralelo com legaldesk_usuarios para preenchimento de compatibilidade retroativa.
-    const [coreRes, ldRes] = await Promise.all([
-      supabase
-        .from('core_usuarios')
-        .select('id, nome, email, ativo')
-        .eq('ativo', true)
-        .order('nome', { ascending: true }),
-      supabase
-        .from('legaldesk_usuarios')
-        .select('id, nome, email, exibir_gestao_usuarios, ativo')
-        .eq('ativo', true),
-    ])
+    // somente usuários ativos de `core_usuarios` (legado do LegalDesk desligado).
+    const { data } = await supabase
+      .from('core_usuarios')
+      .select('id, nome, email, ativo')
+      .eq('ativo', true)
+      .order('nome', { ascending: true })
 
-    const coreData = coreRes.data || []
-    const ldData = ldRes.data || []
-
-    const ldByEmail = new Map<string, any>()
-    for (const ld of ldData) {
-      if (ld.email) {
-        ldByEmail.set(ld.email.trim().toLowerCase(), ld)
-      }
-    }
-
-    if (coreData.length > 0) {
-      return coreData.map((u) => {
-        const emailKey = (u.email || '').trim().toLowerCase()
-        const ldMatch = ldByEmail.get(emailKey)
-        return {
-          id: u.id, // ID central oficial (core_usuarios.id)
-          nome: u.nome || '',
-          email: u.email || undefined,
-          core_usuario_id: u.id,
-          legaldesk_usuario_id: ldMatch?.id,
-        }
-      })
-    }
-
-    // Fallback de contingência caso core_usuarios falhe
-    return ldData
-      .filter((u) => u.exibir_gestao_usuarios !== false)
-      .map((u) => ({
-        id: u.id,
-        nome: u.nome || '',
-        email: u.email || undefined,
-        legaldesk_usuario_id: u.id,
-      }))
+    return (data || []).map((u) => ({
+      id: u.id, // ID central oficial (core_usuarios.id)
+      nome: u.nome || '',
+      email: u.email || undefined,
+      core_usuario_id: u.id,
+    }))
   } catch {
     return []
   }

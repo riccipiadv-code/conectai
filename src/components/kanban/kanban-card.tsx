@@ -15,8 +15,8 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps) {
-  const { profile, managedUserIds } = useAuth()
-  const canEdit = canEditContact(contact, profile, managedUserIds)
+  const { profile, managedCoreUserIds } = useAuth()
+  const canEdit = canEditContact(contact, profile, managedCoreUserIds)
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: contact.id,

@@ -508,42 +508,8 @@ export async function bridgeSubordinatesToOperationalIds(): Promise<{
   items: Array<{ auth_user_id: string; legaldesk_usuario_id: string }>
   error?: string
 }> {
-  try {
-    const { data, error } = await supabase.rpc('core_managed_operational_ids')
-
-    if (error) {
-      if (import.meta.env.DEV) {
-        console.warn(
-          '[core-access] Erro ao chamar RPC core_managed_operational_ids:',
-          error.message,
-        )
-      }
-      return {
-        status: 'error',
-        items: [],
-        error: error.message,
-      }
-    }
-
-    const items = (data || []).filter(
-      (item): item is { auth_user_id: string; legaldesk_usuario_id: string } =>
-        Boolean(item && item.auth_user_id && item.legaldesk_usuario_id),
-    )
-
-    return {
-      status: 'ok',
-      items,
-    }
-  } catch (err: any) {
-    if (import.meta.env.DEV) {
-      console.warn('[core-access] Exceção na RPC core_managed_operational_ids:', err)
-    }
-    return {
-      status: 'error',
-      items: [],
-      error: err?.message || 'Exceção inesperada na RPC core_managed_operational_ids',
-    }
-  }
+  // Legado desligado: a equipe é identificada só pelos IDs centrais (core_usuarios.id).
+  return { status: 'ok', items: [] }
 }
 
 /**
@@ -560,49 +526,8 @@ export async function fetchLegacyManagedOperationalIds(): Promise<{
   managedUserIds: string[]
   error?: string
 }> {
-  try {
-    const { data, error } = await supabase.rpc('legacy_managed_operational_ids')
-
-    if (error) {
-      if (import.meta.env.DEV) {
-        console.warn(
-          '[core-access] Erro ao chamar RPC legacy_managed_operational_ids:',
-          error.message,
-        )
-      }
-      return {
-        status: 'error',
-        items: [],
-        managedUserIds: [],
-        error: error.message,
-      }
-    }
-
-    const items = (data || []).filter(
-      (item): item is { auth_user_id: string; legaldesk_usuario_id: string } =>
-        Boolean(item && item.auth_user_id && item.legaldesk_usuario_id),
-    )
-
-    const managedUserIds = Array.from(
-      new Set(items.map((i) => i.legaldesk_usuario_id).filter(Boolean)),
-    )
-
-    return {
-      status: 'ok',
-      items,
-      managedUserIds,
-    }
-  } catch (err: any) {
-    if (import.meta.env.DEV) {
-      console.warn('[core-access] Exceção na RPC legacy_managed_operational_ids:', err)
-    }
-    return {
-      status: 'error',
-      items: [],
-      managedUserIds: [],
-      error: err?.message || 'Exceção inesperada na RPC legacy_managed_operational_ids',
-    }
-  }
+  // Legado desligado: sem fallback para a equipe do LegalDesk. Em falha técnica do Gestor, equipe vazia.
+  return { status: 'ok', items: [], managedUserIds: [] }
 }
 
 /**
@@ -763,28 +688,15 @@ export async function fetchCoreManagedTeamResult(gestorCoreId: string): Promise<
       }
     }
 
-    // 4. Etapa 5.10: Obter legaldesk_usuario_id via RPC core_managed_operational_ids
-    const rpcResult = await bridgeSubordinatesToOperationalIds()
-
-    // Mapear apenas para os subordinados elegíveis do core
-    const eligibleAuthIds = new Set(
-      eligibleSubordinates.map((s) => s.authUserId).filter((id): id is string => Boolean(id)),
-    )
-
-    let operationalIds: string[] = []
-    if (rpcResult.status === 'ok') {
-      operationalIds = rpcResult.items
-        .filter((item) => eligibleAuthIds.has(item.auth_user_id))
-        .map((item) => item.legaldesk_usuario_id)
-        .filter(Boolean)
-    }
+    // 4. Legado desligado: a equipe usa somente os IDs centrais (core_usuarios.id).
+    const coreIds = eligibleSubordinates.map((s) => s.id)
 
     return {
       status: 'ok',
       subordinates: eligibleSubordinates,
-      managedUserIds: operationalIds,
-      managedCoreUserIds: eligibleSubordinates.map((s) => s.id),
-      rpcBridge: rpcResult,
+      managedUserIds: coreIds,
+      managedCoreUserIds: coreIds,
+      rpcBridge: { status: 'ok', items: [] },
     }
   } catch (err: any) {
     if (import.meta.env.DEV) {

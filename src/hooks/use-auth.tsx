@@ -227,11 +227,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(() => reject(new Error('core_timeout')), 10000),
       )
 
-      const profilePromise = supabase
-        .from('profiles')
-        .select('perfil, ativo, legaldesk_usuario_id, gestor_id')
-        .eq('id', authUserId)
-        .maybeSingle()
+      // Legado desligado: `profiles` não é mais consultada; o Gestor de Acessos (core_*) é a única fonte.
+      const profilePromise = Promise.resolve({
+        data: null as {
+          perfil: string
+          ativo: boolean
+          legaldesk_usuario_id: string | null
+          gestor_id: string | null
+        } | null,
+        error: null as { message: string } | null,
+      })
 
       const [profileResponse, coreResultRaw] = await Promise.allSettled([
         profilePromise,
