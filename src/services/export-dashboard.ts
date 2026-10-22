@@ -118,7 +118,7 @@ export function exportDashboardExcel(
 
   const agentMap = new Map<string, { count: number; approved: number }>()
   data.forEach((c) => {
-    const a = c.legaldesk_usuarios?.nome || c.responsavel_id || 'Não Atribuído'
+    const a = c.core_usuarios?.nome || 'Não Atribuído'
     if (!agentMap.has(a)) agentMap.set(a, { count: 0, approved: 0 })
     const item = agentMap.get(a)!
     item.count++

@@ -44,7 +44,7 @@ export function KanbanCard({ contact, deptos, onEdit, onView }: KanbanCardProps)
     ? format(parseISO(contact.data_follow_up), 'dd/MM/yyyy', { locale: ptBR })
     : null
 
-  const responsavel = contact.profiles?.name || contact.legaldesk_usuarios?.nome || null
+  const responsavel = contact.core_usuarios?.nome || null
 
   return (
     <div

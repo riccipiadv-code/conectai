@@ -33,14 +33,14 @@ export async function getDashboardData(filters: DashboardFilters) {
       .from('manychat_contatos')
       .select(`
         id, created_at, origem, origem_id, current_stage, valor, data_follow_up, 
-        orcamento, servico_id, depto_id, responsavel_id, cancel_reason_id, lead_nome, nome, first_name,
+        orcamento, servico_id, depto_id, responsavel_id, responsavel_core_usuario_id, cancel_reason_id, lead_nome, nome, first_name,
         telefone, lead_email, lead_empresa_pf, porte_empresa, controle, lead_resumo, numero_cliente,
         manychat_origens(nome),
         manychat_servicos(descricao),
         manychat_deptos(nome),
         manychat_cancel_reasons(motivo),
         manychat_portes_empresa(nome),
-        legaldesk_usuarios(nome)
+        core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome)
       `)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
@@ -65,7 +65,9 @@ export async function getDashboardData(filters: DashboardFilters) {
       query = query.in('origem_id', filters.origens)
     if (filters.servico_id) query = query.eq('servico_id', filters.servico_id)
     if (filters.depto_id) query = query.eq('depto_id', Number(filters.depto_id))
-    if (filters.responsavel_id) query = query.eq('responsavel_id', filters.responsavel_id)
+    // O filtro recebe o ID central (core_usuarios.id) vindo de getResponsaveis()
+    if (filters.responsavel_id)
+      query = query.eq('responsavel_core_usuario_id', filters.responsavel_id)
     if (filters.current_stage) query = query.eq('current_stage', filters.current_stage)
     if (filters.orcamento) query = query.eq('orcamento', filters.orcamento)
 
@@ -97,7 +99,7 @@ export async function getDashboardData(filters: DashboardFilters) {
         ...c,
         origem: c.manychat_origens?.nome || c.origem || 'Não informada',
         data_entrada: c.created_at,
-        responsavel_nome: c.legaldesk_usuarios?.nome || 'Sem responsável',
+        responsavel_nome: c.core_usuarios?.nome || 'Sem responsável',
         lead_nome_exibicao: c.lead_nome || c.nome || c.first_name || 'Sem nome',
         email: c.lead_email || '',
         empresa_pf: c.lead_empresa_pf || '',

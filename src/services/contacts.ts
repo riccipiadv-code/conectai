@@ -502,9 +502,7 @@ export async function getContacts(
       manychat_servicos(descricao),
       manychat_deptos(nome),
       manychat_portes_empresa(nome),
-      legaldesk_usuarios(nome),
-      core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome, email),
-      profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
+      core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome, email)
     `)
     .is('deleted_at', null)
     .limit(1000)
@@ -658,9 +656,7 @@ export async function getAllContactsForExport() {
         manychat_servicos(descricao),
         manychat_deptos(nome),
         manychat_portes_empresa(nome),
-        legaldesk_usuarios(nome),
-        core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome, email),
-        profiles!manychat_contatos_responsible_user_id_profiles_fkey(name)
+        core_usuarios!manychat_contatos_responsavel_core_usuario_id_fkey(nome, email)
       `)
       .is('deleted_at', null)
       .order('created_at', { ascending: true, nullsFirst: false })

@@ -1179,8 +1179,7 @@ export default function Contacts() {
                       .replace(/\b\w/g, (l: any) => l.toUpperCase())
                   }
 
-                  const responsavelNome =
-                    c.core_usuarios?.nome || c.legaldesk_usuarios?.nome || c.profiles?.name || '-'
+                  const responsavelNome = c.core_usuarios?.nome || '-'
 
                   return (
                     <TableRow

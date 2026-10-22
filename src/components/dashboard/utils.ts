@@ -30,6 +30,7 @@ export interface DashboardContact {
   servico_id: string | null
   depto_id: number | null
   responsavel_id: string | null
+  responsavel_core_usuario_id: string | null
   lead_nome: string | null
   nome: string | null
   first_name: string | null
@@ -53,7 +54,7 @@ export interface DashboardContact {
   manychat_servicos?: { descricao: string } | null
   manychat_deptos?: { nome: string } | null
   manychat_cancel_reasons?: { motivo: string } | null
-  legaldesk_usuarios?: { nome: string } | null
+  core_usuarios?: { nome: string } | null
 }
 
 export interface AggregatedRow {

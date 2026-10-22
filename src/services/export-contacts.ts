@@ -114,7 +114,7 @@ async function generateExcel(data: any[]): Promise<{ success: boolean; message?:
     const servico = safeStr(c.manychat_servicos?.descricao || c.lead_servico)
     const depto = safeStr(c.manychat_deptos?.nome)
     const porte = safeStr(c.manychat_portes_empresa?.nome || c.porte_empresa)
-    const responsavel = safeStr(c.legaldesk_usuarios?.nome || c.profiles?.name)
+    const responsavel = safeStr(c.core_usuarios?.nome)
     const origem = safeStr(c.manychat_origens?.nome || c.origem)
     const stageLabel = getStageLabel(c.current_stage)
     const subservicos = subservicoMap.get(c.id)?.join(', ') || ''
