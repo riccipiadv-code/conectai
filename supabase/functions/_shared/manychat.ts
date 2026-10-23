@@ -253,7 +253,6 @@ export async function resolveManyChatService(
   }
 }
 
-let cachedAnaEdithId: string | null | undefined = undefined
 let cachedWhatsappOrigemId: number | null | undefined = undefined
 
 export async function getDefaultOrigemId(supabase: any): Promise<number | null> {
@@ -278,28 +277,6 @@ export async function getDefaultOrigemId(supabase: any): Promise<number | null> 
   return cachedWhatsappOrigemId
 }
 
-export async function getDefaultResponsavelId(supabase: any): Promise<string | null> {
-  if (cachedAnaEdithId !== undefined) {
-    return cachedAnaEdithId
-  }
-
-  const { data: user } = await supabase
-    .from('legaldesk_usuarios')
-    .select('id')
-    .eq('nome', 'Ana Edith')
-    .limit(1)
-    .maybeSingle()
-
-  if (user) {
-    cachedAnaEdithId = user.id
-  } else {
-    console.warn('Default responsible user "Ana Edith" not found in legaldesk_usuarios')
-    cachedAnaEdithId = null
-  }
-
-  return cachedAnaEdithId
-}
-
 export async function enrichManyChatRecord(
   supabase: any,
   record: any,
@@ -318,10 +295,6 @@ export async function enrichManyChatRecord(
     }
   }
 
-  if (!existingContact || !existingContact.responsavel_id) {
-    const responsavelId = await getDefaultResponsavelId(supabase)
-    if (responsavelId) {
-      record.responsavel_id = responsavelId
-    }
-  }
+  // Responsável padrão via legaldesk_usuarios removido (22/10/2026): contatos novos entram sem responsável,
+  // que é definido no Conectaí (responsavel_core_usuario_id).
 }

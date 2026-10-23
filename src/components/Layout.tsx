@@ -93,7 +93,7 @@ export default function Layout() {
             <div className="flex flex-col">
               <span>Conectaí</span>
               <span className="text-[11px] text-slate-400 dark:text-slate-500 font-normal">
-                v.1.0.1
+                v1.0.2
               </span>
             </div>
           </div>

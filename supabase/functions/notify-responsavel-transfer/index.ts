@@ -150,46 +150,13 @@ Deno.serve(async (req: Request) => {
 
     // 3. Buscar o responsável diretamente em core_usuarios (nome + email)
     // NÃO usar profiles.legaldesk_usuario_id para resolver responsável ou gestor.
-    let { data: responsavel, error: respError } = await supabase
+    const { data: responsavel, error: respError } = await supabase
       .from('core_usuarios')
       .select('id, nome, email, ativo')
       .eq('id', targetCoreUsuarioId)
       .maybeSingle()
 
     if (respError) throw respError
-
-    // Se não encontrou em core_usuarios pelo id direto (caso raro de envio com id de legaldesk_usuarios),
-    // fazer fallback de compatibilidade buscando legaldesk_usuarios
-    if (!responsavel) {
-      const { data: legacyResp } = await supabase
-        .from('legaldesk_usuarios')
-        .select('id, nome, email')
-        .eq('id', targetCoreUsuarioId)
-        .maybeSingle()
-
-      if (legacyResp) {
-        // Tentar encontrar o usuário corporativo correspondente por e-mail em core_usuarios
-        if (legacyResp.email) {
-          const { data: coreByEmail } = await supabase
-            .from('core_usuarios')
-            .select('id, nome, email, ativo')
-            .ilike('email', legacyResp.email.trim())
-            .maybeSingle()
-          if (coreByEmail) {
-            responsavel = coreByEmail
-            targetCoreUsuarioId = coreByEmail.id
-          }
-        }
-        if (!responsavel) {
-          responsavel = {
-            id: legacyResp.id,
-            nome: legacyResp.nome,
-            email: legacyResp.email,
-            ativo: true,
-          }
-        }
-      }
-    }
 
     // 4. Se não encontrar responsável ou email for nulo/vazio
     const destEmail = responsavel?.email?.trim()

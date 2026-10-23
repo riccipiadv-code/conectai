@@ -1,18 +1,17 @@
 {
   "_versions": {
-    "sync-manychat": 341,
-    "manychat-webhook": 340,
+    "sync-manychat": 342,
+    "manychat-webhook": 341,
     "send-test-email": 140,
     "save-email-settings": 136,
     "admin-user-access": 35,
     "test-gmail-connection": 138,
     "save-email-reading-settings": 130,
     "search-conectai-email": 134,
-    "notify-responsavel-transfer": 138,
+    "notify-responsavel-transfer": 139,
     "notify-task-assignment": 102,
     "notify-task-overdue": 105,
     "manage-core-user": 73,
-    "solicitacao-adiamento": 15,
-    "zz-teste-remocao": 1
+    "solicitacao-adiamento": 15
   }
 }
